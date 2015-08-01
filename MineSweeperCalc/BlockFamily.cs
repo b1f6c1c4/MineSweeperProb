@@ -31,7 +31,7 @@ namespace MineSweeperCalc
         /// <summary>
         ///     各个格
         /// </summary>
-        public IEnumerable<T> Blocks => m_BlockSets.SelectMany(set => set);
+        public IEnumerable<T> Blocks => m_BlockSets.SelectMany(set => set.Blocks);
 
         /// <inheritdoc />
         public void Add(BlockSet<T> item) => m_BlockSets.Add(item);

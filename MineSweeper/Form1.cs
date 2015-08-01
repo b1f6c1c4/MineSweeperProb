@@ -22,7 +22,6 @@ namespace MineSweeper
         {
             InitializeComponent();
             SetProcessDPIAware();
-
             Reset();
         }
 
@@ -43,14 +42,14 @@ namespace MineSweeper
                         if (m_Solver[m_Mgr[i, j]] == BlockStatus.Mine)
                             g.DrawString(
                                          "M",
-                                         new Font("Arial", 24),
+                                         new Font("Consolas", m_Mgr[i, j].IsOpen ? 24 : 12),
                                          new SolidBrush(Color.White),
                                          i * BlockSize,
                                          j * BlockSize);
                         else if (m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                             g.DrawString(
                                          "B",
-                                         new Font("Arial", 24),
+                                         new Font("Consolas", m_Mgr[i, j].IsOpen ? 24 : 12),
                                          new SolidBrush(Color.Black),
                                          i * BlockSize,
                                          j * BlockSize);
@@ -79,7 +78,7 @@ namespace MineSweeper
                                                 BlockSize - 1);
                                 g.DrawString(
                                              m_Mgr[i, j].Degree.ToString(),
-                                             new Font("Arial", 24),
+                                             new Font("Consolas", 24),
                                              new SolidBrush(Color.Black),
                                              i * BlockSize,
                                              j * BlockSize);
@@ -121,10 +120,10 @@ namespace MineSweeper
 
             var deg = block.Degree;
             if (deg == 0)
-                foreach (var b in block.Surrounding.Where(b => !b.IsOpen))
+                foreach (var b in block.Surrounding.Cast<Block>().Where(b => !b.IsOpen))
                     Open(b.X, b.Y);
             else
-                m_Solver.AddRestrain(new Restrain<Block>(deg, new BlockSet<Block>(block.Surrounding)));
+                m_Solver.AddRestrain(new Restrain<Block>(deg, block.Surrounding));
 
             m_Solved = false;
         }
@@ -134,7 +133,6 @@ namespace MineSweeper
         private void Form1_MouseUp(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
-            {
                 if (m_Started)
                 {
                     var x = (int)(e.X / BlockSize);
@@ -151,8 +149,7 @@ namespace MineSweeper
                 }
                 else
                     Reset();
-                RePaint();
-            }
+            RePaint();
         }
 
         private void Form1_KeyUp(object sender, KeyEventArgs e)

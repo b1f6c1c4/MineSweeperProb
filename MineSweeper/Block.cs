@@ -94,7 +94,7 @@ namespace MineSweeper
 
         public BlockSet<Block> Surrounding { get; internal set; }
 
-        public int Degree => Surrounding.Count(b => b.IsMine);
+        public int Degree => Surrounding.Cast<Block>().Count(block => block.IsMine);
 
         public Block(int x, int y)
         {
@@ -104,7 +104,18 @@ namespace MineSweeper
 
         public bool Equals(Block other) => X == other.X && Y == other.Y;
 
-        public override int GetHashCode() => X << 3 + Y;
+        public override int GetHashCode() => Hash(X) << 16 + Hash(Y);
+
+        private static int Hash(int v)
+        {
+            var h = 5381;
+            while (v > 0)
+            {
+                h = h << 5 + h + (v % 2 + 50);
+                v /= 2;
+            }
+            return h;
+        }
 
         public override string ToString() => $"({X} {Y})";
     }

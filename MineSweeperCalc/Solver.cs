@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Enumerable = System.Linq.Enumerable;
 
 namespace MineSweeperCalc
 {
@@ -68,7 +69,7 @@ namespace MineSweeperCalc
         /// <param name="r"></param>
         public void AddRestrain(Restrain<T> r)
         {
-            r.TheBlocks.Coordinate(m_Restrains.Select(rr => rr.TheBlocks));
+            r.TheBlocks.Coordinate(Enumerable.Select(m_Restrains, rr => rr.TheBlocks));
             m_Restrains.Add(r);
         }
 
@@ -99,7 +100,7 @@ namespace MineSweeperCalc
             else
                 proc();
 
-            if (m_Updating.Any())
+            if (Enumerable.Any(m_Updating))
                 throw new Exception("WTF");
 
             Solutions = new List<Solution<T>>();
@@ -137,16 +138,16 @@ namespace MineSweeperCalc
             foreach (var kvp in exp)
             {
                 if (kvp.Value == 0)
-                    foreach (var block in kvp.Key)
+                    foreach (var block in kvp.Key.Blocks)
                         m_Manager.SetStatus(block, BlockStatus.Blank);
                 else if (kvp.Value == total * kvp.Key.Count)
-                    foreach (var block in kvp.Key)
+                    foreach (var block in kvp.Key.Blocks)
                         m_Manager.SetStatus(block, BlockStatus.Mine);
 
                 Expectation.Add(kvp.Key, BigIntegerHelper.Ratio(kvp.Value, total));
 
                 var p = BigIntegerHelper.Ratio(kvp.Value, total) / kvp.Key.Count;
-                foreach (var block in kvp.Key)
+                foreach (var block in kvp.Key.Blocks)
                     Probability.Add(block, p);
             }
 
@@ -164,18 +165,18 @@ namespace MineSweeperCalc
                             BigInteger states,
                                IDictionary<BlockSet<T>, Interval> subRestrains)
         {
-            if (!subRestrains.Keys.Any())
+            if (!Enumerable.Any(subRestrains.Keys))
             {
                 Solutions.Add(
                               new Solution<T>
                                   {
-                                      Distribution = path.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                                      Distribution = Enumerable.ToDictionary(path, kvp => kvp.Key, kvp => kvp.Value),
                                       States = states
                               });
                 return;
             }
 
-            var set = subRestrains.Keys.First();
+            var set = Enumerable.First(subRestrains.Keys);
             var iv = GetInterval(path, subRestrains, set);
 
             for (var mines = iv.MinInclusive; mines <= iv.MaxInclusive; mines++)
@@ -183,7 +184,7 @@ namespace MineSweeperCalc
                 var dic = new Dictionary<BlockSet<T>, Interval>(subRestrains);
                 dic.Remove(set);
 
-                var newPath = path.Concat(new[] { new KeyValuePair<BlockSet<T>, int>(set, mines) }).ToArray();
+                var newPath = Enumerable.ToArray(Enumerable.Concat(path, new[] { new KeyValuePair<BlockSet<T>, int>(set, mines) }));
 
                 Traversal(newPath, states * m_BinomialHelper.Binomial(set.Count, mines), dic);
             }
@@ -192,14 +193,14 @@ namespace MineSweeperCalc
         private Interval GetInterval(IReadOnlyCollection<KeyValuePair<BlockSet<T>, int>> path, IDictionary<BlockSet<T>, Interval> subRestrains, BlockSet<T> set)
         {
             var iv = subRestrains[set];
-            foreach (var r in m_Restrains.Where(r => r.TheBlocks.Contains(set)))
+            foreach (var r in Enumerable.Where(m_Restrains, r => r.TheBlocks.Contains(set)))
             {
                 var lb = 0;
                 var ub = 0;
                 foreach (var s in r.TheBlocks)
-                    if (path.Any(kvp => kvp.Key.Equals(s)))
+                    if (Enumerable.Any(path, kvp => kvp.Key.Equals(s)))
                     {
-                        var val = path.First(kvp => kvp.Key.Equals(s)).Value;
+                        var val = Enumerable.First(path, kvp => kvp.Key.Equals(s)).Value;
                         lb += val;
                         ub += val;
                     }
@@ -289,7 +290,7 @@ namespace MineSweeperCalc
             for (var i = 0; i < r.TheBlocks.Count; i++)
             {
                 var set = new HashSet<T>();
-                foreach (var block in r.TheBlocks[i])
+                foreach (var block in r.TheBlocks[i].Blocks)
                     switch (m_Manager[block])
                     {
                         case BlockStatus.Blank:
@@ -300,12 +301,12 @@ namespace MineSweeperCalc
                             set.Add(block);
                             break;
                     }
-                if (!set.Any())
+                if (!Enumerable.Any(set))
                     continue;
-
-                var newSet = new BlockSet<T>(r.TheBlocks[i].Except(set));
+                
+                var newSet = new BlockSet<T>(r.TheBlocks[i].Blocks.Except(set));
                 r.TheBlocks.RemoveAt(i);
-                if (newSet.Any())
+                if (newSet.Any)
                     r.TheBlocks.Insert(i, newSet);
                 else
                     i--;
@@ -346,13 +347,17 @@ namespace MineSweeperCalc
                 foreach (var set in r.TheBlocks)
                 {
                     var iv =
-                        Interval.From(set)
-                                .Intersect(
-                                           new Interval
-                                               {
-                                                   MinInclusive = r.MinInclusive - (r.TheBlocks.CountBlock - set.Count),
-                                                   MaxInclusive = r.MaxInclusive
-                                               });
+                        new Interval
+                            {
+                                MinInclusive = 0,
+                                MaxInclusive = set.Count
+                            }
+                            .Intersect(
+                                       new Interval
+                                           {
+                                               MinInclusive = r.MinInclusive - (r.TheBlocks.CountBlock - set.Count),
+                                               MaxInclusive = r.MaxInclusive
+                                           });
                     m_SubRestrains.AddOrUpdate(set, iv, (s, ivO) => ivO.Intersect(iv));
                     m_Updating.Enqueue(set);
                 }

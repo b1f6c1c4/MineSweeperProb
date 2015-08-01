@@ -8,11 +8,11 @@ namespace MineSweeperCalc
     {
         public static BlockSet<T> Intersect<T>(this BlockSet<T> one, BlockSet<T> another)
             where T : IBlock<T>
-            => new BlockSet<T>(Enumerable.Intersect(one, another));
+            => new BlockSet<T>(one.Blocks.Intersect(another.Blocks));
 
         public static BlockSet<T> Except<T>(this BlockSet<T> one, BlockSet<T> another)
             where T : IBlock<T>
-            => new BlockSet<T>(Enumerable.Except(one, another));
+            => new BlockSet<T>(one.Blocks.Except(another.Blocks));
 
         public static void Overlap<T>(BlockSet<T> set1, BlockSet<T> set2,
                                       out BlockSet<T> oSet1, out BlockSet<T> oSet2, out BlockSet<T> oSet0)
@@ -39,15 +39,15 @@ namespace MineSweeperCalc
                         Overlap(one[i], newOne[j], out oSet, out oSetN, out oSetI);
 
                         one.RemoveAt(i);
-                        if (oSetI.Any())
+                        if (oSetI.Any)
                             one.Insert(i, oSetI);
-                        if (oSet.Any())
+                        if (oSet.Any)
                             one.Insert(i, oSet);
 
                         newOne.RemoveAt(j);
-                        if (oSetI.Any())
+                        if (oSetI.Any)
                             newOne.Insert(j, oSetI);
-                        if (oSetN.Any())
+                        if (oSetN.Any)
                             newOne.Insert(j, oSetN);
 
                         if (i >= one.Count)

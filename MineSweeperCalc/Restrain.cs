@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace MineSweeperCalc
+﻿namespace MineSweeperCalc
 {
     /// <summary>
     ///     区间
@@ -16,14 +14,7 @@ namespace MineSweeperCalc
         ///     上确界
         /// </summary>
         public int MaxInclusive { get; set; }
-
-        public static Interval From<T>(IReadOnlyCollection<T> col)
-            => new Interval
-                   {
-                       MinInclusive = 0,
-                       MaxInclusive = col.Count
-                   };
-
+        
         /// <summary>
         ///     是否有解
         /// </summary>

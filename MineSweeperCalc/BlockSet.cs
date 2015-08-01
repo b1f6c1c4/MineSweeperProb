@@ -10,36 +10,63 @@ namespace MineSweeperCalc
     ///     格的集合
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
-    public struct BlockSet<T> : IReadOnlyCollection<T>, IEquatable<BlockSet<T>>
+    public struct BlockSet<T> : IEnumerable, IEquatable<BlockSet<T>>
         where T : IBlock<T>
     {
         /// <summary>
         ///     各个格
         /// </summary>
-        private readonly List<T> m_Blocks;
+        public T[] Blocks { get; }
 
-        public BlockSet(IEnumerable<T> blocks) { m_Blocks = new List<T>(blocks); }
+        private readonly int m_Hash;
 
-        /// <inheritdoc />
-        public int Count => m_Blocks.Count;
+        public BlockSet(T[] blocks)
+        {
+            Blocks = blocks;
+            m_Hash = Blocks.Aggregate(0x00000000, (a, b) => a ^ b.GetHashCode());
+        }
 
-        /// <inheritdoc />
-        public bool Equals(BlockSet<T> other) => !(other.Except(this).Any() || this.Except(other).Any());
-
-        /// <inheritdoc />
-        public override int GetHashCode() => m_Blocks.Aggregate(0x00000000, (a, b) => a ^ b.GetHashCode());
-
-        /// <inheritdoc />
-        public IEnumerator<T> GetEnumerator() => m_Blocks.GetEnumerator();
+        public BlockSet(IEnumerable<T> blocks) : this(blocks.ToArray()) { }
 
         /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator() => m_Blocks.GetEnumerator();
+        public int Count => Blocks.Length;
+
+        public bool Any => Count > 0;
+
+        /// <inheritdoc />
+        public bool Equals(BlockSet<T> other)
+        {
+            if (Blocks.Length != other.Blocks.Length)
+                return false;
+
+            if (m_Hash != other.m_Hash)
+                return false;
+
+
+            for (var i = 0; i < Blocks.Length; i++)
+            {
+                int j;
+                for (j = 0; j < other.Blocks.Length; j++)
+                    if (Blocks[i].Equals(other.Blocks[j]))
+                        break;
+                if (j >= other.Blocks.Length)
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode() => m_Hash;
+
+        /// <inheritdoc />
+        IEnumerator IEnumerable.GetEnumerator() => Blocks.GetEnumerator();
 
         public override string ToString()
         {
             var sb = new StringBuilder();
             sb.Append("{");
-            foreach (var block in m_Blocks)
+            foreach (var block in Blocks)
             {
                 sb.Append(block);
                 sb.Append(",");
