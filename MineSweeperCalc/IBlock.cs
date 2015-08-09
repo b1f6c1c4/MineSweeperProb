@@ -6,7 +6,7 @@ namespace MineSweeperCalc
     ///     格
     /// </summary>
     /// <typeparam name="T">自身的类型</typeparam>
-    public interface IBlock<T> : IEquatable<T>
+    public interface IBlock<T> : IEquatable<T>, IComparable<T>
         where T : IBlock<T>
     {
         ///// <summary>

@@ -23,7 +23,21 @@ namespace MineSweeperCalc
         public BlockSet(T[] blocks)
         {
             Blocks = blocks;
-            m_Hash = Blocks.Aggregate(0x00000000, (a, b) => a ^ b.GetHashCode());
+
+            for (var i = 0; i < Blocks.Length; i++)
+            {
+                for (var j = 0; j < i; j++)
+                {
+                    if (Blocks[j].CompareTo(Blocks[j + 1]) < 0)
+                    {
+                        var tmp = Blocks[j];
+                        Blocks[j] = Blocks[j + 1];
+                        Blocks[j + 1] = tmp;
+                    }
+                }
+            }
+
+            m_Hash = Blocks.Aggregate(5381, (h, t) => (h << 5) + h + t.GetHashCode());
         }
 
         public BlockSet(IEnumerable<T> blocks) : this(blocks.ToArray()) { }
@@ -42,18 +56,7 @@ namespace MineSweeperCalc
             if (m_Hash != other.m_Hash)
                 return false;
 
-
-            for (var i = 0; i < Blocks.Length; i++)
-            {
-                int j;
-                for (j = 0; j < other.Blocks.Length; j++)
-                    if (Blocks[i].Equals(other.Blocks[j]))
-                        break;
-                if (j >= other.Blocks.Length)
-                    return false;
-            }
-
-            return true;
+            return !Blocks.Where((t, i) => !t.Equals(other.Blocks[i])).Any();
         }
 
         /// <inheritdoc />
