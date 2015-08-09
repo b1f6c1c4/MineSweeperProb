@@ -5,7 +5,6 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
-using Enumerable = System.Linq.Enumerable;
 
 namespace MineSweeperCalc
 {
@@ -69,7 +68,7 @@ namespace MineSweeperCalc
         /// <param name="r"></param>
         public void AddRestrain(Restrain<T> r)
         {
-            r.TheBlocks.Coordinate(Enumerable.Select(m_Restrains, rr => rr.TheBlocks));
+            r.TheBlocks.Coordinate(m_Restrains.Select(rr => rr.TheBlocks));
             m_Restrains.Add(r);
         }
 
@@ -100,7 +99,7 @@ namespace MineSweeperCalc
             else
                 proc();
 
-            if (Enumerable.Any(m_Updating))
+            if (m_Updating.Any())
                 throw new Exception("WTF");
 
             Solutions = new List<Solution<T>>();
@@ -119,8 +118,9 @@ namespace MineSweeperCalc
                 foreach (var s in m_SubRestrains.Keys)
                 {
                     var v = so.States * so.Distribution[s];
-                    if (exp.ContainsKey(s))
-                        exp[s] += v;
+                    BigInteger oldV;
+                    if (exp.TryGetValue(s, out oldV))
+                        exp[s] = oldV + v;
                     else
                         exp[s] = v;
                 }
@@ -129,12 +129,10 @@ namespace MineSweeperCalc
             Expectation = new Dictionary<BlockSet<T>, double>();
             Probability = new Dictionary<T, double>();
             foreach (var block in m_Manager.Keys)
-            {
                 if (m_Manager[block] == BlockStatus.Mine)
                     Probability[block] = 1;
                 else if (m_Manager[block] == BlockStatus.Blank)
                     Probability[block] = 0;
-            }
             foreach (var kvp in exp)
             {
                 if (kvp.Value == 0)
@@ -162,21 +160,21 @@ namespace MineSweeperCalc
         /// <param name="states">当前状态数</param>
         /// <param name="subRestrains">待遍历解空间</param>
         private void Traversal(IReadOnlyCollection<KeyValuePair<BlockSet<T>, int>> path,
-                            BigInteger states,
+                               BigInteger states,
                                IDictionary<BlockSet<T>, Interval> subRestrains)
         {
-            if (!Enumerable.Any(subRestrains.Keys))
+            if (!subRestrains.Keys.Any())
             {
                 Solutions.Add(
                               new Solution<T>
                                   {
-                                      Distribution = Enumerable.ToDictionary(path, kvp => kvp.Key, kvp => kvp.Value),
+                                      Distribution = path.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                                       States = states
-                              });
+                                  });
                 return;
             }
 
-            var set = Enumerable.First(subRestrains.Keys);
+            var set = subRestrains.Keys.First();
             var iv = GetInterval(path, subRestrains, set);
 
             for (var mines = iv.MinInclusive; mines <= iv.MaxInclusive; mines++)
@@ -184,33 +182,42 @@ namespace MineSweeperCalc
                 var dic = new Dictionary<BlockSet<T>, Interval>(subRestrains);
                 dic.Remove(set);
 
-                var newPath = Enumerable.ToArray(Enumerable.Concat(path, new[] { new KeyValuePair<BlockSet<T>, int>(set, mines) }));
+                var newPath = path.Concat(new[] { new KeyValuePair<BlockSet<T>, int>(set, mines) }).ToArray();
 
                 Traversal(newPath, states * m_BinomialHelper.Binomial(set.Count, mines), dic);
             }
         }
 
-        private Interval GetInterval(IReadOnlyCollection<KeyValuePair<BlockSet<T>, int>> path, IDictionary<BlockSet<T>, Interval> subRestrains, BlockSet<T> set)
+        private Interval GetInterval(IReadOnlyCollection<KeyValuePair<BlockSet<T>, int>> path,
+                                     IDictionary<BlockSet<T>, Interval> subRestrains, BlockSet<T> set)
         {
             var iv = subRestrains[set];
-            foreach (var r in Enumerable.Where(m_Restrains, r => r.TheBlocks.Contains(set)))
+            foreach (var r in m_Restrains.Where(r => r.TheBlocks.Contains(set)))
             {
                 var lb = 0;
                 var ub = 0;
                 foreach (var s in r.TheBlocks)
-                    if (Enumerable.Any(path, kvp => kvp.Key.Equals(s)))
+                {
+                    if (s.Equals(set))
+                        continue;
+                    var exists = false;
+                    foreach (var kvp in path.Where(kvp => kvp.Key.Equals(s)))
                     {
-                        var val = Enumerable.First(path, kvp => kvp.Key.Equals(s)).Value;
+                        exists = true;
+                        var val = kvp.Value;
                         lb += val;
                         ub += val;
+                        break;
                     }
-                    else if (!s.Equals(set) &&
-                             subRestrains.ContainsKey(s))
+                    if (exists)
+                        continue;
+                    Interval ivO;
+                    if (subRestrains.TryGetValue(s, out ivO))
                     {
-                        var ivO = subRestrains[s];
                         lb += ivO.MinInclusive;
                         ub += ivO.MaxInclusive;
                     }
+                }
                 iv = iv.Intersect(
                                   new Interval
                                       {
@@ -301,9 +308,9 @@ namespace MineSweeperCalc
                             set.Add(block);
                             break;
                     }
-                if (!Enumerable.Any(set))
+                if (!set.Any())
                     continue;
-                
+
                 var newSet = new BlockSet<T>(r.TheBlocks[i].Blocks.Except(set));
                 r.TheBlocks.RemoveAt(i);
                 if (newSet.Any)

@@ -103,6 +103,7 @@ namespace MineSweeper
             m_Solver.AddRestrain(new Restrain<Block>(m_Mgr.TotalMines, new BlockSet<Block>(m_Mgr.Blocks)));
             m_Started = true;
             m_ShowProb = false;
+            m_Solved = false;
             Width = (int)(m_Mgr.TotalWidth * BlockSize) + 22;
             Height = (int)(m_Mgr.TotalHeight * BlockSize) + 56;
         }
@@ -149,6 +150,19 @@ namespace MineSweeper
                 }
                 else
                     Reset();
+            else if (e.Button == MouseButtons.Right)
+                if (m_Started)
+                {
+                    if (!m_Solved)
+                    {  m_Solver.Solve(0);
+                        m_Solved = true;
+                    }
+                    for (var i = 0; i < m_Mgr.TotalWidth; i++)
+                        for (var j = 0; j < m_Mgr.TotalHeight; j++)
+                            if (!m_Mgr[i, j].IsOpen &&
+                                m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
+                                Open(i, j);
+                }
             RePaint();
         }
 

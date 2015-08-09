@@ -88,6 +88,8 @@ namespace MineSweeper
 
         public int Y { get; }
 
+        private readonly int m_Hash;
+
         public bool IsMine { get; internal set; }
 
         public bool IsOpen { get; internal set; }
@@ -100,18 +102,19 @@ namespace MineSweeper
         {
             X = x;
             Y = y;
+            m_Hash = ((0x0000ffff & Hash(X)) << 16) + (0x0000ffff & Hash(Y));
         }
 
-        public bool Equals(Block other) => X == other.X && Y == other.Y;
+        public bool Equals(Block other) => m_Hash == other.m_Hash; //X == other.X && Y == other.Y;
 
-        public override int GetHashCode() => Hash(X) << 16 + Hash(Y);
+        public override int GetHashCode() => m_Hash;
 
         private static int Hash(int v)
         {
             var h = 5381;
             while (v > 0)
             {
-                h = h << 5 + h + (v % 2 + 50);
+                h = (h << 5) + h + (v % 2 + 50);
                 v /= 2;
             }
             return h;
