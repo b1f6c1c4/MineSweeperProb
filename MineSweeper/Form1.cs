@@ -154,7 +154,7 @@ namespace MineSweeper
                 if (m_Started)
                 {
                     if (!m_Solved)
-                    {  m_Solver.Solve(0);
+                    {  m_Solver.Solve();
                         m_Solved = true;
                     }
                     for (var i = 0; i < m_Mgr.TotalWidth; i++)
@@ -173,7 +173,7 @@ namespace MineSweeper
                 m_ShowProb ^= true;
                 if (m_ShowProb && !m_Solved)
                 {
-                    m_Solver.Solve(0);
+                    m_Solver.Solve();
                     m_Solved = true;
                 }
                 RePaint();

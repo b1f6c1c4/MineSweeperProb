@@ -18,11 +18,16 @@ namespace MineSweeperCalc
         /// </summary>
         private readonly List<BlockSet<T>> m_BlockSets;
 
-        public BlockFamily(BlockSet<T> sets) { m_BlockSets = new List<BlockSet<T>> { sets }; }
+        public BlockFamily(BlockSet<T> sets)
+        {
+            m_BlockSets = new List<BlockSet<T>> { sets };
+            m_BlockSets.Sort();
+        }
 
         public BlockFamily(IEnumerable<BlockSet<T>> sets)
         {
             m_BlockSets = sets as List<BlockSet<T>> ?? sets.ToList();
+            m_BlockSets.Sort();
             var blocks = Blocks.ToList();
             if (blocks.Distinct().Count() < blocks.Count)
                 throw new ArgumentException("集合之交非空", nameof(sets));
@@ -53,6 +58,11 @@ namespace MineSweeperCalc
 
         /// <inheritdoc />
         public bool IsReadOnly => false;
+
+        /// <summary>
+        ///     排序
+        /// </summary>
+        public void Sort()=> m_BlockSets.Sort();
 
         /// <summary>
         ///     格的个数

@@ -27,7 +27,22 @@
         public bool Unique
             => MinInclusive == MaxInclusive;
 
+        public Interval(int num)
+        {
+            MinInclusive = num;
+            MaxInclusive = num;
+        }
+
+        public Interval(int min, int max)
+        {
+            MinInclusive = min;
+            MaxInclusive = max;
+        }
+
         public override string ToString() => $"{MinInclusive}-{MaxInclusive}";
+
+        public static Interval operator -(Interval one, Interval other)
+            => new Interval(one.MinInclusive - other.MaxInclusive, one.MaxInclusive - other.MinInclusive);
     }
 
     /// <summary>
@@ -58,7 +73,7 @@
         public Restrain(int num, BlockSet<T> set)
         {
             TheBlocks = new BlockFamily<T>(set);
-            Interval = new Interval { MinInclusive = num, MaxInclusive = num };
+            Interval = new Interval(num);
         }
 
         /// <summary>

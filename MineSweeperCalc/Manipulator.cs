@@ -58,10 +58,9 @@ namespace MineSweeperCalc
         }
 
         public static Interval Intersect(this Interval one, Interval another)
-            => new Interval
-                   {
-                       MinInclusive = Math.Max(one.MinInclusive, another.MinInclusive),
-                       MaxInclusive = Math.Min(one.MaxInclusive, another.MaxInclusive)
-                   };
+            =>
+                new Interval(
+                    Math.Max(one.MinInclusive, another.MinInclusive),
+                    Math.Min(one.MaxInclusive, another.MaxInclusive));
     }
 }
