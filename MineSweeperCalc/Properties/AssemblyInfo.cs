@@ -1,14 +1,15 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // 有关程序集的一般信息由以下
 // 控制。更改这些特性值可修改
 // 与程序集关联的信息。
-[assembly: AssemblyTitle("MineSweeperCalc")]
+[assembly: AssemblyTitle("MineSweeperCalc2")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("MineSweeperCalc")]
+[assembly: AssemblyProduct("MineSweeperCalc2")]
 [assembly: AssemblyCopyright("Copyright ©  2015")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -19,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // 如果此项目向 COM 公开，则下列 GUID 用于类型库的 ID
-[assembly: Guid("e658fcd6-d22d-44ac-80a6-6cbbaee4cf63")]
+[assembly: Guid("1e0a1bfe-76be-4cd3-9c29-4a417a7f3c2e")]
 
 // 程序集的版本信息由下列四个值组成: 
 //

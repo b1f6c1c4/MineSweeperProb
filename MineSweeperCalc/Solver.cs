@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -19,14 +18,23 @@ namespace MineSweeperCalc
         private readonly BlockManager<T> m_Manager;
 
         /// <summary>
-        ///     所有约束
+        ///     待求解单元
         /// </summary>
-        private readonly List<Restrain<T>> m_Restrains;
+        private readonly List<BlockSet<T>> m_BlockSets;
 
         /// <summary>
-        ///     各格集合上添加的子约束
+        ///     约束
         /// </summary>
-        private ConcurrentDictionary<BlockSet<T>, Interval> m_SubRestrains;
+        private readonly List<Restrain> m_Restrains;
+
+        /// <summary>
+        ///     约束
+        /// </summary>
+        private sealed class Restrain
+        {
+            public List<int> BlockSets { get; set; }
+            public int Mines { get; set; }
+        }
 
         /// <summary>
         ///     二项式系数计算器
@@ -52,17 +60,71 @@ namespace MineSweeperCalc
         {
             m_BinomialHelper = binomialHelper;
             m_Manager = new BlockManager<T>(blocks);
-            m_Restrains = new List<Restrain<T>>();
+            m_Restrains = new List<Restrain>();
+            m_BlockSets = new List<BlockSet<T>>();
         }
 
         /// <summary>
         ///     添加约束
         /// </summary>
-        /// <param name="r"></param>
-        public void AddRestrain(Restrain<T> r)
+        /// <param name="set">格的集合</param>
+        /// <param name="mines">数</param>
+        public void AddRestrain(BlockSet<T> set, int mines)
         {
-            r.TheBlocks.Coordinate(m_Restrains.Select(rr => rr.TheBlocks));
-            m_Restrains.Add(r);
+            var theSet = set;
+            var count = m_BlockSets.Count;
+            var blkLst = new List<int>(m_BlockSets.Count);
+            for (var i = 0; i < count; i++)
+            {
+                var intersection = m_BlockSets[i].Blocks.Intersect(theSet.Blocks).ToArray();
+                if (intersection.Length == 0)
+                {
+                    blkLst.Add(0);
+                    continue;
+                }
+
+                var newA = new BlockSet<T>(m_BlockSets[i].Blocks.Except(intersection));
+                var newB = new BlockSet<T>(theSet.Blocks.Except(intersection));
+                var newC = new BlockSet<T>(intersection);
+
+                theSet = newB;
+                if (!newA.Any)
+                {
+                    m_BlockSets[i] = newC;
+                    blkLst.Add(1);
+                }
+                else
+                {
+                    m_BlockSets[i] = newA;
+                    blkLst.Add(0);
+                    if (newC.Any)
+                    {
+                        m_BlockSets.Add(newC);
+                        foreach (var restrain in m_Restrains)
+                            restrain.BlockSets.Add(restrain.BlockSets[i]);
+                    }
+                }
+                if (!theSet.Any)
+                    break;
+            }
+
+            for (var i = blkLst.Count; i < count; i++)
+                blkLst.Add(0); // oldA
+            for (var i = count; i < m_BlockSets.Count; i++)
+                blkLst.Add(1); // newC
+            if (theSet.Any)
+            {
+                m_BlockSets.Add(theSet);
+                foreach (var restrain in m_Restrains)
+                    restrain.BlockSets.Add(0);
+                blkLst.Add(1); // theSet
+            }
+            m_Restrains.Add(
+                            new Restrain
+                                {
+                                    BlockSets = blkLst,
+                                    Mines = mines
+                                });
         }
 
         public BlockStatus this[T key] => m_Manager[key];
@@ -70,120 +132,252 @@ namespace MineSweeperCalc
         /// <summary>
         ///     求解
         /// </summary>
-        public void Solve()
+        public BigInteger Solve()
         {
-            m_SubRestrains = new ConcurrentDictionary<BlockSet<T>, Interval>();
-            var flag = true;
-            while (flag)
-            {
-                flag = false;
-                ReduceRestrainsExhaust();
-                m_SubRestrains.Clear();
+            while (ReduceRestrains()) { }
 
-                m_Restrains.ForEach(r => r.TheBlocks.Sort());
-                for (var i = 0; i < m_Restrains.Count; i++)
-                    for (var j = 0; j < i; j++)
-                        flag |= SimpleOverlap(m_Restrains[i], m_Restrains[j]);
-            }
+            var augmentedMatrix = GenerateMatrix();
+            var minors = Gauss(augmentedMatrix);
 
-            Solutions = new List<Solution<T>>();
-            Traversal(new Dictionary<BlockSet<T>, int>(), BigInteger.One, m_SubRestrains);
+            if (minors[minors.Count - 1] == m_BlockSets.Count)
+                minors.RemoveAt(minors.Count - 1);
+            else
+                throw new ApplicationException("无解");
 
-            ProcessSolutions();
+            var result = EnumerateSolutions(minors, augmentedMatrix);
+            if (result.Count == 0)
+                throw new ApplicationException("无解");
+
+            Solutions = result;
+
+            return ProcessSolutions();
         }
 
-        private bool SimpleOverlap(Restrain<T> first, Restrain<T> second)
+        /// <summary>
+        ///     化简约束
+        /// </summary>
+        /// <returns>是否成功化简</returns>
+        private bool ReduceRestrains()
         {
-            var lstA = new List<BlockSet<T>>();
-            var lstB = new List<BlockSet<T>>();
-            var lstC = new List<BlockSet<T>>();
-            var p = 0;
-            var q = 0;
-            while (p < first.TheBlocks.Count &&
-                   q < second.TheBlocks.Count)
-            {
-                var cmp = first.TheBlocks[p].CompareTo(second.TheBlocks[q]);
-                if (cmp > 0)
-                    lstA.Add(first.TheBlocks[p++]);
-                else if (cmp < 0)
-                    lstB.Add(second.TheBlocks[q++]);
-                else
-                {
-                    lstC.Add(first.TheBlocks[p]);
-                    p++;
-                    q++;
-                }
-            }
-            while (p < first.TheBlocks.Count)
-                lstA.Add(first.TheBlocks[p++]);
-            while (q < second.TheBlocks.Count)
-                lstB.Add(second.TheBlocks[q++]);
-
-            var sumA = lstA.Sum(set => set.Count);
-            var sumB = lstB.Sum(set => set.Count);
-            var sumC = lstC.Sum(set => set.Count);
-
-            var ivA = (first.Interval - new Interval(0, sumC)).Intersect(new Interval(0, sumA));
-            var ivB = (second.Interval - new Interval(0, sumC)).Intersect(new Interval(0, sumB));
-            var ivC = (first.Interval - ivA).Intersect(second.Interval - ivB);
-
-            Func<List<BlockSet<T>>, Interval, bool> process
-                = (sets, iv) =>
-                  {
-                      if (sets.Count == 0)
-                          return false;
-                      var sum = sets.Sum(s => s.Count);
-                      if (sum == iv.MinInclusive)
-                          foreach (var set in sets)
-                          {
-                              UpdateSubRestrain(set, new Interval(set.Count));
-                              foreach (var block in set.Blocks)
-                                  m_Manager.SetStatus(block, BlockStatus.Mine);
-                          }
-                      else if (iv.MaxInclusive == 0)
-                          foreach (var set in sets)
-                          {
-                              UpdateSubRestrain(set, new Interval(0));
-                              foreach (var block in set.Blocks)
-                                  m_Manager.SetStatus(block, BlockStatus.Blank);
-                          }
-                      else
-                      {
-                          foreach (var set in sets)
-                              UpdateSubRestrain(
-                                                set,
-                                                (new Interval(0, set.Count))
-                                                    .Intersect(iv - new Interval(0, sum - set.Count)));
-                          return false;
-                      }
-                      return true;
-                  };
-
             var flag = false;
-            flag |= process(lstA, ivA);
-            flag |= process(lstB, ivB);
-            flag |= process(lstC, ivC);
+
+            var cnts = m_BlockSets.Select(b => b.Count).ToArray();
+            for (var i = 0; i < m_Restrains.Count; i++)
+                if (m_Restrains[i].Mines == 0)
+                {
+                    for (var j = 0; j < m_BlockSets.Count; j++)
+                        if (m_Restrains[i].BlockSets[j] != 0)
+                            foreach (var block in m_BlockSets[j].Blocks)
+                                m_Manager.SetStatus(block, BlockStatus.Blank);
+                    m_Restrains.RemoveAt(i--);
+                }
+                else if (m_Restrains[i].Mines == m_Restrains[i].BlockSets.Zip(cnts, (c, cn) => c * cn).Sum())
+                {
+                    for (var j = 0; j < m_BlockSets.Count; j++)
+                        if (m_Restrains[i].BlockSets[j] != 0)
+                            foreach (var block in m_BlockSets[j].Blocks)
+                                m_Manager.SetStatus(block, BlockStatus.Mine);
+                    m_Restrains.RemoveAt(i--);
+                }
+
+            for (var i = 0; i < m_BlockSets.Count; i++)
+            {
+                var mines = 0;
+                var blanks = 0;
+                foreach (var block in m_BlockSets[i].Blocks)
+                    switch (m_Manager[block])
+                    {
+                        case BlockStatus.Mine:
+                            mines++;
+                            break;
+                        case BlockStatus.Blank:
+                            blanks++;
+                            break;
+                    }
+                if (m_BlockSets[i].Count == blanks + mines)
+                {
+                    foreach (var restrain in m_Restrains)
+                    {
+                        if (restrain.BlockSets[i] != 0)
+                            restrain.Mines -= mines;
+                        restrain.BlockSets.RemoveAt(i);
+                    }
+                    m_BlockSets.RemoveAt(i--);
+                    continue;
+                }
+                if (mines == 0 &&
+                    blanks == 0)
+                    continue;
+                flag = true;
+                m_BlockSets[i] =
+                    new BlockSet<T>(m_BlockSets[i].Blocks.Where(b => m_Manager[b] == BlockStatus.Unknown));
+                foreach (var restrain in m_Restrains)
+                    if (restrain.BlockSets[i] != 0)
+                        restrain.Mines -= mines;
+            }
 
             return flag;
         }
 
-        private void UpdateSubRestrain(BlockSet<T> set, Interval iv)
+        /// <summary>
+        ///     生成矩阵
+        /// </summary>
+        /// <returns></returns>
+        private double[,] GenerateMatrix()
         {
-            Interval ivO;
-            if (m_SubRestrains.TryGetValue(set, out ivO))
-                m_SubRestrains[set] = ivO.Intersect(iv);
-            else
-                m_SubRestrains[set] = iv;
+            var m = m_Restrains.Count;
+            var n = m_BlockSets.Count;
+
+            var argMat = new double[n + 1, m];
+            for (var row = 0; row < m; row++)
+            {
+                for (var col = 0; col < n; col++)
+                    argMat[col, row] = m_Restrains[row].BlockSets[col];
+                argMat[n, row] = m_Restrains[row].Mines;
+            }
+            return argMat;
         }
 
-        private void ProcessSolutions()
+        /// <summary>
+        ///     对矩阵进行高斯消元
+        /// </summary>
+        /// <param name="matrix">矩阵</param>
+        /// <returns>非主元列</returns>
+        private static List<int> Gauss(double[,] matrix)
+        {
+            var n = matrix.GetLength(0);
+            var m = matrix.GetLength(1);
+            var minorCol = new List<int>();
+            var major = 0;
+            for (var col = 0; col < n; col++)
+            {
+                int biasRow;
+                for (biasRow = major; biasRow < m; biasRow++)
+                    if (Math.Abs(matrix[col, biasRow]) >= 1E-8)
+                        break;
+                if (biasRow >= m)
+                {
+                    minorCol.Add(col);
+                    continue;
+                }
+
+                var vec = new double[m];
+                var theBiasInv = 1 / matrix[col, biasRow];
+                for (var row = 0; row < m; row++)
+                {
+                    if (row != biasRow)
+                        vec[row] = -matrix[col, row] * theBiasInv;
+                    if (row == major)
+                        matrix[col, row] = 1;
+                    else
+                        matrix[col, row] = 0;
+                }
+
+                for (var co = col + 1; co < n; co++)
+                {
+                    var swap = matrix[co, major];
+                    var bias = matrix[co, biasRow];
+                    for (var row = 0; row < m; row++)
+                        if (row == major)
+                            matrix[co, row] = bias * theBiasInv;
+                        else if (row == biasRow)
+                            matrix[co, row] = swap + vec[major] * bias;
+                        else
+                            matrix[co, row] += vec[row] * bias;
+                }
+                major++;
+            }
+            return minorCol;
+        }
+
+        /// <summary>
+        ///     遍历解空间
+        /// </summary>
+        /// <param name="minors">非主元列</param>
+        /// <param name="augmentedMatrix"></param>
+        /// <returns>所有解</returns>
+        private List<Solution<T>> EnumerateSolutions(IReadOnlyList<int> minors, double[,] augmentedMatrix)
+        {
+            var n = m_BlockSets.Count;
+            var counts = m_BlockSets.Select(b => b.Count).ToArray();
+
+            var res = new List<Solution<T>>();
+            if (minors.Count == 0)
+            {
+                var lst = new List<int>(n);
+                for (var i = 0; i < n; i++)
+                    lst.Add((int)Math.Round(augmentedMatrix[n, i]));
+                res.Add(new Solution<T>(lst));
+            }
+            else
+            {
+                var stack = new List<int>(minors.Count) { 0 };
+                while (true)
+                    if (stack.Count == minors.Count)
+                        if (stack[stack.Count - 1] <= counts[minors[stack.Count - 1]])
+                        {
+                            var lst = new List<int>(n);
+                            var minorID = 0;
+                            var mainRow = 0;
+                            for (var col = 0; col < n; col++)
+                                if (minorID < minors.Count &&
+                                    col == minors[minorID])
+                                    lst.Add(stack[minorID++]);
+                                else // major
+                                {
+                                    var sum = augmentedMatrix[n, mainRow];
+                                    for (var i = 0; i < minors.Count; i++)
+                                        sum -= augmentedMatrix[minors[i], mainRow] * stack[i];
+                                    var val = (int)Math.Round(sum);
+                                    if (val < 0 ||
+                                        val > counts[col])
+                                        break;
+                                    lst.Add(val);
+                                    mainRow++;
+                                }
+                            if (lst.Count == m_BlockSets.Count)
+                                res.Add(new Solution<T>(lst));
+
+                            stack[stack.Count - 1]++;
+                        }
+                        else
+                        {
+                            stack.RemoveAt(stack.Count - 1);
+                            if (stack.Count == 0)
+                                break;
+                            stack[stack.Count - 1]++;
+                        }
+                    else if (stack[stack.Count - 1] <= counts[minors[stack.Count - 1]])
+                        stack.Add(0);
+                    else
+                    {
+                        stack.RemoveAt(stack.Count - 1);
+                        if (stack.Count == 0)
+                            break;
+                        stack[stack.Count - 1]++;
+                    }
+            }
+            return res;
+        }
+
+        /// <summary>
+        ///     处理解及解空间
+        /// </summary>
+        private BigInteger ProcessSolutions()
         {
             var exp = new Dictionary<BlockSet<T>, BigInteger>();
             var total = BigInteger.Zero;
             foreach (var so in Solutions)
             {
+                so.States = BigInteger.One;
+                so.Distribution = new Dictionary<BlockSet<T>, int>(m_BlockSets.Count);
+                for (var i = 0; i < m_BlockSets.Count; i++)
+                {
+                    so.States *= m_BinomialHelper.Binomial(m_BlockSets[i].Count, so.Dist[i]);
+                    so.Distribution.Add(m_BlockSets[i], so.Dist[i]);
+                }
                 total += so.States;
-                foreach (var s in m_SubRestrains.Keys)
+                foreach (var s in m_BlockSets)
                 {
                     var v = so.States * so.Distribution[s];
                     BigInteger oldV;
@@ -193,14 +387,17 @@ namespace MineSweeperCalc
                         exp[s] = v;
                 }
             }
+            foreach (var so in Solutions)
+                so.Ratio = BigIntegerHelper.Ratio(so.States, total);
 
-            Expectation = new Dictionary<BlockSet<T>, double>();
             Probability = new Dictionary<T, double>();
             foreach (var block in m_Manager.Keys)
                 if (m_Manager[block] == BlockStatus.Mine)
                     Probability[block] = 1;
                 else if (m_Manager[block] == BlockStatus.Blank)
                     Probability[block] = 0;
+
+            Expectation = new Dictionary<BlockSet<T>, double>();
             foreach (var kvp in exp)
             {
                 if (kvp.Value == 0)
@@ -210,162 +407,15 @@ namespace MineSweeperCalc
                     foreach (var block in kvp.Key.Blocks)
                         m_Manager.SetStatus(block, BlockStatus.Mine);
 
-                Expectation.Add(kvp.Key, BigIntegerHelper.Ratio(kvp.Value, total));
+                var ratio = BigIntegerHelper.Ratio(kvp.Value, total);
+                Expectation.Add(kvp.Key, ratio);
 
-                var p = BigIntegerHelper.Ratio(kvp.Value, total) / kvp.Key.Count;
+                var p = ratio / kvp.Key.Count;
                 foreach (var block in kvp.Key.Blocks)
                     Probability.Add(block, p);
             }
 
-            foreach (var so in Solutions)
-                so.Ratio = BigIntegerHelper.Ratio(so.States, total);
-        }
-
-        /// <summary>
-        ///     遍历解空间
-        /// </summary>
-        /// <param name="path">当前路径</param>
-        /// <param name="states">当前状态数</param>
-        /// <param name="subRestrains">待遍历解空间</param>
-        private void Traversal(IDictionary<BlockSet<T>, int> path,
-                               BigInteger states,
-                               IDictionary<BlockSet<T>, Interval> subRestrains)
-        {
-            if (!subRestrains.Keys.Any())
-            {
-                Solutions.Add(
-                              new Solution<T>
-                                  {
-                                      Distribution = path.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                                      States = states
-                                  });
-                return;
-            }
-
-            var set = subRestrains.Keys.First();
-            var iv = GetInterval(path, subRestrains, set);
-
-            var newPath = new Dictionary<BlockSet<T>, int>(path);
-            for (var mines = iv.MinInclusive; mines <= iv.MaxInclusive; mines++)
-            {
-                var dic = new Dictionary<BlockSet<T>, Interval>(subRestrains);
-                dic.Remove(set);
-
-                newPath[set] = mines;
-
-                Traversal(newPath, states * m_BinomialHelper.Binomial(set.Count, mines), dic);
-            }
-        }
-
-        private Interval GetInterval(IDictionary<BlockSet<T>, int> path,
-                                     IDictionary<BlockSet<T>, Interval> subRestrains, BlockSet<T> set)
-        {
-            var iv = subRestrains[set];
-            foreach (var r in m_Restrains.Where(r => r.TheBlocks.Contains(set)))
-            {
-                var ivN = new Interval(0, 0);
-                foreach (var s in r.TheBlocks)
-                {
-                    if (s.Equals(set))
-                        continue;
-                    int val;
-                    if (path.TryGetValue(s, out val))
-                    {
-                        ivN.MinInclusive += val;
-                        ivN.MaxInclusive += val;
-                    }
-                    else
-                    {
-                        Interval ivO;
-                        if (subRestrains.TryGetValue(s, out ivO))
-                        {
-                            ivN.MinInclusive += ivO.MinInclusive;
-                            ivN.MaxInclusive += ivO.MaxInclusive;
-                        }
-                    }
-                }
-                iv = iv.Intersect(r.Interval - ivN);
-            }
-            return iv;
-        }
-
-        /// <summary>
-        ///     重复化简约束直至无法继续
-        /// </summary>
-        private bool ReduceRestrainsExhaust()
-        {
-            var fflag = false;
-            var flag = true;
-            while (flag)
-            {
-                flag = false;
-                for (var i = 0; i < m_Restrains.Count; i++)
-                {
-                    if (!ReduceRestrain(m_Restrains[i]))
-                        continue;
-                    m_Restrains.RemoveAt(i);
-                    flag = true;
-                    i--;
-                }
-                fflag |= flag;
-            }
-            return fflag;
-        }
-
-        /// <summary>
-        ///     化简约束
-        /// </summary>
-        /// <param name="r">约束</param>
-        /// <returns>是否引起了状态变化</returns>
-        private bool ReduceRestrain(Restrain<T> r)
-        {
-            if (!r.Exist)
-                throw new InvalidOperationException("无解");
-
-            var mines = 0;
-            for (var i = 0; i < r.TheBlocks.Count; i++)
-            {
-                var set = new HashSet<T>();
-                foreach (var block in r.TheBlocks[i].Blocks)
-                    switch (m_Manager[block])
-                    {
-                        case BlockStatus.Blank:
-                            set.Add(block);
-                            break;
-                        case BlockStatus.Mine:
-                            mines++;
-                            set.Add(block);
-                            break;
-                    }
-                if (!set.Any())
-                    continue;
-
-                var newSet = new BlockSet<T>(r.TheBlocks[i].Blocks.Except(set));
-                r.TheBlocks.RemoveAt(i);
-                if (newSet.Any)
-                    r.TheBlocks.Insert(i, newSet);
-                else
-                    i--;
-            }
-            if (mines > 0)
-                r.Interval = r.Interval - new Interval(mines);
-
-            if (!r.Exist)
-                throw new InvalidOperationException("无解");
-
-            if (r.TheBlocks.CountBlock == 0)
-                return true;
-
-            if (!r.Unique)
-                return false;
-
-            if (r.MaxInclusive == 0)
-                foreach (var block in r.TheBlocks.Blocks)
-                    m_Manager.SetStatus(block, BlockStatus.Blank);
-            else // if (r.MinInclusive == r.TheBlocks.CountBlock)
-                foreach (var block in r.TheBlocks.Blocks)
-                    m_Manager.SetStatus(block, BlockStatus.Mine);
-            return true;
+            return total;
         }
     }
 }

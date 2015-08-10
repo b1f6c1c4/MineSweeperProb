@@ -10,7 +10,7 @@ namespace MineSweeperCalc
     ///     格的集合
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
-    public struct BlockSet<T> : IEnumerable, IEquatable<BlockSet<T>>, IComparable<BlockSet<T>>
+    public class BlockSet<T> : IEnumerable, IEquatable<BlockSet<T>>
         where T : IBlock<T>
     {
         /// <summary>
@@ -23,20 +23,6 @@ namespace MineSweeperCalc
         public BlockSet(T[] blocks)
         {
             Blocks = blocks;
-
-            for (var i = 0; i < Blocks.Length; i++)
-            {
-                for (var j = 0; j < i; j++)
-                {
-                    if (Blocks[j].CompareTo(Blocks[j + 1]) < 0)
-                    {
-                        var tmp = Blocks[j];
-                        Blocks[j] = Blocks[j + 1];
-                        Blocks[j + 1] = tmp;
-                    }
-                }
-            }
-
             m_Hash = Blocks.Aggregate(5381, (h, t) => (h << 5) + h + t.GetHashCode());
         }
 
@@ -64,25 +50,6 @@ namespace MineSweeperCalc
 
         /// <inheritdoc />
         IEnumerator IEnumerable.GetEnumerator() => Blocks.GetEnumerator();
-
-        public int CompareTo(BlockSet<T> other)
-        {
-            var i = 0;
-            while (i < Blocks.Length && i < other.Blocks.Length)
-            {
-                var cmp = Blocks[i].CompareTo(other.Blocks[i]);
-                if (cmp > 0)
-                    return 1;
-                if (cmp < 0)
-                    return -1;
-                i++;
-            }
-            if (Blocks.Length > other.Blocks.Length)
-                return 1;
-            if (Blocks.Length < other.Blocks.Length)
-                return -1;
-            return 0;
-        }
 
         public override string ToString()
         {

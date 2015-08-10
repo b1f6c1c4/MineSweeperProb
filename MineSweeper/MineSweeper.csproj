@@ -36,6 +36,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -84,7 +85,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MineSweeperCalc\MineSweeperCalc.csproj">
-      <Project>{e658fcd6-d22d-44ac-80a6-6cbbaee4cf63}</Project>
+      <Project>{1e0a1bfe-76be-4cd3-9c29-4a417a7f3c2e}</Project>
       <Name>MineSweeperCalc</Name>
     </ProjectReference>
   </ItemGroup>

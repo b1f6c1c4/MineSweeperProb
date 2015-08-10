@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -9,11 +10,14 @@ namespace MineSweeper
     public partial class Form1 : Form
     {
         private bool m_Started;
-        private bool m_Solved;
         private BlockMgr m_Mgr;
         private Solver<Block> m_Solver;
         private bool m_ShowProb;
         private const float BlockSize = 38F;
+        private double m_Sig;
+        private int m_Exp;
+        private int m_ToOpen;
+        private bool m_Suceed;
 
         [DllImport("user32.dll")]
         private static extern bool SetProcessDPIAware();
@@ -27,8 +31,24 @@ namespace MineSweeper
 
         private void RePaint(Graphics g = null)
         {
+            var fontO = new Font("Consolas", 24);
+            var fontC = new Font("Consolas", 12);
+            var white = new SolidBrush(Color.White);
+            var black = new SolidBrush(Color.Black);
+            var red = new SolidBrush(Color.Red);
+            var green = new SolidBrush(Color.Green);
+            var gray = new SolidBrush(Color.LightGray);
+
             g = g ?? CreateGraphics();
             if (m_Started && m_ShowProb)
+            {
+                var prob = 1D;
+                for (var i = 0; i < m_Mgr.TotalWidth; i++)
+                    for (var j = 0; j < m_Mgr.TotalHeight; j++)
+                        if (m_Solver.Probability[m_Mgr[i, j]] < prob &&
+                            m_Solver[m_Mgr[i, j]] == BlockStatus.Unknown)
+                            prob = m_Solver.Probability[m_Mgr[i, j]];
+
                 for (var i = 0; i < m_Mgr.TotalWidth; i++)
                     for (var j = 0; j < m_Mgr.TotalHeight; j++)
                     {
@@ -42,18 +62,26 @@ namespace MineSweeper
                         if (m_Solver[m_Mgr[i, j]] == BlockStatus.Mine)
                             g.DrawString(
                                          "M",
-                                         new Font("Consolas", m_Mgr[i, j].IsOpen ? 24 : 12),
-                                         new SolidBrush(Color.White),
+                                         m_Mgr[i, j].IsOpen ? fontO : fontC,
+                                         white,
                                          i * BlockSize,
                                          j * BlockSize);
                         else if (m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                             g.DrawString(
                                          "B",
-                                         new Font("Consolas", m_Mgr[i, j].IsOpen ? 24 : 12),
-                                         new SolidBrush(Color.Black),
+                                         m_Mgr[i, j].IsOpen ? fontO : fontC,
+                                         black,
                                          i * BlockSize,
                                          j * BlockSize);
+                        else if (m_Solver.Probability[m_Mgr[i, j]] <= prob)
+                            g.FillEllipse(
+                                          green,
+                                          i * BlockSize + BlockSize / 4,
+                                          j * BlockSize + BlockSize / 4,
+                                          BlockSize / 2 - 1,
+                                          BlockSize / 2 - 1);
                     }
+            }
             else
                 for (var i = 0; i < m_Mgr.TotalWidth; i++)
                     for (var j = 0; j < m_Mgr.TotalHeight; j++)
@@ -61,7 +89,7 @@ namespace MineSweeper
                         if (!m_Started)
                             if (m_Mgr[i, j].IsMine)
                                 g.FillRectangle(
-                                                new SolidBrush(Color.Red),
+                                                m_Suceed ? green : red,
                                                 i * BlockSize,
                                                 j * BlockSize,
                                                 BlockSize - 1,
@@ -71,22 +99,22 @@ namespace MineSweeper
                             if (!m_Mgr[i, j].IsMine)
                             {
                                 g.FillRectangle(
-                                                new SolidBrush(Color.White),
+                                                white,
                                                 i * BlockSize,
                                                 j * BlockSize,
                                                 BlockSize - 1,
                                                 BlockSize - 1);
                                 g.DrawString(
                                              m_Mgr[i, j].Degree.ToString(),
-                                             new Font("Consolas", 24),
-                                             new SolidBrush(Color.Black),
+                                             fontO,
+                                             black,
                                              i * BlockSize,
                                              j * BlockSize);
                             }
                         }
                         else if (m_Started)
                             g.FillRectangle(
-                                            new SolidBrush(Color.LightGray),
+                                            gray,
                                             i * BlockSize,
                                             j * BlockSize,
                                             BlockSize - 1,
@@ -97,18 +125,36 @@ namespace MineSweeper
         private void Reset()
         {
             m_Mgr = new BlockMgr(30, 16, 99);
-            m_Solver = new Solver<Block>(
-                m_Mgr.Blocks,
-                new BinomialHelper(m_Mgr.TotalWidth * m_Mgr.TotalHeight, m_Mgr.TotalMines));
-            m_Solver.AddRestrain(new Restrain<Block>(m_Mgr.TotalMines, new BlockSet<Block>(m_Mgr.Blocks)));
+
+            var blocks = m_Mgr.TotalWidth * m_Mgr.TotalHeight;
+            var helper = new BinomialHelper(blocks, m_Mgr.TotalMines);
+            BigIntegerHelper.Part(helper.Binomial(blocks, m_Mgr.TotalMines), out m_Sig, out m_Exp);
+
+            m_ToOpen = blocks - m_Mgr.TotalMines;
+
+            m_Solver = new Solver<Block>(m_Mgr.Blocks, helper);
+            m_Solver.AddRestrain(new BlockSet<Block>(m_Mgr.Blocks), m_Mgr.TotalMines);
+
             m_Started = true;
+            m_Suceed = false;
             m_ShowProb = false;
-            m_Solved = false;
+
             Width = (int)(m_Mgr.TotalWidth * BlockSize) + 22;
-            Height = (int)(m_Mgr.TotalHeight * BlockSize) + 56;
+            Height = (int)(m_Mgr.TotalHeight * BlockSize) + 56 + progressBar1.Height;
         }
 
         private void Open(int x, int y)
+        {
+            OpenBlock(x, y);
+            if (m_ToOpen == 0)
+            {
+                m_Started = false;
+                m_Suceed = true;
+            }
+            Solve();
+        }
+
+        private void OpenBlock(int x, int y)
         {
             var block = m_Mgr.OpenBlock(x, y);
             if (block.IsMine)
@@ -117,16 +163,16 @@ namespace MineSweeper
                 return;
             }
 
-            m_Solver.AddRestrain(new Restrain<Block>(0, new BlockSet<Block>(new[] { block })));
+            m_ToOpen--;
+
+            m_Solver.AddRestrain(new BlockSet<Block>(new[] { block }), 0);
 
             var deg = block.Degree;
             if (deg == 0)
                 foreach (var b in block.Surrounding.Cast<Block>().Where(b => !b.IsOpen))
-                    Open(b.X, b.Y);
+                    OpenBlock(b.X, b.Y);
             else
-                m_Solver.AddRestrain(new Restrain<Block>(deg, block.Surrounding));
-
-            m_Solved = false;
+                m_Solver.AddRestrain(block.Surrounding, deg);
         }
 
         private void Form1_Paint(object sender, PaintEventArgs e) => RePaint(e.Graphics);
@@ -152,17 +198,11 @@ namespace MineSweeper
                     Reset();
             else if (e.Button == MouseButtons.Right)
                 if (m_Started)
-                {
-                    if (!m_Solved)
-                    {  m_Solver.Solve();
-                        m_Solved = true;
-                    }
                     for (var i = 0; i < m_Mgr.TotalWidth; i++)
                         for (var j = 0; j < m_Mgr.TotalHeight; j++)
                             if (!m_Mgr[i, j].IsOpen &&
                                 m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                                 Open(i, j);
-                }
             RePaint();
         }
 
@@ -171,13 +211,26 @@ namespace MineSweeper
             if (e.KeyCode == Keys.Space)
             {
                 m_ShowProb ^= true;
-                if (m_ShowProb && !m_Solved)
-                {
-                    m_Solver.Solve();
-                    m_Solved = true;
-                }
+                if (m_ShowProb)
+                    Solve();
                 RePaint();
             }
+        }
+
+        private void Solve()
+        {
+            var total = m_Solver.Solve();
+
+            double sig;
+            int exp;
+            BigIntegerHelper.Part(total, out sig, out exp);
+
+            var cur = Math.Log(sig, 2) + exp;
+            var tot = Math.Log(m_Sig, 2) + m_Exp;
+
+            Text = $"Resume:{cur:F2}bits";
+
+            progressBar1.Value = (int)(2147483647 * (1 - cur / tot));
         }
     }
 }

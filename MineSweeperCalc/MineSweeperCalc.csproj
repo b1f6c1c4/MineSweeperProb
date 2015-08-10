@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{E658FCD6-D22D-44AC-80A6-6CBBAEE4CF63}</ProjectGuid>
+    <ProjectGuid>{1E0A1BFE-76BE-4CD3-9C29-4A417A7F3C2E}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>MineSweeperCalc</RootNamespace>
@@ -42,14 +42,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BlockFamily.cs" />
     <Compile Include="BlockManager.cs" />
     <Compile Include="BlockSet.cs" />
     <Compile Include="BlockStatus.cs" />
     <Compile Include="IBlock.cs" />
-    <Compile Include="Manipulator.cs" />
     <Compile Include="Numeric.cs" />
-    <Compile Include="Restrain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Solution.cs" />
     <Compile Include="Solver.cs" />
