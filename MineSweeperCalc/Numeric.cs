@@ -75,9 +75,9 @@ namespace MineSweeperCalc
             }
             else
             {
-                res[1] |= (byte)(0x0F & (lst[0] << (shift - 3)) | lst[1] >> (11-shift));
+                res[1] |= (byte)(0x0F & (lst[0] << (shift - 3)) | lst[1] >> (11 - shift));
                 for (var i = 1; i < 6; i++)
-                    res[i + 1] = (byte)((lst[i] << (shift - 3)) | (lst[i + 1] >> (11-shift)));
+                    res[i + 1] = (byte)((lst[i] << (shift - 3)) | (lst[i + 1] >> (11 - shift)));
                 res[7] = (byte)((lst[6] << (shift - 3)));
             }
 

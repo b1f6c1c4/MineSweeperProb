@@ -16,7 +16,10 @@ namespace MineSweeperCalc
         /// </summary>
         private readonly Dictionary<T, BlockStatus> m_Dic;
 
-        public BlockManager(IEnumerable<T> blocks) { m_Dic = blocks.ToDictionary(kvp => kvp, kvp => BlockStatus.Unknown); }
+        public BlockManager(IEnumerable<T> blocks)
+        {
+            m_Dic = blocks.ToDictionary(kvp => kvp, kvp => BlockStatus.Unknown);
+        }
 
         /// <inheritdoc />
         public bool ContainsKey(T key) => m_Dic.ContainsKey(key);
