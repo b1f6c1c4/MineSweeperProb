@@ -21,6 +21,8 @@ namespace MineSweeperCalc
             m_Dic = blocks.ToDictionary(kvp => kvp, kvp => BlockStatus.Unknown);
         }
 
+        public BlockManager(BlockManager<T> other) { m_Dic = new Dictionary<T, BlockStatus>(other.m_Dic); }
+
         /// <inheritdoc />
         public bool ContainsKey(T key) => m_Dic.ContainsKey(key);
 

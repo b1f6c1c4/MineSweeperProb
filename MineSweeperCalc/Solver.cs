@@ -64,12 +64,22 @@ namespace MineSweeperCalc
             m_BlockSets = new List<BlockSet<T>>();
         }
 
+        public Solver(Solver<T> other)
+        {
+            m_BinomialHelper = other.m_BinomialHelper;
+            m_Manager = new BlockManager<T>(other.m_Manager);
+            m_Restrains = new List<Restrain>(other.m_Restrains.Count);
+            foreach (var restrain in other.m_Restrains)
+                m_Restrains.Add(new Restrain { BlockSets = new List<int>(restrain.BlockSets), Mines = restrain.Mines });
+            m_BlockSets = new List<BlockSet<T>>(other.m_BlockSets);
+        }
+
         /// <summary>
-        ///     添加约束
+        ///     准备约束
         /// </summary>
         /// <param name="set">格的集合</param>
-        /// <param name="mines">数</param>
-        public void AddRestrain(BlockSet<T> set, int mines)
+        /// <returns>约束</returns>
+        private List<int> OverlapRestrain(BlockSet<T> set)
         {
             var theSet = set;
             var count = m_BlockSets.Count;
@@ -119,12 +129,20 @@ namespace MineSweeperCalc
                     restrain.BlockSets.Add(0);
                 blkLst.Add(1); // theSet
             }
-            m_Restrains.Add(
-                            new Restrain
-                                {
-                                    BlockSets = blkLst,
-                                    Mines = mines
-                                });
+
+            return blkLst;
+        }
+
+        /// <summary>
+        ///     添加约束
+        /// </summary>
+        /// <param name="set">格的集合</param>
+        /// <param name="mines">数</param>
+        public void AddRestrain(BlockSet<T> set, int mines)
+        {
+            int dMines, dBlanks;
+            var setN = OverlapRestrain(new BlockSet<T>(ReduceSet(set, out dMines, out dBlanks)));
+            m_Restrains.Add(new Restrain { BlockSets = setN, Mines = mines - dMines });
         }
 
         public BlockStatus this[T key] => m_Manager[key];
@@ -136,21 +154,49 @@ namespace MineSweeperCalc
         {
             while (ReduceRestrains()) { }
 
-            var augmentedMatrix = GenerateMatrix();
-            var minors = Gauss(augmentedMatrix);
+            var augmentedMatrixT = GenerateMatrix();
+            var minors = Gauss(augmentedMatrixT);
 
             if (minors[minors.Count - 1] == m_BlockSets.Count)
                 minors.RemoveAt(minors.Count - 1);
             else
                 throw new ApplicationException("无解");
 
-            var result = EnumerateSolutions(minors, augmentedMatrix);
+            var result = EnumerateSolutions(minors, augmentedMatrixT);
             if (result.Count == 0)
                 throw new ApplicationException("无解");
 
             Solutions = result;
 
             return ProcessSolutions();
+        }
+
+        /// <summary>
+        ///     化简格的集合
+        /// </summary>
+        /// <param name="set">格的集合</param>
+        /// <param name="mines">雷数</param>
+        /// <param name="blanks">空格数</param>
+        /// <returns></returns>
+        private List<T> ReduceSet(BlockSet<T> set, out int mines, out int blanks)
+        {
+            mines = 0;
+            blanks = 0;
+            var lst = new List<T>();
+            foreach (var block in set.Blocks)
+                switch (m_Manager[block])
+                {
+                    case BlockStatus.Mine:
+                        mines++;
+                        break;
+                    case BlockStatus.Blank:
+                        blanks++;
+                        break;
+                    default:
+                        lst.Add(block);
+                        break;
+                }
+            return lst;
         }
 
         /// <summary>
@@ -182,18 +228,8 @@ namespace MineSweeperCalc
 
             for (var i = 0; i < m_BlockSets.Count; i++)
             {
-                var mines = 0;
-                var blanks = 0;
-                foreach (var block in m_BlockSets[i].Blocks)
-                    switch (m_Manager[block])
-                    {
-                        case BlockStatus.Mine:
-                            mines++;
-                            break;
-                        case BlockStatus.Blank:
-                            blanks++;
-                            break;
-                    }
+                int mines, blanks;
+                var lst = ReduceSet(m_BlockSets[i], out mines, out blanks);
                 if (m_BlockSets[i].Count == blanks + mines)
                 {
                     foreach (var restrain in m_Restrains)
@@ -209,8 +245,7 @@ namespace MineSweeperCalc
                     blanks == 0)
                     continue;
                 flag = true;
-                m_BlockSets[i] =
-                    new BlockSet<T>(m_BlockSets[i].Blocks.Where(b => m_Manager[b] == BlockStatus.Unknown));
+                m_BlockSets[i] = new BlockSet<T>(lst);
                 foreach (var restrain in m_Restrains)
                     if (restrain.BlockSets[i] != 0)
                         restrain.Mines -= mines;
@@ -222,7 +257,7 @@ namespace MineSweeperCalc
         /// <summary>
         ///     生成矩阵
         /// </summary>
-        /// <returns></returns>
+        /// <returns>增广矩阵的转置</returns>
         private double[,] GenerateMatrix()
         {
             var m = m_Restrains.Count;
@@ -294,9 +329,9 @@ namespace MineSweeperCalc
         ///     遍历解空间
         /// </summary>
         /// <param name="minors">非主元列</param>
-        /// <param name="augmentedMatrix"></param>
+        /// <param name="augmentedMatrixT">增广矩阵的转置</param>
         /// <returns>所有解</returns>
-        private List<Solution<T>> EnumerateSolutions(IReadOnlyList<int> minors, double[,] augmentedMatrix)
+        private List<Solution<T>> EnumerateSolutions(IReadOnlyList<int> minors, double[,] augmentedMatrixT)
         {
             var n = m_BlockSets.Count;
             var counts = m_BlockSets.Select(b => b.Count).ToArray();
@@ -306,54 +341,82 @@ namespace MineSweeperCalc
             {
                 var lst = new List<int>(n);
                 for (var i = 0; i < n; i++)
-                    lst.Add((int)Math.Round(augmentedMatrix[n, i]));
+                    lst.Add((int)Math.Round(augmentedMatrixT[n, i]));
                 res.Add(new Solution<T>(lst));
             }
             else
             {
-                var stack = new List<int>(minors.Count) { 0 };
+                var mR = n - minors.Count;
+                var majors = new int[mR];
+                var cnts = new int[mR];
+                var sums = new double[mR];
+                {
+                    var minorID = 0;
+                    var mainRow = 0;
+                    for (var col = 0; col < n; col++)
+                        if (minorID < minors.Count &&
+                            col == minors[minorID])
+                            minorID++;
+                        else // major
+                        {
+                            majors[mainRow] = col;
+                            cnts[mainRow] = counts[col];
+                            sums[mainRow] = augmentedMatrixT[n, mainRow];
+                            mainRow++;
+                        }
+                }
+                Action<int, int> aggr =
+                    (minor, val) =>
+                    {
+                        for (var mainRow = 0; mainRow < mR; mainRow++)
+                            sums[mainRow] -= val * augmentedMatrixT[minors[minor], mainRow];
+                    };
+                var stack = new List<int>(minors.Count) { 0 }; // aggr(0, 0);
                 while (true)
                     if (stack.Count == minors.Count)
                         if (stack[stack.Count - 1] <= counts[minors[stack.Count - 1]])
                         {
-                            var lst = new List<int>(n);
-                            var minorID = 0;
-                            var mainRow = 0;
-                            for (var col = 0; col < n; col++)
-                                if (minorID < minors.Count &&
-                                    col == minors[minorID])
-                                    lst.Add(stack[minorID++]);
-                                else // major
+                            var lst = new int[n];
+                            var flag = true;
+                            for (var mainRow = 0; mainRow < mR; mainRow++)
+                            {
+                                var val = (int)Math.Round(sums[mainRow]);
+                                if (val < 0 ||
+                                    val > cnts[mainRow])
                                 {
-                                    var sum = augmentedMatrix[n, mainRow];
-                                    for (var i = 0; i < minors.Count; i++)
-                                        sum -= augmentedMatrix[minors[i], mainRow] * stack[i];
-                                    var val = (int)Math.Round(sum);
-                                    if (val < 0 ||
-                                        val > counts[col])
-                                        break;
-                                    lst.Add(val);
-                                    mainRow++;
+                                    flag = false;
+                                    break;
                                 }
-                            if (lst.Count == m_BlockSets.Count)
-                                res.Add(new Solution<T>(lst));
+                                lst[majors[mainRow]] = val;
+                            }
+                            if (flag)
+                            {
+                                for (var minorID = 0; minorID < minors.Count; minorID++)
+                                    lst[minors[minorID]] = stack[minorID];
+                                res.Add(new Solution<T>(lst.ToList()));
+                            }
 
+                            aggr(stack.Count - 1, 1);
                             stack[stack.Count - 1]++;
                         }
                         else
                         {
+                            aggr(stack.Count - 1, -stack[stack.Count - 1]);
                             stack.RemoveAt(stack.Count - 1);
                             if (stack.Count == 0)
                                 break;
+                            aggr(stack.Count - 1, 1);
                             stack[stack.Count - 1]++;
                         }
                     else if (stack[stack.Count - 1] <= counts[minors[stack.Count - 1]])
-                        stack.Add(0);
+                        stack.Add(0); // aggr(stack.Count - 1, 0);
                     else
                     {
+                        aggr(stack.Count - 1, -stack[stack.Count - 1]);
                         stack.RemoveAt(stack.Count - 1);
                         if (stack.Count == 0)
                             break;
+                        aggr(stack.Count - 1, 1);
                         stack[stack.Count - 1]++;
                     }
             }
@@ -416,6 +479,219 @@ namespace MineSweeperCalc
             }
 
             return total;
+        }
+
+        /// <summary>
+        ///     清点格的集合与现有格的集合的交叉数
+        /// </summary>
+        /// <param name="set">格的集合</param>
+        /// <returns>各交叉数</returns>
+        private int[] GetIntersectionCounts(BlockSet<T> set)
+        {
+            var lst = new List<T>(set.Blocks);
+            var sets = new int[m_BlockSets.Count];
+            for (var i = 0; i < m_BlockSets.Count; i++)
+            {
+                var ins = m_BlockSets[i].Blocks.Intersect(lst).ToArray();
+                lst.RemoveAll(ins.Contains);
+                sets[i] = ins.Length;
+            }
+            return sets;
+        }
+
+        /// <summary>
+        ///     清点两格的集合与现有格的集合的交叉数
+        /// </summary>
+        /// <param name="set1">第一个格的集合</param>
+        /// <param name="set2">第二个格的集合</param>
+        /// <param name="sets1">仅第一个格的集合的各交叉数</param>
+        /// <param name="sets2">仅第二个格的集合的各交叉数</param>
+        /// <param name="sets3">两格的集合共同的各交叉数</param>
+        private void GetIntersectionCounts(BlockSet<T> set1, BlockSet<T> set2,
+                                           out int[] sets1, out int[] sets2, out int[] sets3)
+        {
+            var lst1 = new List<T>(set1.Blocks);
+            var lst2 = new List<T>(set2.Blocks);
+            sets1 = new int[m_BlockSets.Count];
+            sets2 = new int[m_BlockSets.Count];
+            sets3 = new int[m_BlockSets.Count];
+            for (var i = 0; i < m_BlockSets.Count; i++)
+            {
+                var ins1 = m_BlockSets[i].Blocks.Intersect(lst1).ToArray();
+                var ins2 = m_BlockSets[i].Blocks.Intersect(lst2).ToArray();
+                var ins3 = ins1.Intersect(ins2).ToArray();
+                lst1.RemoveAll(ins1.Contains);
+                lst2.RemoveAll(ins2.Contains);
+                sets1[i] = ins1.Length - ins3.Length;
+                sets2[i] = ins2.Length - ins3.Length;
+                sets3[i] = ins3.Length;
+            }
+        }
+
+        /// <summary>
+        ///     计算指定格的集合的雷数的分布
+        /// </summary>
+        /// <param name="set">格的集合，必须是完整的</param>
+        /// <returns>分布</returns>
+        public IDictionary<int, BigInteger> Distribution(BlockSet<T> set)
+        {
+            int dMines, dBlanks;
+            var lst = ReduceSet(set, out dMines, out dBlanks);
+            var sets = GetIntersectionCounts(new BlockSet<T>(lst));
+
+            var dic = new Dictionary<int, BigInteger>();
+            foreach (var solution in Solutions)
+            {
+                var dicT = new Dictionary<int, BigInteger> { { dMines, 1 } };
+                for (var i = 0; i < m_BlockSets.Count; i++)
+                {
+                    var n = m_BlockSets[i].Count;
+                    var a = sets[i];
+                    var m = solution.Dist[i];
+
+                    var cases = new BigInteger[Math.Min(m, a) + 1];
+                    for (var j = 0; j <= m && j <= a; j++)
+                        cases[j] = m_BinomialHelper.Binomial(a, j) * m_BinomialHelper.Binomial(n - a, m - j);
+
+                    dicT = Add(dicT, cases);
+                }
+                Merge(dicT, dic);
+            }
+
+            return dic;
+        }
+
+        private static void Merge(IDictionary<int, BigInteger> from, IDictionary<int, BigInteger> to)
+        {
+            foreach (var kvp in from)
+            {
+                BigInteger old;
+                if (to.TryGetValue(kvp.Key, out old))
+                    to[kvp.Key] = old + kvp.Value;
+                else
+                    to.Add(kvp.Key, kvp.Value);
+            }
+        }
+
+        private static Dictionary<int, BigInteger> Add(IDictionary<int, BigInteger> from,
+                                                       IReadOnlyList<BigInteger> cases)
+        {
+            var dicN = new Dictionary<int, BigInteger>(from.Count);
+            foreach (var kvp in from)
+                for (var j = 0; j < cases.Count; j++)
+                {
+                    var key = kvp.Key + j;
+                    BigInteger old;
+                    if (dicN.TryGetValue(key, out old))
+                        dicN[key] = old + kvp.Value * cases[j];
+                    else
+                        dicN.Add(key, kvp.Value * cases[j]);
+                }
+            return dicN;
+        }
+
+        /// <summary>
+        ///     计算在一定条件下指定格的集合的雷数的分布
+        /// </summary>
+        /// <param name="set">格的集合，必须是完整的</param>
+        /// <param name="setCond">用作条件的格的集合，必须是完整的</param>
+        /// <param name="mines">用作条件的格的集合中的雷数</param>
+        /// <returns>分布</returns>
+        public IDictionary<int, BigInteger> DistributionConditioned(BlockSet<T> set, BlockSet<T> setCond, int mines)
+        {
+            int dMines, dBlanks;
+            var lst = ReduceSet(set, out dMines, out dBlanks);
+
+            int dMinesCond, dBlanksCond;
+            var lstCond = ReduceSet(setCond, out dMinesCond, out dBlanksCond);
+
+            if (lstCond.Count == 0)
+            {
+                if (dMinesCond == mines)
+                    return new Dictionary<int, BigInteger> { { dMines, 1 } };
+                return new Dictionary<int, BigInteger>();
+            }
+
+            int[] sets1, sets2, sets3;
+            GetIntersectionCounts(
+                                  new BlockSet<T>(lst),
+                                  new BlockSet<T>(lstCond),
+                                  out sets1,
+                                  out sets2,
+                                  out sets3);
+
+            var dic = new Dictionary<int, BigInteger>();
+            foreach (var solution in Solutions)
+            {
+                var max = new int[m_BlockSets.Count];
+                for (var i = 0; i < m_BlockSets.Count; i++)
+                    max[i] = Math.Min(solution.Dist[i], sets2[i] + sets3[i]);
+
+                var stack = new List<int>(m_BlockSets.Count);
+                if (m_BlockSets.Count > 1)
+                    stack.Add(0);
+                while (true)
+                    if (stack.Count == m_BlockSets.Count - 1)
+                    {
+                        var mns = mines - (stack.Sum() + dMinesCond);
+                        if (mns >= 0 &&
+                            mns <= max[m_BlockSets.Count - 1])
+                        {
+                            stack.Add(mns);
+
+                            var dicT = new Dictionary<int, BigInteger> { { dMines, 1 } };
+                            for (var i = 0; i < m_BlockSets.Count; i++)
+                            {
+                                var n = m_BlockSets[i].Count;
+                                var a = sets1[i];
+                                var b = sets2[i];
+                                var c = sets3[i];
+                                var m = solution.Dist[i]; // in a + b + c
+                                var p = stack[i]; // in b + c
+
+                                {
+                                    var cases = new BigInteger[Math.Min(p, c) + 1];
+                                    for (var j = 0; j <= p && j <= c; j++)
+                                        cases[j] = m_BinomialHelper.Binomial(c, j) *
+                                                   m_BinomialHelper.Binomial(b, p - j);
+
+                                    dicT = Add(dicT, cases);
+                                }
+                                {
+                                    var cases = new BigInteger[Math.Min(m - p, a) + 1];
+                                    for (var j = 0; j <= m - p && j <= a; j++)
+                                        cases[j] = m_BinomialHelper.Binomial(a, j) *
+                                                   m_BinomialHelper.Binomial(n - a - b - c, m - p - j);
+
+                                    dicT = Add(dicT, cases);
+                                }
+                            }
+                            Merge(dicT, dic);
+
+                            stack.RemoveAt(stack.Count - 1);
+                        }
+                        if (stack.Count == 0)
+                            break;
+                        if (mns <= 0)
+                        {
+                            stack.RemoveAt(stack.Count - 1);
+                            if (stack.Count == 0)
+                                break;
+                        }
+                        stack[stack.Count - 1]++;
+                    }
+                    else if (stack[stack.Count - 1] <= max[stack.Count - 1])
+                        stack.Add(0);
+                    else
+                    {
+                        stack.RemoveAt(stack.Count - 1);
+                        if (stack.Count == 0)
+                            break;
+                        stack[stack.Count - 1]++;
+                    }
+            }
+
+            return dic;
         }
     }
 }
