@@ -444,7 +444,7 @@ namespace MineSweeperCalc
                 }
             }
             foreach (var so in Solutions)
-                so.Ratio = BigIntegerHelper.Ratio(so.States, total);
+                so.Ratio = so.States.Over(total);
 
             Probability = new Dictionary<T, double>();
             foreach (var block in m_Manager.Keys)
@@ -463,7 +463,7 @@ namespace MineSweeperCalc
                     foreach (var block in kvp.Key.Blocks)
                         m_Manager.SetStatus(block, BlockStatus.Mine);
 
-                var ratio = BigIntegerHelper.Ratio(kvp.Value, total);
+                var ratio = kvp.Value.Over(total);
                 Expectation.Add(kvp.Key, ratio);
 
                 var p = ratio / kvp.Key.Count;
