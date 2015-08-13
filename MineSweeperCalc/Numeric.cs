@@ -5,21 +5,65 @@ using System.Numerics;
 
 namespace MineSweeperCalc
 {
-    public class BinomialHelper
+    public static class BinomialHelper
     {
-        private readonly BigInteger[,] m_Arr;
+        private static bool m_Editing;
+        private static readonly object m_LockObj;
+        private static readonly List<List<BigInteger>> m_Arr;
 
-        public BinomialHelper(int n, int r)
+        static BinomialHelper()
         {
-            var arr = new BigInteger[n, r];
-            arr[0, 0] = BigInteger.One;
-            for (var i = 1; i < n; i++)
-                for (var j = 0; j < r && j <= i; j++)
-                    arr[i, j] = (j == 0 ? BigInteger.One : arr[i - 1, j - 1]) + arr[i - 1, j];
-            m_Arr = arr;
+            m_LockObj = new object();
+            m_Arr = new List<List<BigInteger>> { new List<BigInteger> { 1 } };
         }
 
-        public BigInteger Binomial(int n, int m) => (n >= 1 && m >= 1) ? m_Arr[n - 1, m - 1] : BigInteger.One;
+        public static void UpdateTo(int n, int m)
+        {
+            if (n < 0)
+                throw new ArgumentException("必须为非负整数", nameof(n));
+            if (m > n ||
+                m < 0)
+                return;
+            if (m == 0 ||
+                m == n)
+                return;
+            if (m > n / 2)
+                m = n - m;
+            lock (m_LockObj)
+            {
+                m_Editing = true;
+                if (m_Arr[m_Arr.Count - 1].Count * 2 < m)
+                {
+                    for (var i = 0; i < m_Arr.Count; i++)
+                        for (var j = m_Arr[i].Count; j <= (i - 1) / 2 && j < m; j++)
+                            m_Arr[i].Add(
+                                         m_Arr[i - 1][j - 1] +
+                                         (j == (i - 1) / 2 && i % 2 == 1 ? m_Arr[i - 1][j - 1] : m_Arr[i - 1][j]));
+                }
+                for (var i = m_Arr.Count; i < n; i++)
+                {
+                    var lst = new List<BigInteger>(Math.Min((i - 1) / 2 + 1, m)) { BigInteger.One + m_Arr[i - 1][0] };
+                    for (var j = 1; j <= (i - 1) / 2 && j <m; j++)
+                        lst.Add(
+                                m_Arr[i - 1][j - 1] +
+                                (j == (i - 1) / 2 && i % 2 == 1 ? m_Arr[i - 1][j - 1] : m_Arr[i - 1][j]));
+                    m_Arr.Add(lst);
+                }
+                m_Editing = false;
+            }
+        }
+
+        public static BigInteger Binomial(int n, int m)
+        {
+            if (n < 0)
+                throw new ArgumentException("必须为非负整数", nameof(n));
+            if (m > n || m < 0)
+                return BigInteger.Zero;
+            if (m == 0 ||
+                m == n)
+                return BigInteger.One;
+            return m_Arr[n - 1][m <= n / 2 ? m - 1 : n - m - 1];
+        }
     }
 
     public static class BigIntegerHelper

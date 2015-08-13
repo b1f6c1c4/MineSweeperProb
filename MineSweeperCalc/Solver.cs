@@ -37,11 +37,6 @@ namespace MineSweeperCalc
         }
 
         /// <summary>
-        ///     二项式系数计算器
-        /// </summary>
-        private readonly BinomialHelper m_BinomialHelper;
-
-        /// <summary>
         ///     解空间
         /// </summary>
         public List<Solution<T>> Solutions { get; private set; }
@@ -56,9 +51,8 @@ namespace MineSweeperCalc
         /// </summary>
         public IDictionary<T, double> Probability { get; private set; }
 
-        public Solver(IEnumerable<T> blocks, BinomialHelper binomialHelper)
+        public Solver(IEnumerable<T> blocks)
         {
-            m_BinomialHelper = binomialHelper;
             m_Manager = new BlockManager<T>(blocks);
             m_Restrains = new List<Restrain>();
             m_BlockSets = new List<BlockSet<T>>();
@@ -66,7 +60,6 @@ namespace MineSweeperCalc
 
         public Solver(Solver<T> other)
         {
-            m_BinomialHelper = other.m_BinomialHelper;
             m_Manager = new BlockManager<T>(other.m_Manager);
             m_Restrains = new List<Restrain>(other.m_Restrains.Count);
             foreach (var restrain in other.m_Restrains)
@@ -436,7 +429,7 @@ namespace MineSweeperCalc
                 so.Distribution = new Dictionary<BlockSet<T>, int>(m_BlockSets.Count);
                 for (var i = 0; i < m_BlockSets.Count; i++)
                 {
-                    so.States *= m_BinomialHelper.Binomial(m_BlockSets[i].Count, so.Dist[i]);
+                    so.States *= BinomialHelper.Binomial(m_BlockSets[i].Count, so.Dist[i]);
                     so.Distribution.Add(m_BlockSets[i], so.Dist[i]);
                 }
                 total += so.States;
@@ -551,7 +544,7 @@ namespace MineSweeperCalc
 
                     var cases = new BigInteger[Math.Min(m, a) + 1];
                     for (var j = 0; j <= m && j <= a; j++)
-                        cases[j] = m_BinomialHelper.Binomial(a, j) * m_BinomialHelper.Binomial(n - a, m - j);
+                        cases[j] = BinomialHelper.Binomial(a, j) * BinomialHelper.Binomial(n - a, m - j);
 
                     dicT = Add(dicT, cases);
                 }
@@ -655,16 +648,16 @@ namespace MineSweeperCalc
                                 {
                                     var cases = new BigInteger[Math.Min(p, c) + 1];
                                     for (var j = 0; j <= p && j <= c; j++)
-                                        cases[j] = m_BinomialHelper.Binomial(c, j) *
-                                                   m_BinomialHelper.Binomial(b, p - j);
+                                        cases[j] = BinomialHelper.Binomial(c, j) *
+                                                   BinomialHelper.Binomial(b, p - j);
 
                                     dicT = Add(dicT, cases);
                                 }
                                 {
                                     var cases = new BigInteger[Math.Min(m - p, a) + 1];
                                     for (var j = 0; j <= m - p && j <= a; j++)
-                                        cases[j] = m_BinomialHelper.Binomial(a, j) *
-                                                   m_BinomialHelper.Binomial(n - a - b - c, m - p - j);
+                                        cases[j] = BinomialHelper.Binomial(a, j) *
+                                                   BinomialHelper.Binomial(n - a - b - c, m - p - j);
 
                                     dicT = Add(dicT, cases);
                                 }
