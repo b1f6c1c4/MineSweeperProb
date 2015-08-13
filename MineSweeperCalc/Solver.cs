@@ -542,7 +542,7 @@ namespace MineSweeperCalc
             var dic = new Dictionary<int, BigInteger>();
             foreach (var solution in Solutions)
             {
-                var dicT = new Dictionary<int, BigInteger> { { dMines, 1 } };
+                var dicT = new Dictionary<int, BigInteger> { { 0, 1 } };
                 for (var i = 0; i < m_BlockSets.Count; i++)
                 {
                     var n = m_BlockSets[i].Count;
@@ -558,7 +558,10 @@ namespace MineSweeperCalc
                 Merge(dicT, dic);
             }
 
-            return dic;
+            if (!dic.ContainsKey(0))
+                dic.Add(0, 0);
+
+            return dic.ToDictionary(kvp => kvp.Key + dMines, kvp => kvp.Value);
         }
 
         private static void Merge(IDictionary<int, BigInteger> from, IDictionary<int, BigInteger> to)
@@ -639,7 +642,7 @@ namespace MineSweeperCalc
                         {
                             stack.Add(mns);
 
-                            var dicT = new Dictionary<int, BigInteger> { { dMines, 1 } };
+                            var dicT = new Dictionary<int, BigInteger> { { 0, 1 } };
                             for (var i = 0; i < m_BlockSets.Count; i++)
                             {
                                 var n = m_BlockSets[i].Count;
@@ -691,7 +694,10 @@ namespace MineSweeperCalc
                     }
             }
 
-            return dic;
+            if (!dic.ContainsKey(0))
+                dic.Add(0, 0);
+
+            return dic.ToDictionary(kvp => kvp.Key + dMines, kvp => kvp.Value);
         }
     }
 }
