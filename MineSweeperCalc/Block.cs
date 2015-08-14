@@ -108,6 +108,19 @@ namespace MineSweeperCalc
             return h;
         }
 
+        public int CompareTo(Block other)
+        {
+            if (X > other.X)
+                return 1;
+            if (X < other.X)
+                return -1;
+            if (Y > other.Y)
+                return 1;
+            if (Y < other.Y)
+                return -1;
+            return 0;
+        }
+
         /// <inheritdoc />
         public override string ToString() => $"({X} {Y})";
     }

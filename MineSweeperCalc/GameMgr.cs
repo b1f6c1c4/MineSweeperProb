@@ -17,7 +17,7 @@ namespace MineSweeperCalc
         /// <param name="blocks">格</param>
         /// <param name="mgr">游戏</param>
         /// <returns>最优格</returns>
-        public delegate IEnumerable<Block> DecideDelegate(IEnumerable<Block> blocks, GameMgr mgr);
+        public delegate IEnumerable<Block> DecideDelegate(List<Block> blocks, GameMgr mgr);
 
         /// <summary>
         ///     格

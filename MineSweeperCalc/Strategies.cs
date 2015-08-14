@@ -6,8 +6,13 @@ using MineSweeperCalc.Solver;
 
 namespace MineSweeperCalc
 {
+    /// <summary>
+    ///     策略
+    /// </summary>
     public static class Strategies
     {
+        #region Auxiliary
+
         private static BigInteger Sum(this IEnumerable<BigInteger> lst)
             => lst.Aggregate(BigInteger.One, (c, v) => c + v);
 
@@ -26,54 +31,126 @@ namespace MineSweeperCalc
         private static double Quantity(IDictionary<int, BigInteger> dist)
         {
             var total = dist.Values.Sum();
-            Func<double, double> f = p => p * Math.Log(p, 2);
+            Func<double, double> f = p => -p * Math.Log(p, 2);
             return dist.Sum(kvp => kvp.Value.IsZero ? 0D : f(kvp.Value.Over(total)));
         }
 
-        public static IEnumerable<Block> MinProb(IEnumerable<Block> blocks, GameMgr mgr)
+        private static IEnumerable<Block> Best(IReadOnlyCollection<Block> lst, Func<Block, double> f, bool dir = false)
         {
-            var lst = blocks.ToList();
-            var prob = lst.Min(b => mgr.Solver.Probability[b]);
-            return lst.Where(b => mgr.Solver.Probability[b] <= prob);
+            var vals = lst.Select(f).ToList();
+            var m = dir ? vals.Min() : vals.Max();
+            return lst.Where((t, i) => dir && vals[i] >= m || !dir && vals[i] <= m);
         }
 
-        public static IEnumerable<Block> MinProbMaxZeroProb(IEnumerable<Block> blocks, GameMgr mgr)
+        private static IEnumerable<Block> ZeroProb(IReadOnlyCollection<Block> lst, IReadOnlyDictionary<Block, IDictionary<int, BigInteger>> degreeDist, bool dir = false) => Best(lst, b => ZeroProb(degreeDist[b]), dir);
+
+        private static IEnumerable<Block> ZeroCount(IReadOnlyCollection<Block> lst, GameMgr mgr, IReadOnlyDictionary<Block, IDictionary<int, BigInteger>> degreeDist, bool dir = false)
+            => Best(lst, b => b.ZeroCount(degreeDist[b], mgr), dir);
+
+        private static IEnumerable<Block> Quantity(IReadOnlyCollection<Block> lst, IReadOnlyDictionary<Block, IDictionary<int, BigInteger>> degreeDist, bool dir = false)
+            => Best(lst, b => Quantity(degreeDist[b]), dir);
+
+        #endregion
+
+        public static IEnumerable<Block> MinProb(List<Block> blocks, GameMgr mgr)
+            => Best(blocks, b => mgr.Solver.Probability[b], true);
+
+        public static IEnumerable<Block> MinProbMaxZeroProb(List<Block> blocks, GameMgr mgr)
         {
-            var lst = blocks.ToList();
-            var prob = lst.Min(b => mgr.Solver.Probability[b]);
-            lst = lst.Where(b => mgr.Solver.Probability[b] <= prob).ToList();
-
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
             var degreeDist = lst.ToDist(mgr);
-
-            var zeroProb = lst.ToDictionary(b => b, b => ZeroProb(degreeDist[b]));
-            var zero = zeroProb.Values.Max();
-            return lst.Where(b => zeroProb[b] >= zero);
+            return ZeroProb(lst, degreeDist);
         }
 
-        public static IEnumerable<Block> MinProbMaxZeroCount(IEnumerable<Block> blocks, GameMgr mgr)
+        public static IEnumerable<Block> MinProbMaxZeroCount(List<Block> blocks, GameMgr mgr)
         {
-            var lst = blocks.ToList();
-            var prob = lst.Min(b => mgr.Solver.Probability[b]);
-            lst = lst.Where(b => mgr.Solver.Probability[b] <= prob).ToList();
-
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
             var degreeDist = lst.ToDist(mgr);
-
-            var zeroCount = lst.ToDictionary(b => b, b => b.ZeroCount(degreeDist[b], mgr));
-            var zero = zeroCount.Values.Max();
-            return lst.Where(b => zeroCount[b] >= zero);
+            return ZeroCount(lst, mgr, degreeDist);
         }
 
-        public static IEnumerable<Block> MinProbMaxQuantity(IEnumerable<Block> blocks, GameMgr mgr)
+        public static IEnumerable<Block> MinProbMaxQuantity(List<Block> blocks, GameMgr mgr)
         {
-            var lst = blocks.ToList();
-            var prob = lst.Min(b => mgr.Solver.Probability[b]);
-            lst = lst.Where(b => mgr.Solver.Probability[b] <= prob).ToList();
-
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
             var degreeDist = lst.ToDist(mgr);
+            return Quantity(lst, degreeDist);
+        }
 
-            var quantity = lst.ToDictionary(b => b, b => Quantity(degreeDist[b]));
-            var quant = quantity.Values.Max();
-            return lst.Where(b => quantity[b] >= quant);
+        public static IEnumerable<Block> MinProbMinQuantity(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            return Quantity(lst, degreeDist, true);
+        }
+
+        public static IEnumerable<Block> MinProbMaxZeroProbMaxQuantity(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = ZeroProb(lst, degreeDist).ToList();
+            return Quantity(lst, degreeDist);
+        }
+
+        public static IEnumerable<Block> MinProbMaxZeroProbMinQuantity(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = ZeroProb(lst, degreeDist).ToList();
+            return Quantity(lst, degreeDist, true);
+        }
+
+        public static IEnumerable<Block> MinProbMaxZeroCountMaxQuantity(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = ZeroCount(lst, mgr, degreeDist).ToList();
+            return Quantity(lst, degreeDist);
+        }
+
+        public static IEnumerable<Block> MinProbMaxZeroCountMinQuantity(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = ZeroCount(lst, mgr, degreeDist).ToList();
+            return Quantity(lst, degreeDist, true);
+        }
+
+        public static IEnumerable<Block> MinProbMaxQuantityMaxZeroProb(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = Quantity(lst, degreeDist).ToList();
+            return ZeroProb(lst, degreeDist);
+        }
+
+        public static IEnumerable<Block> MinProbMaxQuantityMaxZeroCount(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = Quantity(lst, degreeDist).ToList();
+            return ZeroCount(lst, mgr, degreeDist);
+        }
+
+        public static IEnumerable<Block> MinProbMinQuantityMaxZeroProb(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = Quantity(lst, degreeDist, true).ToList();
+            return ZeroProb(lst, degreeDist);
+        }
+
+        public static IEnumerable<Block> MinProbMinQuantityMaxZeroCount(List<Block> blocks, GameMgr mgr)
+        {
+            var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
+            var degreeDist = lst.ToDist(mgr);
+            lst = Quantity(lst, degreeDist, true).ToList();
+            return ZeroCount(lst, mgr, degreeDist);
+        }
+
+        public static IEnumerable<Block> MixProbZeroProb(List<Block> blocks, GameMgr mgr)
+        {
+            var degreeDist = blocks.ToDist(mgr);
+            return Best(blocks, b => (1 - mgr.Solver.Probability[b]) * ZeroProb(degreeDist[b]));
         }
     }
 }

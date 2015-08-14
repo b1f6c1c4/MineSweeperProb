@@ -84,15 +84,16 @@ namespace MineSweeperCalc.Solver
             var blkLst = new List<int>(m_BlockSets.Count);
             for (var i = 0; i < count; i++)
             {
-                var intersection = m_BlockSets[i].Blocks.Intersect(theSet.Blocks).ToArray();
-                if (intersection.Length == 0)
+                List<T> exceptA, exceptB, intersection;
+                Overlap(m_BlockSets[i], theSet, out exceptA, out exceptB, out intersection);
+                if (intersection.Count == 0)
                 {
                     blkLst.Add(0);
                     continue;
                 }
 
-                var newA = new BlockSet<T>(m_BlockSets[i].Blocks.Except(intersection));
-                var newB = new BlockSet<T>(theSet.Blocks.Except(intersection));
+                var newA = new BlockSet<T>(exceptA);
+                var newB = new BlockSet<T>(exceptB);
                 var newC = new BlockSet<T>(intersection);
 
                 theSet = newB;
@@ -130,6 +131,37 @@ namespace MineSweeperCalc.Solver
 
             return blkLst;
         }
+
+        private static void Overlap(IReadOnlyList<T> setA, IReadOnlyList<T> setB,
+                                    out List<T> exceptA, out List<T> exceptB, out List<T> intersection)
+        {
+            int p = 0, q = 0;
+            intersection = new List<T>();
+            exceptA = new List<T>();
+            exceptB = new List<T>();
+            for (; p < setA.Count && q < setB.Count;)
+            {
+                var cmp = setA[p].CompareTo(setB[q]);
+                if (cmp < 0)
+                    exceptA.Add(setA[p++]);
+                else if (cmp > 0)
+                    exceptB.Add(setB[q++]);
+                else
+                {
+                    intersection.Add(setB[q]);
+                    p++;
+                    q++;
+                }
+            }
+            while (p < setA.Count)
+                exceptA.Add(setA[p++]);
+            while (q < setB.Count)
+                exceptB.Add(setB[q++]);
+        }
+
+        private static void Overlap(BlockSet<T> setA, BlockSet<T> setB,
+                                    out List<T> exceptA, out List<T> exceptB, out List<T> intersection)
+            => Overlap(setA.Blocks, setB.Blocks, out exceptA, out exceptB, out intersection);
 
         /// <summary>
         ///     添加约束
@@ -490,9 +522,10 @@ namespace MineSweeperCalc.Solver
             var sets = new int[m_BlockSets.Count];
             for (var i = 0; i < m_BlockSets.Count; i++)
             {
-                var ins = m_BlockSets[i].Blocks.Intersect(lst).ToArray();
-                lst.RemoveAll(ins.Contains);
-                sets[i] = ins.Length;
+                List<T> exceptA, exceptB, intersection;
+                Overlap(m_BlockSets[i].Blocks, lst, out exceptA, out exceptB, out intersection);
+                lst = exceptB;
+                sets[i] = intersection.Count;
             }
             return sets;
         }
@@ -515,14 +548,15 @@ namespace MineSweeperCalc.Solver
             sets3 = new int[m_BlockSets.Count];
             for (var i = 0; i < m_BlockSets.Count; i++)
             {
-                var ins1 = m_BlockSets[i].Blocks.Intersect(lst1).ToArray();
-                var ins2 = m_BlockSets[i].Blocks.Intersect(lst2).ToArray();
-                var ins3 = ins1.Intersect(ins2).ToArray();
-                lst1.RemoveAll(ins1.Contains);
-                lst2.RemoveAll(ins2.Contains);
-                sets1[i] = ins1.Length - ins3.Length;
-                sets2[i] = ins2.Length - ins3.Length;
-                sets3[i] = ins3.Length;
+                List<T> exceptA, exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC, resume1, resume2;
+                Overlap(m_BlockSets[i].Blocks, lst1, out exceptA, out resume1, out exceptB1T);
+                Overlap(m_BlockSets[i].Blocks, lst2, out exceptA, out resume2, out exceptB2T);
+                Overlap(exceptB1T, exceptB2T, out exceptB1, out exceptB2, out exceptC);
+                lst1 = resume1;
+                lst2 = resume2;
+                sets1[i] = exceptB1.Count;
+                sets2[i] = exceptB2.Count;
+                sets3[i] = exceptC.Count;
             }
         }
 

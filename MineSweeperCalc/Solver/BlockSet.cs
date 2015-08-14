@@ -22,7 +22,22 @@ namespace MineSweeperCalc.Solver
 
         public BlockSet(T[] blocks)
         {
-            Blocks = blocks;
+            var flag = true;
+            for (var i = 0; i < blocks.Length - 1; i++)
+                if (blocks[i].CompareTo(blocks[i + 1]) > 0)
+                {
+                    flag = false;
+                    break;
+                }
+            if (!flag)
+            {
+                var lst = blocks.ToList();
+                lst.Sort();
+                Blocks = lst.ToArray();
+            }
+            else
+                Blocks = blocks;
+
             m_Hash = Blocks.Aggregate(5381, (h, t) => (h << 5) + h + t.GetHashCode());
         }
 
