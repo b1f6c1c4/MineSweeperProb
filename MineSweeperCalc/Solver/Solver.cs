@@ -51,6 +51,11 @@ namespace MineSweeperCalc.Solver
         /// </summary>
         public IDictionary<T, double> Probability { get; private set; }
 
+        /// <summary>
+        ///     总状态数
+        /// </summary>
+        public BigInteger TotalStates { get; private set; }
+
         public Solver(IEnumerable<T> blocks)
         {
             m_Manager = new BlockManager<T>(blocks);
@@ -143,7 +148,7 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     求解
         /// </summary>
-        public BigInteger Solve()
+        public void Solve()
         {
             while (ReduceRestrains()) { }
 
@@ -159,7 +164,7 @@ namespace MineSweeperCalc.Solver
             if (result.Count == 0)
                 throw new ApplicationException("无解");
 
-            return ProcessSolutions(result);
+            ProcessSolutions(result);
         }
 
         /// <summary>
@@ -417,7 +422,7 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     处理解及解空间
         /// </summary>
-        private BigInteger ProcessSolutions(List<Solution<T>> solutions)
+        private void ProcessSolutions(List<Solution<T>> solutions)
         {
             var exp = new Dictionary<BlockSet<T>, BigInteger>();
             var total = BigInteger.Zero;
@@ -471,7 +476,7 @@ namespace MineSweeperCalc.Solver
                     Probability.Add(block, p);
             }
 
-            return total;
+            TotalStates = total;
         }
 
         /// <summary>
@@ -604,7 +609,7 @@ namespace MineSweeperCalc.Solver
         /// <param name="setCond">用作条件的格的集合，必须是完整的</param>
         /// <param name="mines">用作条件的格的集合中的雷数</param>
         /// <returns>分布</returns>
-        public IDictionary<int, BigInteger> DistributionConditioned(BlockSet<T> set, BlockSet<T> setCond, int mines)
+        public IDictionary<int, BigInteger> DistributionCond(BlockSet<T> set, BlockSet<T> setCond, int mines)
         {
             int dMines, dBlanks;
             var lst = ReduceSet(set, out dMines, out dBlanks);
@@ -615,7 +620,7 @@ namespace MineSweeperCalc.Solver
             if (lstCond.Count == 0)
             {
                 if (dMinesCond == mines)
-                    return new Dictionary<int, BigInteger> { { dMines, 1 } };
+                    return Distribution(set);
                 return new Dictionary<int, BigInteger>();
             }
 

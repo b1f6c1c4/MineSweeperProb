@@ -7,10 +7,18 @@ using MineSweeperCalc.Solver;
 namespace MineSweeperCalc
 {
     /// <summary>
-    ///     半自动扫雷游戏
+    ///     自动扫雷游戏
     /// </summary>
     public sealed class GameMgr
     {
+        /// <summary>
+        ///     进行决策
+        /// </summary>
+        /// <param name="blocks">格</param>
+        /// <param name="mgr">游戏</param>
+        /// <returns>最优格</returns>
+        public delegate IEnumerable<Block> DecideDelegate(IEnumerable<Block> blocks, GameMgr mgr);
+
         /// <summary>
         ///     格
         /// </summary>
@@ -52,22 +60,28 @@ namespace MineSweeperCalc
         public int ToOpen { get; private set; }
 
         /// <summary>
-        ///     随机发生器种子
-        /// </summary>
-        private readonly int m_Seed;
-
-        /// <summary>
         ///     求解器
         /// </summary>
         public Solver<Block> Solver { get; }
 
-        public GameMgr(int width, int height, int totalMines, int seed)
+        /// <summary>
+        ///     决策器
+        /// </summary>
+        public DecideDelegate DecisionMaker { get; set; }
+
+        /// <summary>
+        ///     随机数发生器
+        /// </summary>
+        private readonly Random m_Random;
+
+        public GameMgr(int width, int height, int totalMines, int seed, DecideDelegate decisionMaker = null)
         {
             m_Blocks = new Block[width, height];
             TotalWidth = width;
             TotalHeight = height;
             TotalMines = totalMines;
-            m_Seed = seed;
+            m_Random = new Random(seed);
+            DecisionMaker = decisionMaker;
 
             var set = new Collection<Block>();
 
@@ -111,11 +125,10 @@ namespace MineSweeperCalc
         private void SettleMines(int initX, int initY)
         {
             var totalMines = TotalMines;
-            var rnd = new Random(m_Seed);
             while (totalMines > 0)
             {
-                var x = rnd.Next(TotalWidth);
-                var y = rnd.Next(TotalHeight);
+                var x = m_Random.Next(TotalWidth);
+                var y = m_Random.Next(TotalHeight);
                 if (x == initX &&
                     y == initY)
                     continue;
@@ -158,7 +171,7 @@ namespace MineSweeperCalc
                 return;
             }
 
-            Solver.AddRestrain(new BlockSet<Block>(new[] { block }), 0);
+            Solver.AddRestrain(new BlockSet<Block>(block), 0);
             if (block.Degree == 0)
                 foreach (var b in block.Surrounding.Blocks.Where(b => !b.IsOpen))
                     OpenBlock(b.X, b.Y);
@@ -170,6 +183,84 @@ namespace MineSweeperCalc
                 Started = false;
                 Suceed = true;
             }
+        }
+
+        /// <summary>
+        ///     半自动操作一步
+        /// </summary>
+        /// <returns>可以继续半自动操作</returns>
+        public bool SemiAutomaticStep()
+        {
+            if (!Started)
+                return false;
+            Solver.Solve();
+            var flag = false;
+            for (var i = 0; i < TotalWidth; i++)
+            {
+                for (var j = 0; j < TotalHeight; j++)
+                    if (!m_Blocks[i, j].IsOpen &&
+                        Solver[m_Blocks[i, j]] == BlockStatus.Blank)
+                    {
+                        OpenBlock(i, j);
+                        flag = true;
+                        if (Started)
+                            continue;
+                        if (!Suceed)
+                            throw new ApplicationException("判断错误");
+                        break;
+                    }
+                if (!Started)
+                    break;
+            }
+            return flag && Started;
+        }
+
+        /// <summary>
+        ///     半自动操作
+        /// </summary>
+        /// <returns>需要进行决策</returns>
+        public bool SemiAutomatic()
+        {
+            if (!Started)
+                return false;
+            while (SemiAutomaticStep()) { }
+            return Started;
+        }
+
+        /// <summary>
+        ///     按特定策略自动操作一次
+        /// </summary>
+        public void AutomaticStep()
+        {
+            if (!Started)
+                return;
+
+            if (DecisionMaker == null)
+            {
+                Started = false;
+                return;
+            }
+
+            var lst = new List<Block>();
+            for (var i = 0; i < TotalWidth; i++)
+                for (var j = 0; j < TotalHeight; j++)
+                    if (!m_Blocks[i, j].IsOpen &&
+                        Solver[m_Blocks[i, j]] == BlockStatus.Unknown)
+                        lst.Add(m_Blocks[i, j]);
+
+            var ary = DecisionMaker(lst, this).ToArray();
+            var blk = ary[m_Random.Next(ary.Length)];
+            OpenBlock(blk.X, blk.Y);
+        }
+
+        /// <summary>
+        ///     按特定策略自动操作
+        /// </summary>
+        public void Automatic()
+        {
+            while (Started)
+                if (SemiAutomatic())
+                    AutomaticStep();
         }
     }
 }

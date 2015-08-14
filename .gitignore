@@ -7,7 +7,9 @@ $RECYCLE.BIN/
 
 *.suo
 *.cache
-MineSweeperCalc/bin/
-MineSweeperCalc/obj/
 MineSweeper/bin/
 MineSweeper/obj/
+MineSweeperAnalyzer/bin/
+MineSweeperAnalyzer/obj/
+MineSweeperCalc/bin/
+MineSweeperCalc/obj/

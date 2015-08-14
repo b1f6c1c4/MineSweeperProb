@@ -28,6 +28,8 @@ namespace MineSweeperCalc.Solver
 
         public BlockSet(IEnumerable<T> blocks) : this(blocks.ToArray()) { }
 
+        public BlockSet(T block) : this(new[] { block }) { }
+
         /// <inheritdoc />
         public int Count => Blocks.Length;
 
