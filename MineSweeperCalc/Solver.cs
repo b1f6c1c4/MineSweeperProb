@@ -159,9 +159,7 @@ namespace MineSweeperCalc
             if (result.Count == 0)
                 throw new ApplicationException("无解");
 
-            Solutions = result;
-
-            return ProcessSolutions();
+            return ProcessSolutions(result);
         }
 
         /// <summary>
@@ -419,11 +417,11 @@ namespace MineSweeperCalc
         /// <summary>
         ///     处理解及解空间
         /// </summary>
-        private BigInteger ProcessSolutions()
+        private BigInteger ProcessSolutions(List<Solution<T>> solutions)
         {
             var exp = new Dictionary<BlockSet<T>, BigInteger>();
             var total = BigInteger.Zero;
-            foreach (var so in Solutions)
+            foreach (var so in solutions)
             {
                 so.States = BigInteger.One;
                 so.Distribution = new Dictionary<BlockSet<T>, int>(m_BlockSets.Count);
@@ -443,8 +441,10 @@ namespace MineSweeperCalc
                         exp[s] = v;
                 }
             }
-            foreach (var so in Solutions)
+            foreach (var so in solutions)
                 so.Ratio = so.States.Over(total);
+
+            Solutions = solutions;
 
             Probability = new Dictionary<T, double>();
             foreach (var block in m_Manager.Keys)

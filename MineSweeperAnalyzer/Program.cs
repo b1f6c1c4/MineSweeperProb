@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using MineSweeperCalc;
 
@@ -11,11 +14,11 @@ namespace MineSweeperAnalyzer
     internal class Program
     {
         private static int N;
-        private static readonly BinomialHelper Helper = new BinomialHelper(30 * 16, 99);
 
         private static void Main(string[] args)
         {
             N = Convert.ToInt32(Console.ReadLine());
+            BinomialHelper.UpdateTo(30 * 16, 99);
 
             //using (var sw = new StreamWriter(@"output.txt"))
             //    for (var x = 0; x < 15; x++)
@@ -37,15 +40,15 @@ namespace MineSweeperAnalyzer
         private static ConcurrentDictionary<double, int> Process(int x, int y)
         {
             var dic = new ConcurrentDictionary<double, int>();
+            var seed = (int)DateTime.Now.Ticks;
             Parallel.For(
                          0,
                          N,
                          i =>
                          {
-                             var bit =
-                                 (new Tester(new BlockMgr(30, 16, 99), Helper, (int)DateTime.Now.Ticks))
-                                     .Execute(x, y);
-
+                             var blockMgr = new BlockMgr(30, 16, 99, Interlocked.Increment(ref seed));
+                             var tester = new Tester(blockMgr, Interlocked.Increment(ref seed));
+                             var bit = tester.Execute(x, y);
                              dic.AddOrUpdate(bit, 1, (key, val) => val + 1);
                          });
             return dic;
@@ -61,7 +64,7 @@ namespace MineSweeperAnalyzer
         private double m_Bits;
         private readonly Random m_Rnd;
 
-        public Tester(BlockMgr mgr, BinomialHelper helper, int seed)
+        public Tester(BlockMgr mgr, int seed)
         {
             m_Rnd = new Random(seed);
             m_Mgr = mgr;
@@ -70,7 +73,7 @@ namespace MineSweeperAnalyzer
 
             m_ToOpen = blocks - m_Mgr.TotalMines;
 
-            m_Solver = new Solver<Block>(m_Mgr.Blocks, helper);
+            m_Solver = new Solver<Block>(m_Mgr.Blocks);
             m_Solver.AddRestrain(new BlockSet<Block>(m_Mgr.Blocks), m_Mgr.TotalMines);
 
             m_Started = true;
@@ -82,7 +85,7 @@ namespace MineSweeperAnalyzer
             while (m_Started)
             {
                 Solve();
-                var flag = true;
+                var flag = false;
                 for (var i = 0; i < m_Mgr.TotalWidth; i++)
                     for (var j = 0; j < m_Mgr.TotalHeight; j++)
                         if (!m_Mgr[i, j].IsOpen &&
@@ -92,9 +95,9 @@ namespace MineSweeperAnalyzer
                             if (!m_Started &&
                                 m_ToOpen > 0)
                                 throw new ApplicationException("判断错误");
-                            flag = false;
+                            flag = true;
                         }
-                if (!flag)
+                if (flag)
                     continue;
 
                 var prob = 1D;
@@ -105,6 +108,7 @@ namespace MineSweeperAnalyzer
                             m_Solver[m_Mgr[i, j]] == BlockStatus.Unknown)
                             prob = m_Solver.Probability[m_Mgr[i, j]];
 
+                var pOfZero = new Dictionary<Block, double>();
                 var quantities = new Dictionary<Block, double>();
                 for (var i = 0; i < m_Mgr.TotalWidth; i++)
                     for (var j = 0; j < m_Mgr.TotalHeight; j++)
@@ -117,15 +121,23 @@ namespace MineSweeperAnalyzer
                             var total = dic.Aggregate(BigInteger.Zero, (cur, kvp) => cur + kvp.Value);
                             if (total.IsZero)
                                 throw new Exception();
-                            var q = dic.Sum(
-                                            kvp =>
-                                            -BigIntegerHelper.Ratio(kvp.Value, total)
-                                            * Math.Log(BigIntegerHelper.Ratio(kvp.Value, total), 2));
+                            pOfZero[block] = dic[dic.Keys.Min()].Over(total);
+                            var q =
+                                dic.Sum(
+                                        kvp =>
+                                        {
+                                            if (kvp.Value == 0)
+                                                return 0D;
+                                            var p = kvp.Value.Over(total);
+                                            return -p * Math.Log(p, 2);
+                                        });
                             quantities[block] = q;
                         }
 
-                var maxQ = quantities.Values.Max();
-                var lst = quantities.Where(kvp => kvp.Value >= maxQ).Select(kvp => kvp.Key).ToList();
+                var maxP = pOfZero.Values.Max();
+                var lst = pOfZero.Where(kvp => kvp.Value >= maxP).Select(kvp => kvp.Key).ToList();
+                var maxQ = lst.Select(b => quantities[b]).Max();
+                lst = quantities.Where(kvp => kvp.Value >= maxQ).Select(kvp => kvp.Key).ToList();
 
                 var blk = lst[m_Rnd.Next(lst.Count)];
                 OpenBlock(blk.X, blk.Y);
@@ -161,7 +173,7 @@ namespace MineSweeperAnalyzer
 
             double sig;
             int exp;
-            BigIntegerHelper.Part(total, out sig, out exp);
+            total.Part(out sig, out exp);
             m_Bits = Math.Log(sig, 2) + exp;
         }
     }

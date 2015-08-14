@@ -13,13 +13,15 @@ namespace MineSweeperAnalyzer
         public int TotalHeight { get; }
         public int TotalMines { get; }
         private bool m_Settled;
+        private readonly int m_Seed;
 
-        public BlockMgr(int width, int height, int totalMines)
+        public BlockMgr(int width, int height, int totalMines, int seed)
         {
             m_Blocks = new Block[width, height];
             TotalWidth = width;
             TotalHeight = height;
             TotalMines = totalMines;
+            m_Seed = seed;
 
             var col = new Collection<Block>();
 
@@ -55,7 +57,7 @@ namespace MineSweeperAnalyzer
         private void SettleMines(int initX, int initY)
         {
             var totalMines = TotalMines;
-            var rnd = new Random();
+            var rnd = new Random(m_Seed);
             while (totalMines > 0)
             {
                 var x = rnd.Next(TotalWidth);

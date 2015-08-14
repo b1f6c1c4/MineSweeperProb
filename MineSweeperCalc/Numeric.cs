@@ -92,9 +92,9 @@ namespace MineSweeperCalc
             TheLock.EnterReadLock();
             try
             {
-                if (Coeff.Count >= n)
+                if (Coeff.Count < n)
                     throw new ArgumentOutOfRangeException(nameof(n), "超出范围");
-                if (Coeff[Coeff.Count - 1].Count >= mm)
+                if (Coeff[Coeff.Count - 1].Count < mm)
                     throw new ArgumentOutOfRangeException(nameof(m), "超出范围");
                 return Coeff[n - 1][mm - 1];
             }

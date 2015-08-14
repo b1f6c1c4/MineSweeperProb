@@ -123,12 +123,12 @@ namespace MineSweeper
             m_Mgr = new BlockMgr(30, 16, 99);
 
             var blocks = m_Mgr.TotalWidth * m_Mgr.TotalHeight;
-            var helper = new BinomialHelper(blocks, m_Mgr.TotalMines);
-            BigIntegerHelper.Part(helper.Binomial(blocks, m_Mgr.TotalMines), out m_Sig, out m_Exp);
+            BinomialHelper.UpdateTo(blocks, m_Mgr.TotalMines);
+            BinomialHelper.Binomial(blocks, m_Mgr.TotalMines).Part(out m_Sig, out m_Exp);
 
             m_ToOpen = blocks - m_Mgr.TotalMines;
 
-            m_Solver = new Solver<Block>(m_Mgr.Blocks, helper);
+            m_Solver = new Solver<Block>(m_Mgr.Blocks);
             m_Solver.AddRestrain(new BlockSet<Block>(m_Mgr.Blocks), m_Mgr.TotalMines);
 
             m_Started = true;
@@ -147,7 +147,8 @@ namespace MineSweeper
                 m_Started = false;
                 m_Suceed = true;
             }
-            Solve();
+            if (m_Started)
+                Solve();
         }
 
         private void OpenBlock(int x, int y)
@@ -211,7 +212,8 @@ namespace MineSweeper
                             m_Started = false;
                             m_Suceed = true;
                         }
-                        Solve();
+                        else
+                            Solve();
                     }
                 }
             RePaint();
@@ -249,7 +251,8 @@ namespace MineSweeper
                                 m_Started = false;
                                 m_Suceed = true;
                             }
-                            Solve();
+                            else
+                                Solve();
                         }
                     }
                 }
@@ -263,7 +266,7 @@ namespace MineSweeper
 
             double sig;
             int exp;
-            BigIntegerHelper.Part(m_Total, out sig, out exp);
+            m_Total.Part(out sig, out exp);
 
             var cur = Math.Log(sig, 2) + exp;
             var tot = Math.Log(m_Sig, 2) + m_Exp;
@@ -306,11 +309,11 @@ namespace MineSweeper
             var theBlock = new BlockSet<Block>(new[] { block });
             var dic = m_Solver.DistributionConditioned(block.Surrounding, theBlock, 0);
             var total = dic.Aggregate(BigInteger.Zero, (cur, kvp) => cur + kvp.Value);
-            var q = dic.Sum(
-                            kvp =>
-                            -BigIntegerHelper.Ratio(kvp.Value, total)
-                            * Math.Log(BigIntegerHelper.Ratio(kvp.Value, total), 2));
-            m_Quantities[block] = q;
+            //var q = dic.Sum(
+            //                kvp =>
+            //                -BigIntegerHelper.Ratio(kvp.Value, total)
+            //                * Math.Log(BigIntegerHelper.Ratio(kvp.Value, total), 2));
+            m_Quantities[block] = dic[dic.Keys.Min()].Over(total);
         }
     }
 }
