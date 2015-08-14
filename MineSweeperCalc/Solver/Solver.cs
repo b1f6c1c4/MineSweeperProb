@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 
-namespace MineSweeperCalc
+namespace MineSweeperCalc.Solver
 {
     /// <summary>
     ///     求解器
@@ -557,7 +557,12 @@ namespace MineSweeperCalc
             return dic.ToDictionary(kvp => kvp.Key + dMines, kvp => kvp.Value);
         }
 
-        private static void Merge(IDictionary<int, BigInteger> from, IDictionary<int, BigInteger> to)
+        /// <summary>
+        ///     将一个分布叠加到另一个上
+        /// </summary>
+        /// <param name="from">一个分布</param>
+        /// <param name="to">另一个分布</param>
+        private static void Merge<TKey>(IDictionary<TKey, BigInteger> from, IDictionary<TKey, BigInteger> to)
         {
             foreach (var kvp in from)
             {
@@ -569,6 +574,12 @@ namespace MineSweeperCalc
             }
         }
 
+        /// <summary>
+        ///     计算两个随机变量的和的分布
+        /// </summary>
+        /// <param name="from">源分布</param>
+        /// <param name="cases">新分布</param>
+        /// <returns>和的分布</returns>
         private static Dictionary<int, BigInteger> Add(IDictionary<int, BigInteger> from,
                                                        IReadOnlyList<BigInteger> cases)
         {

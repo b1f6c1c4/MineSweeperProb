@@ -6,21 +6,16 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using MineSweeperCalc;
+using MineSweeperCalc.Solver;
 
 namespace MineSweeper
 {
     public partial class Form1 : Form
     {
-        private bool m_Started;
-        private BlockMgr m_Mgr;
-        private Solver<Block> m_Solver;
+        private GameMgr m_Mgr;
         private bool m_ShowProb;
         private const float BlockSize = 38F;
-        private double m_Sig;
-        private int m_Exp;
-        private int m_ToOpen;
-        private bool m_Suceed;
-        private Dictionary<Block, double> m_Quantities;
+        private double m_AllLog2;
         private List<Block> m_Bests;
         private BigInteger m_Total;
 
@@ -45,25 +40,25 @@ namespace MineSweeper
             var gray = new SolidBrush(Color.LightGray);
 
             g = g ?? CreateGraphics();
-            if (m_Started && m_ShowProb)
+            if (m_Mgr.Started && m_ShowProb)
                 for (var i = 0; i < m_Mgr.TotalWidth; i++)
                     for (var j = 0; j < m_Mgr.TotalHeight; j++)
                     {
-                        var v = (int)((1 - m_Solver.Probability[m_Mgr[i, j]]) * 255);
+                        var v = (int)((1 - m_Mgr.Solver.Probability[m_Mgr[i, j]]) * 255);
                         g.FillRectangle(
                                         new SolidBrush(Color.FromArgb(v, v, v)),
                                         i * BlockSize,
                                         j * BlockSize,
                                         BlockSize - 1,
                                         BlockSize - 1);
-                        if (m_Solver[m_Mgr[i, j]] == BlockStatus.Mine)
+                        if (m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Mine)
                             g.DrawString(
                                          "M",
                                          m_Mgr[i, j].IsOpen ? fontO : fontC,
                                          white,
                                          i * BlockSize,
                                          j * BlockSize);
-                        else if (m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
+                        else if (m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                             g.DrawString(
                                          "B",
                                          m_Mgr[i, j].IsOpen ? fontO : fontC,
@@ -82,10 +77,10 @@ namespace MineSweeper
                 for (var i = 0; i < m_Mgr.TotalWidth; i++)
                     for (var j = 0; j < m_Mgr.TotalHeight; j++)
                     {
-                        if (!m_Started)
+                        if (!m_Mgr.Started)
                             if (m_Mgr[i, j].IsMine)
                                 g.FillRectangle(
-                                                m_Suceed ? green : red,
+                                                m_Mgr.Suceed ? green : red,
                                                 i * BlockSize,
                                                 j * BlockSize,
                                                 BlockSize - 1,
@@ -108,7 +103,7 @@ namespace MineSweeper
                                              j * BlockSize);
                             }
                         }
-                        else if (m_Started)
+                        else if (m_Mgr.Started)
                             g.FillRectangle(
                                             gray,
                                             i * BlockSize,
@@ -120,56 +115,16 @@ namespace MineSweeper
 
         private void Reset()
         {
-            m_Mgr = new BlockMgr(30, 16, 99);
+            m_Mgr = new GameMgr(30, 16, 99, (int)DateTime.Now.Ticks);
 
             var blocks = m_Mgr.TotalWidth * m_Mgr.TotalHeight;
             BinomialHelper.UpdateTo(blocks, m_Mgr.TotalMines);
-            BinomialHelper.Binomial(blocks, m_Mgr.TotalMines).Part(out m_Sig, out m_Exp);
+            m_AllLog2 = BinomialHelper.Binomial(blocks, m_Mgr.TotalMines).Log2();
 
-            m_ToOpen = blocks - m_Mgr.TotalMines;
-
-            m_Solver = new Solver<Block>(m_Mgr.Blocks);
-            m_Solver.AddRestrain(new BlockSet<Block>(m_Mgr.Blocks), m_Mgr.TotalMines);
-
-            m_Started = true;
-            m_Suceed = false;
             m_ShowProb = false;
 
             Width = (int)(m_Mgr.TotalWidth * BlockSize) + 22;
             Height = (int)(m_Mgr.TotalHeight * BlockSize) + 56 + progressBar1.Height;
-        }
-
-        private void Open(int x, int y)
-        {
-            OpenBlock(x, y);
-            if (m_ToOpen == 0)
-            {
-                m_Started = false;
-                m_Suceed = true;
-            }
-            if (m_Started)
-                Solve();
-        }
-
-        private void OpenBlock(int x, int y)
-        {
-            var block = m_Mgr.OpenBlock(x, y);
-            if (block.IsMine)
-            {
-                m_Started = false;
-                return;
-            }
-
-            m_ToOpen--;
-
-            m_Solver.AddRestrain(new BlockSet<Block>(new[] { block }), 0);
-
-            var deg = block.Degree;
-            if (deg == 0)
-                foreach (var b in block.Surrounding.Cast<Block>().Where(b => !b.IsOpen))
-                    OpenBlock(b.X, b.Y);
-            else
-                m_Solver.AddRestrain(block.Surrounding, deg);
         }
 
         private void Form1_Paint(object sender, PaintEventArgs e) => RePaint(e.Graphics);
@@ -177,7 +132,7 @@ namespace MineSweeper
         private void Form1_MouseUp(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
-                if (m_Started)
+                if (m_Mgr.Started)
                 {
                     var x = (int)(e.X / BlockSize);
                     var y = (int)(e.Y / BlockSize);
@@ -189,32 +144,25 @@ namespace MineSweeper
                         return;
                     if (m_Mgr[x, y].IsOpen)
                         return;
-                    Open(x, y);
+                    m_Mgr.OpenBlock(x, y);
+                    Solve();
                 }
                 else
                     Reset();
             else if (e.Button == MouseButtons.Right)
-                if (m_Started)
+                if (m_Mgr.Started)
                 {
                     var flag = false;
                     for (var i = 0; i < m_Mgr.TotalWidth; i++)
                         for (var j = 0; j < m_Mgr.TotalHeight; j++)
                             if (!m_Mgr[i, j].IsOpen &&
-                                m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
+                                m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                             {
-                                OpenBlock(i, j);
+                                m_Mgr.OpenBlock(i, j);
                                 flag = true;
                             }
-                    if (flag)
-                    {
-                        if (m_ToOpen == 0)
-                        {
-                            m_Started = false;
-                            m_Suceed = true;
-                        }
-                        else
-                            Solve();
-                    }
+                    if (flag && m_Mgr.Started)
+                        Solve();
                 }
             RePaint();
         }
@@ -230,56 +178,54 @@ namespace MineSweeper
             }
             else if (e.KeyCode == Keys.X)
             {
-                if (m_Started)
-                {
-                    var flag = true;
-                    while (flag)
+                if (m_Mgr.Started)
+                    while (true)
                     {
-                        flag = false;
+                        var flag = false;
                         for (var i = 0; i < m_Mgr.TotalWidth; i++)
                             for (var j = 0; j < m_Mgr.TotalHeight; j++)
                                 if (!m_Mgr[i, j].IsOpen &&
-                                    m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
+                                    m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                                 {
-                                    OpenBlock(i, j);
+                                    m_Mgr.OpenBlock(i, j);
                                     flag = true;
                                 }
-                        if (flag)
-                        {
-                            if (m_ToOpen == 0)
-                            {
-                                m_Started = false;
-                                m_Suceed = true;
-                            }
-                            else
-                                Solve();
-                        }
+                        if (!flag ||
+                            !m_Mgr.Started)
+                            break;
+                        Solve();
                     }
-                }
                 RePaint();
             }
         }
 
         private void Solve()
         {
-            m_Total = m_Solver.Solve();
+            if (!m_Mgr.Started)
+            {
+                if (m_Mgr.Suceed)
+                {
+                    Text = "Suceed";
+                    progressBar1.Value = 2147483647;
+                }
+                else
+                    Text = $"Failed At {m_Total.Log2():F2}bits";
+                return;
+            }
 
-            double sig;
-            int exp;
-            m_Total.Part(out sig, out exp);
+            m_Total = m_Mgr.Solver.Solve();
 
-            var cur = Math.Log(sig, 2) + exp;
-            var tot = Math.Log(m_Sig, 2) + m_Exp;
+            var curBits = m_Total.Log2();
 
-            Text = $"Resume:{cur:F2}bits";
+            Text = $"Resume: {curBits:F2}bits";
 
-            progressBar1.Value = (int)(2147483647 * (1 - cur / tot));
+            progressBar1.Value = (int)(2147483647 * (1 - curBits / m_AllLog2));
 
             m_Bests = new List<Block>();
             for (var i = 0; i < m_Mgr.TotalWidth; i++)
                 for (var j = 0; j < m_Mgr.TotalHeight; j++)
                     if (!m_Mgr[i, j].IsOpen &&
-                        m_Solver[m_Mgr[i, j]] == BlockStatus.Blank)
+                        m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                         m_Bests.Add(m_Mgr[i, j]);
 
             if (m_Bests.Count != 0)
@@ -289,31 +235,41 @@ namespace MineSweeper
             for (var i = 0; i < m_Mgr.TotalWidth; i++)
                 for (var j = 0; j < m_Mgr.TotalHeight; j++)
                     if (!m_Mgr[i, j].IsOpen &&
-                        m_Solver.Probability[m_Mgr[i, j]] < prob &&
-                        m_Solver[m_Mgr[i, j]] == BlockStatus.Unknown)
-                        prob = m_Solver.Probability[m_Mgr[i, j]];
+                        m_Mgr.Solver.Probability[m_Mgr[i, j]] < prob &&
+                        m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Unknown)
+                        prob = m_Mgr.Solver.Probability[m_Mgr[i, j]];
 
-            m_Quantities = new Dictionary<Block, double>();
+            var pOfZero = new Dictionary<Block, double>();
+            var quantities = new Dictionary<Block, double>();
             for (var i = 0; i < m_Mgr.TotalWidth; i++)
                 for (var j = 0; j < m_Mgr.TotalHeight; j++)
                     if (!m_Mgr[i, j].IsOpen &&
-                        m_Solver.Probability[m_Mgr[i, j]] <= prob)
-                        CalcQuantity(m_Mgr[i, j]);
+                        m_Mgr.Solver.Probability[m_Mgr[i, j]] <= prob)
+                    {
+                        var block = m_Mgr[i, j];
+                        var theBlock = new BlockSet<Block>(new[] { block });
+                        var dic = m_Mgr.Solver.DistributionConditioned(block.Surrounding, theBlock, 0);
+                        var total = dic.Aggregate(BigInteger.Zero, (cur, kvp) => cur + kvp.Value);
+                        if (total.IsZero)
+                            throw new Exception();
+                        pOfZero[block] = dic[dic.Keys.Min()].Over(total);
+                        var q =
+                            dic.Sum(
+                                    kvp =>
+                                    {
+                                        if (kvp.Value == 0)
+                                            return 0D;
+                                        var p = kvp.Value.Over(total);
+                                        return -p * Math.Log(p, 2);
+                                    });
+                        quantities[block] = q;
+                    }
 
-            var maxQ = m_Quantities.Values.Max();
-            m_Bests = m_Quantities.Where(kvp => kvp.Value >= maxQ).Select(kvp => kvp.Key).ToList();
-        }
-
-        private void CalcQuantity(Block block)
-        {
-            var theBlock = new BlockSet<Block>(new[] { block });
-            var dic = m_Solver.DistributionConditioned(block.Surrounding, theBlock, 0);
-            var total = dic.Aggregate(BigInteger.Zero, (cur, kvp) => cur + kvp.Value);
-            //var q = dic.Sum(
-            //                kvp =>
-            //                -BigIntegerHelper.Ratio(kvp.Value, total)
-            //                * Math.Log(BigIntegerHelper.Ratio(kvp.Value, total), 2));
-            m_Quantities[block] = dic[dic.Keys.Min()].Over(total);
+            var maxP = pOfZero.Values.Max();
+            var lst = pOfZero.Where(kvp => kvp.Value >= maxP).Select(kvp => kvp.Key).ToList();
+            var maxQ = lst.Select(b => quantities[b]).Max();
+            m_Bests =
+                quantities.Where(kvp => lst.Contains(kvp.Key) && kvp.Value >= maxQ).Select(kvp => kvp.Key).ToList();
         }
     }
 }

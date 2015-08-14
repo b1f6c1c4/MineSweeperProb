@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MineSweeperCalc
+namespace MineSweeperCalc.Solver
 {
     /// <summary>
     ///     格

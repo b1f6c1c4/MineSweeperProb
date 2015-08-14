@@ -4,7 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 
-namespace MineSweeperCalc
+namespace MineSweeperCalc.Solver
 {
     /// <summary>
     ///     二项式系数计算器
@@ -183,6 +183,19 @@ namespace MineSweeperCalc
 
             significand = BitConverter.ToDouble(res.Reverse().ToArray(), 0);
             exponent = lastID * 8 + (7 - shift);
+        }
+
+        /// <summary>
+        ///     获取其以2为底的对数
+        /// </summary>
+        /// <param name="val">值</param>
+        /// <returns>对数</returns>
+        public static double Log2(this BigInteger val)
+        {
+            double sig;
+            int exp;
+            val.Part(out sig, out exp);
+            return Math.Log(sig, 2) + exp;
         }
     }
 }

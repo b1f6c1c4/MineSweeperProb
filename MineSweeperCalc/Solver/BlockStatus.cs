@@ -1,4 +1,4 @@
-﻿namespace MineSweeperCalc
+﻿namespace MineSweeperCalc.Solver
 {
     public enum BlockStatus
     {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MineSweeperCalc
+namespace MineSweeperCalc.Solver
 {
     /// <summary>
     ///     当前状态

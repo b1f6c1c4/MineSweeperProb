@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Numerics;
 
-namespace MineSweeperCalc
+namespace MineSweeperCalc.Solver
 {
     /// <summary>
     ///     解
