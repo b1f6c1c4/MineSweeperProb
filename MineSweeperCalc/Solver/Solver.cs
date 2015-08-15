@@ -32,7 +32,14 @@ namespace MineSweeperCalc.Solver
         /// </summary>
         private sealed class Restrain
         {
+            /// <summary>
+            ///     组成部分
+            /// </summary>
             public List<int> BlockSets { get; set; }
+
+            /// <summary>
+            ///     总雷数
+            /// </summary>
             public int Mines { get; set; }
         }
 
@@ -90,10 +97,7 @@ namespace MineSweeperCalc.Solver
                 List<T> exceptA, exceptB, intersection;
                 Overlap(m_BlockSets[i], theSet, out exceptA, out exceptB, out intersection);
                 if (intersection.Count == 0)
-                {
-                    blkLst.Add(0);
                     continue;
-                }
 
                 var newA = new BlockSet<T>(exceptA);
                 var newB = new BlockSet<T>(exceptB);
@@ -103,33 +107,31 @@ namespace MineSweeperCalc.Solver
                 if (!newA.Any)
                 {
                     m_BlockSets[i] = newC;
-                    blkLst.Add(1);
+                    blkLst.Add(i);
                 }
                 else
                 {
                     m_BlockSets[i] = newA;
-                    blkLst.Add(0);
                     if (newC.Any)
                     {
-                        m_BlockSets.Add(newC);
                         foreach (var restrain in m_Restrains)
-                            restrain.BlockSets.Add(restrain.BlockSets[i]);
+                        {
+                            if (restrain.BlockSets.BinarySearch(i) >= 0)
+                                restrain.BlockSets.Add(m_BlockSets.Count);
+                        }
+                        m_BlockSets.Add(newC);
                     }
                 }
                 if (!theSet.Any)
                     break;
             }
-
-            for (var i = blkLst.Count; i < count; i++)
-                blkLst.Add(0); // oldA
+            
             for (var i = count; i < m_BlockSets.Count; i++)
-                blkLst.Add(1); // newC
+                blkLst.Add(i);
             if (theSet.Any)
             {
+                blkLst.Add(m_BlockSets.Count);
                 m_BlockSets.Add(theSet);
-                foreach (var restrain in m_Restrains)
-                    restrain.BlockSets.Add(0);
-                blkLst.Add(1); // theSet
             }
 
             return blkLst;
@@ -264,15 +266,15 @@ namespace MineSweeperCalc.Solver
                 if (m_Restrains[i].Mines == 0)
                 {
                     for (var j = 0; j < m_BlockSets.Count; j++)
-                        if (m_Restrains[i].BlockSets[j] != 0)
+                        if (m_Restrains[i].BlockSets.BinarySearch(j) >= 0)
                             foreach (var block in m_BlockSets[j].Blocks)
                                 m_Manager.SetStatus(block, BlockStatus.Blank);
                     m_Restrains.RemoveAt(i--);
                 }
-                else if (m_Restrains[i].Mines == m_Restrains[i].BlockSets.Zip(cnts, (c, cn) => c * cn).Sum())
+                else if (m_Restrains[i].Mines == m_Restrains[i].BlockSets.Select(index=>cnts[index]).Sum())
                 {
                     for (var j = 0; j < m_BlockSets.Count; j++)
-                        if (m_Restrains[i].BlockSets[j] != 0)
+                        if (m_Restrains[i].BlockSets.BinarySearch(j) >= 0)
                             foreach (var block in m_BlockSets[j].Blocks)
                                 m_Manager.SetStatus(block, BlockStatus.Mine);
                     m_Restrains.RemoveAt(i--);
@@ -285,11 +287,14 @@ namespace MineSweeperCalc.Solver
                 if (m_BlockSets[i].Count == blanks + mines)
                 {
                     foreach (var restrain in m_Restrains)
-                    {
-                        if (restrain.BlockSets[i] != 0)
-                            restrain.Mines -= mines;
-                        restrain.BlockSets.RemoveAt(i);
-                    }
+                        for (var j = 0; j < restrain.BlockSets.Count; j++)
+                            if (restrain.BlockSets[j] == i)
+                            {
+                                restrain.Mines -= mines;
+                                restrain.BlockSets.RemoveAt(j--);
+                            }
+                            else if (restrain.BlockSets[j] > i)
+                                restrain.BlockSets[j]--;
                     m_BlockSets.RemoveAt(i--);
                     continue;
                 }
@@ -299,7 +304,7 @@ namespace MineSweeperCalc.Solver
                 flag = true;
                 m_BlockSets[i] = new BlockSet<T>(lst);
                 foreach (var restrain in m_Restrains)
-                    if (restrain.BlockSets[i] != 0)
+                    if (restrain.BlockSets.BinarySearch(i) >= 0)
                         restrain.Mines -= mines;
             }
 
@@ -318,8 +323,8 @@ namespace MineSweeperCalc.Solver
             var argMat = new double[n + 1, m];
             for (var row = 0; row < m; row++)
             {
-                for (var col = 0; col < n; col++)
-                    argMat[col, row] = m_Restrains[row].BlockSets[col];
+                foreach (var index in m_Restrains[row].BlockSets)
+                    argMat[index, row] = 1;
                 argMat[n, row] = m_Restrains[row].Mines;
             }
             return argMat;
