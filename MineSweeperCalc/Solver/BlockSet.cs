@@ -81,5 +81,9 @@ namespace MineSweeperCalc.Solver
             sb.Append("}");
             return sb.ToString();
         }
+
+        public static BlockSet<T> Empty { get; }
+
+        static BlockSet() { Empty = new BlockSet<T>(Enumerable.Empty<T>()); }
     }
 }

@@ -17,7 +17,7 @@ namespace MineSweeperCalc
         /// <param name="blocks">格</param>
         /// <param name="mgr">游戏</param>
         /// <returns>最优格</returns>
-        public delegate IEnumerable<Block> DecideDelegate(List<Block> blocks, GameMgr mgr);
+        public delegate IEnumerable<Block> DecideDelegate(List<Block> blocks, GameMgr mgr, bool multiThread);
 
         /// <summary>
         ///     格
@@ -57,6 +57,7 @@ namespace MineSweeperCalc
         /// <summary>
         ///     待翻开格数
         /// </summary>
+        // ReSharper disable once MemberCanBePrivate.Global
         public int ToOpen { get; private set; }
 
         /// <summary>
@@ -67,6 +68,7 @@ namespace MineSweeperCalc
         /// <summary>
         ///     决策器
         /// </summary>
+        // ReSharper disable once MemberCanBePrivate.Global
         public DecideDelegate DecisionMaker { get; set; }
 
         /// <summary>
@@ -230,7 +232,9 @@ namespace MineSweeperCalc
         /// <summary>
         ///     按特定策略自动操作一次
         /// </summary>
-        public void AutomaticStep()
+        /// <param name="multiThread"></param>
+        // ReSharper disable once MemberCanBePrivate.Global
+        public void AutomaticStep(bool multiThread)
         {
             if (!Started)
                 return;
@@ -248,7 +252,7 @@ namespace MineSweeperCalc
                         Solver[m_Blocks[i, j]] == BlockStatus.Unknown)
                         lst.Add(m_Blocks[i, j]);
 
-            var ary = DecisionMaker(lst, this).ToArray();
+            var ary = DecisionMaker(lst, this, multiThread).ToArray();
             var blk = ary[m_Random.Next(ary.Length)];
             OpenBlock(blk.X, blk.Y);
         }
@@ -256,11 +260,12 @@ namespace MineSweeperCalc
         /// <summary>
         ///     按特定策略自动操作
         /// </summary>
-        public void Automatic()
+        /// <param name="multiThread"></param>
+        public void Automatic(bool multiThread)
         {
             while (Started)
                 if (SemiAutomatic())
-                    AutomaticStep();
+                    AutomaticStep(multiThread);
         }
     }
 }

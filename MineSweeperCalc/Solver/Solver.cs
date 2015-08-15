@@ -9,7 +9,7 @@ namespace MineSweeperCalc.Solver
     ///     求解器
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
-    public sealed class Solver<T>
+    public sealed partial class Solver<T>
         where T : IBlock<T>
     {
         /// <summary>
@@ -39,11 +39,14 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     解空间
         /// </summary>
+        // ReSharper disable once MemberCanBePrivate.Global
         public List<Solution<T>> Solutions { get; private set; }
 
         /// <summary>
         ///     数学期望
         /// </summary>
+        // ReSharper disable once MemberCanBePrivate.Global
+        // ReSharper disable once CollectionNeverQueried.Global
         public IDictionary<BlockSet<T>, double> Expectation { get; private set; }
 
         /// <summary>
@@ -132,6 +135,14 @@ namespace MineSweeperCalc.Solver
             return blkLst;
         }
 
+        /// <summary>
+        ///     交叉
+        /// </summary>
+        /// <param name="setA">格的集合A</param>
+        /// <param name="setB">格的集合B</param>
+        /// <param name="exceptA">A差B</param>
+        /// <param name="exceptB">B差A</param>
+        /// <param name="intersection">A交B</param>
         private static void Overlap(IReadOnlyList<T> setA, IReadOnlyList<T> setB,
                                     out List<T> exceptA, out List<T> exceptB, out List<T> intersection)
         {
@@ -159,6 +170,14 @@ namespace MineSweeperCalc.Solver
                 exceptB.Add(setB[q++]);
         }
 
+        /// <summary>
+        ///     交叉
+        /// </summary>
+        /// <param name="setA">格的集合A</param>
+        /// <param name="setB">格的集合B</param>
+        /// <param name="exceptA">A差B</param>
+        /// <param name="exceptB">B差A</param>
+        /// <param name="intersection">A交B</param>
         private static void Overlap(BlockSet<T> setA, BlockSet<T> setB,
                                     out List<T> exceptA, out List<T> exceptB, out List<T> intersection)
             => Overlap(setA.Blocks, setB.Blocks, out exceptA, out exceptB, out intersection);
@@ -197,6 +216,11 @@ namespace MineSweeperCalc.Solver
                 throw new ApplicationException("无解");
 
             ProcessSolutions(result);
+
+            m_DistCache.Clear();
+            m_DistCacheLock.Clear();
+            m_DistCondCache.Clear();
+            m_DistCondCacheLock.Clear();
         }
 
         /// <summary>
@@ -509,238 +533,6 @@ namespace MineSweeperCalc.Solver
             }
 
             TotalStates = total;
-        }
-
-        /// <summary>
-        ///     清点格的集合与现有格的集合的交叉数
-        /// </summary>
-        /// <param name="set">格的集合</param>
-        /// <returns>各交叉数</returns>
-        private int[] GetIntersectionCounts(BlockSet<T> set)
-        {
-            var lst = new List<T>(set.Blocks);
-            var sets = new int[m_BlockSets.Count];
-            for (var i = 0; i < m_BlockSets.Count; i++)
-            {
-                List<T> exceptA, exceptB, intersection;
-                Overlap(m_BlockSets[i].Blocks, lst, out exceptA, out exceptB, out intersection);
-                lst = exceptB;
-                sets[i] = intersection.Count;
-            }
-            return sets;
-        }
-
-        /// <summary>
-        ///     清点两格的集合与现有格的集合的交叉数
-        /// </summary>
-        /// <param name="set1">第一个格的集合</param>
-        /// <param name="set2">第二个格的集合</param>
-        /// <param name="sets1">仅第一个格的集合的各交叉数</param>
-        /// <param name="sets2">仅第二个格的集合的各交叉数</param>
-        /// <param name="sets3">两格的集合共同的各交叉数</param>
-        private void GetIntersectionCounts(BlockSet<T> set1, BlockSet<T> set2,
-                                           out int[] sets1, out int[] sets2, out int[] sets3)
-        {
-            var lst1 = new List<T>(set1.Blocks);
-            var lst2 = new List<T>(set2.Blocks);
-            sets1 = new int[m_BlockSets.Count];
-            sets2 = new int[m_BlockSets.Count];
-            sets3 = new int[m_BlockSets.Count];
-            for (var i = 0; i < m_BlockSets.Count; i++)
-            {
-                List<T> exceptA, exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC, resume1, resume2;
-                Overlap(m_BlockSets[i].Blocks, lst1, out exceptA, out resume1, out exceptB1T);
-                Overlap(m_BlockSets[i].Blocks, lst2, out exceptA, out resume2, out exceptB2T);
-                Overlap(exceptB1T, exceptB2T, out exceptB1, out exceptB2, out exceptC);
-                lst1 = resume1;
-                lst2 = resume2;
-                sets1[i] = exceptB1.Count;
-                sets2[i] = exceptB2.Count;
-                sets3[i] = exceptC.Count;
-            }
-        }
-
-        /// <summary>
-        ///     计算指定格的集合的雷数的分布
-        /// </summary>
-        /// <param name="set">格的集合，必须是完整的</param>
-        /// <returns>分布</returns>
-        public IDictionary<int, BigInteger> Distribution(BlockSet<T> set)
-        {
-            int dMines, dBlanks;
-            var lst = ReduceSet(set, out dMines, out dBlanks);
-            var sets = GetIntersectionCounts(new BlockSet<T>(lst));
-
-            var dic = new Dictionary<int, BigInteger>();
-            foreach (var solution in Solutions)
-            {
-                var dicT = new Dictionary<int, BigInteger> { { 0, 1 } };
-                for (var i = 0; i < m_BlockSets.Count; i++)
-                {
-                    var n = m_BlockSets[i].Count;
-                    var a = sets[i];
-                    var m = solution.Dist[i];
-
-                    var cases = new BigInteger[Math.Min(m, a) + 1];
-                    for (var j = 0; j <= m && j <= a; j++)
-                        cases[j] = BinomialHelper.Binomial(a, j) * BinomialHelper.Binomial(n - a, m - j);
-
-                    dicT = Add(dicT, cases);
-                }
-                Merge(dicT, dic);
-            }
-
-            if (!dic.ContainsKey(0))
-                dic.Add(0, 0);
-
-            return dic.ToDictionary(kvp => kvp.Key + dMines, kvp => kvp.Value);
-        }
-
-        /// <summary>
-        ///     将一个分布叠加到另一个上
-        /// </summary>
-        /// <param name="from">一个分布</param>
-        /// <param name="to">另一个分布</param>
-        private static void Merge<TKey>(IDictionary<TKey, BigInteger> from, IDictionary<TKey, BigInteger> to)
-        {
-            foreach (var kvp in from)
-            {
-                BigInteger old;
-                if (to.TryGetValue(kvp.Key, out old))
-                    to[kvp.Key] = old + kvp.Value;
-                else
-                    to.Add(kvp.Key, kvp.Value);
-            }
-        }
-
-        /// <summary>
-        ///     计算两个随机变量的和的分布
-        /// </summary>
-        /// <param name="from">源分布</param>
-        /// <param name="cases">新分布</param>
-        /// <returns>和的分布</returns>
-        private static Dictionary<int, BigInteger> Add(IDictionary<int, BigInteger> from,
-                                                       IReadOnlyList<BigInteger> cases)
-        {
-            var dicN = new Dictionary<int, BigInteger>(from.Count);
-            foreach (var kvp in from)
-                for (var j = 0; j < cases.Count; j++)
-                {
-                    var key = kvp.Key + j;
-                    BigInteger old;
-                    if (dicN.TryGetValue(key, out old))
-                        dicN[key] = old + kvp.Value * cases[j];
-                    else
-                        dicN.Add(key, kvp.Value * cases[j]);
-                }
-            return dicN;
-        }
-
-        /// <summary>
-        ///     计算在一定条件下指定格的集合的雷数的分布
-        /// </summary>
-        /// <param name="set">格的集合，必须是完整的</param>
-        /// <param name="setCond">用作条件的格的集合，必须是完整的</param>
-        /// <param name="mines">用作条件的格的集合中的雷数</param>
-        /// <returns>分布</returns>
-        public IDictionary<int, BigInteger> DistributionCond(BlockSet<T> set, BlockSet<T> setCond, int mines)
-        {
-            int dMines, dBlanks;
-            var lst = ReduceSet(set, out dMines, out dBlanks);
-
-            int dMinesCond, dBlanksCond;
-            var lstCond = ReduceSet(setCond, out dMinesCond, out dBlanksCond);
-
-            if (lstCond.Count == 0)
-            {
-                if (dMinesCond == mines)
-                    return Distribution(set);
-                return new Dictionary<int, BigInteger>();
-            }
-
-            int[] sets1, sets2, sets3;
-            GetIntersectionCounts(
-                                  new BlockSet<T>(lst),
-                                  new BlockSet<T>(lstCond),
-                                  out sets1,
-                                  out sets2,
-                                  out sets3);
-
-            var dic = new Dictionary<int, BigInteger>();
-            foreach (var solution in Solutions)
-            {
-                var max = new int[m_BlockSets.Count];
-                for (var i = 0; i < m_BlockSets.Count; i++)
-                    max[i] = Math.Min(solution.Dist[i], sets2[i] + sets3[i]);
-
-                var stack = new List<int>(m_BlockSets.Count);
-                if (m_BlockSets.Count > 1)
-                    stack.Add(0);
-                while (true)
-                    if (stack.Count == m_BlockSets.Count - 1)
-                    {
-                        var mns = mines - (stack.Sum() + dMinesCond);
-                        if (mns >= 0 &&
-                            mns <= max[m_BlockSets.Count - 1])
-                        {
-                            stack.Add(mns);
-
-                            var dicT = new Dictionary<int, BigInteger> { { 0, 1 } };
-                            for (var i = 0; i < m_BlockSets.Count; i++)
-                            {
-                                var n = m_BlockSets[i].Count;
-                                var a = sets1[i];
-                                var b = sets2[i];
-                                var c = sets3[i];
-                                var m = solution.Dist[i]; // in a + b + c
-                                var p = stack[i]; // in b + c
-
-                                {
-                                    var cases = new BigInteger[Math.Min(p, c) + 1];
-                                    for (var j = 0; j <= p && j <= c; j++)
-                                        cases[j] = BinomialHelper.Binomial(c, j) *
-                                                   BinomialHelper.Binomial(b, p - j);
-
-                                    dicT = Add(dicT, cases);
-                                }
-                                {
-                                    var cases = new BigInteger[Math.Min(m - p, a) + 1];
-                                    for (var j = 0; j <= m - p && j <= a; j++)
-                                        cases[j] = BinomialHelper.Binomial(a, j) *
-                                                   BinomialHelper.Binomial(n - a - b - c, m - p - j);
-
-                                    dicT = Add(dicT, cases);
-                                }
-                            }
-                            Merge(dicT, dic);
-
-                            stack.RemoveAt(stack.Count - 1);
-                        }
-                        if (stack.Count == 0)
-                            break;
-                        if (mns <= 0)
-                        {
-                            stack.RemoveAt(stack.Count - 1);
-                            if (stack.Count == 0)
-                                break;
-                        }
-                        stack[stack.Count - 1]++;
-                    }
-                    else if (stack[stack.Count - 1] <= max[stack.Count - 1])
-                        stack.Add(0);
-                    else
-                    {
-                        stack.RemoveAt(stack.Count - 1);
-                        if (stack.Count == 0)
-                            break;
-                        stack[stack.Count - 1]++;
-                    }
-            }
-
-            if (!dic.ContainsKey(0))
-                dic.Add(0, 0);
-
-            return dic.ToDictionary(kvp => kvp.Key + dMines, kvp => kvp.Value);
         }
     }
 }

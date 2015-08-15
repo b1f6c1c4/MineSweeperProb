@@ -15,37 +15,30 @@ namespace MineSweeperAnalyzer
 
         private static void Main(string[] args)
         {
-            Console.WriteLine("Threads: ");
-            m_Par = Convert.ToInt32(Console.ReadLine());
-            Console.WriteLine("N: ");
-            var n = Convert.ToInt32(Console.ReadLine());
-            BinomialHelper.UpdateTo(30 * 16, 99);
-
             var seed = (int)DateTime.Now.Ticks;
-            var stuff =
-                new ConcurrentDictionary<GameMgr.DecideDelegate, int>
-                    {
-                        [Strategies.MinProb] = n,
-                        [Strategies.MinProbMaxZeroProb] = n,
-                        [Strategies.MinProbMaxZeroCount] = n,
-                        [Strategies.MinProbMaxQuantity] = n,
-                        [Strategies.MinProbMinQuantity] = n,
-                        [Strategies.MinProbMaxQuantityMaxZeroCount] = n,
-                        [Strategies.MinProbMaxQuantityMaxZeroProb] = n,
-                        [Strategies.MinProbMinQuantityMaxZeroCount] = n,
-                        [Strategies.MinProbMinQuantityMaxZeroProb] = n,
-                        [Strategies.MinProbMaxZeroCountMaxQuantity] = n,
-                        [Strategies.MinProbMaxZeroCountMinQuantity] = n,
-                        [Strategies.MinProbMaxZeroProbMaxQuantity] = n,
-                        [Strategies.MinProbMaxZeroProbMinQuantity] = n,
-                        [Strategies.MixProbZeroProb] = n
-                    };
+            var stuff = new ConcurrentDictionary<GameMgr.DecideDelegate, int>();
+            using (var sr = new StreamReader(@"config.txt"))
+            {
+                m_Par = Convert.ToInt32(sr.ReadLine());
+                var n = Convert.ToInt32(sr.ReadLine());
+                while (!sr.EndOfStream)
+                {
+                    var s = sr.ReadLine();
+                    if (s == null)
+                        break;
+                    var del = typeof(Strategies).GetMethod(s).CreateDelegate(typeof(GameMgr.DecideDelegate))
+                              as GameMgr.DecideDelegate;
+                    if (del != null)
+                        stuff[del] = n;
+                }
+            }
+            BinomialHelper.UpdateTo(30 * 16, 99);
             Process(
                     stuff,
                     d =>
                     {
                         var game = new GameMgr(30, 16, 99, Interlocked.Increment(ref seed), d);
-                        game.Automatic();
+                        game.Automatic(true);
                         game.Solver.Solve();
                         return game.Solver.TotalStates.Log2();
                     },
@@ -57,8 +50,8 @@ namespace MineSweeperAnalyzer
                     });
         }
 
-        private static ConcurrentDictionary<Tuple<T, TResult>, int> Process<T, TResult>(
-            ConcurrentDictionary<T, int> stuff, Func<T, TResult> action, Action<ConcurrentDictionary<Tuple<T, TResult>, int>> damp)
+        private static void Process<T, TResult>(ConcurrentDictionary<T, int> stuff, Func<T, TResult> action,
+                                                Action<ConcurrentDictionary<Tuple<T, TResult>, int>> damp)
             where T : class
         {
             var dic = new ConcurrentDictionary<Tuple<T, TResult>, int>();
@@ -129,7 +122,7 @@ namespace MineSweeperAnalyzer
                     lock (locks[i])
                     {
                         timeouts[i] -= 1;
-                        Console.Write($"{i}:{timeouts[i]} ");
+                        Console.Write($"{timeouts[i]} ");
                         if (timeouts[i] > 0)
                             continue;
                         timeouts[i] = 100;
@@ -157,8 +150,6 @@ namespace MineSweeperAnalyzer
                 Thread.Sleep(1000);
             }
             damp(dic);
-
-            return dic;
         }
     }
 }

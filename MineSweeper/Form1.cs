@@ -97,7 +97,7 @@ namespace MineSweeper
 
         private void Reset()
         {
-            m_Mgr = new GameMgr(30, 16, 99, (int)DateTime.Now.Ticks);
+            m_Mgr = new GameMgr(30, 16, 99, (int)DateTime.Now.Ticks, Strategies.MinProbMaxZeroProbMaxQuantity);
 
             var blocks = m_Mgr.TotalWidth * m_Mgr.TotalHeight;
             BinomialHelper.UpdateTo(blocks, m_Mgr.TotalMines);
@@ -176,6 +176,22 @@ namespace MineSweeper
                 m_ShowProb ^= true;
                 RePaint();
             }
+            else if (e.KeyCode == Keys.A)
+            {
+                if (m_Mgr.Started)
+                {
+                    m_ShowProb = true;
+                    var flag = false;
+                    while (m_Mgr.SemiAutomaticStep())
+                        flag = true;
+                    if (!flag)
+                        m_Mgr.AutomaticStep(true);
+                    Solve();
+                }
+                else
+                    Reset();
+                RePaint();
+            }
             else if (e.KeyCode == Keys.X)
             {
                 if (m_Mgr.Started)
@@ -222,6 +238,13 @@ namespace MineSweeper
                         m_Bests.Add(m_Mgr[i, j]);
 
             var blks = new List<Block>();
+            for (var i = 0; i < m_Mgr.TotalWidth; i++)
+                for (var j = 0; j < m_Mgr.TotalHeight; j++)
+                    if (m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Unknown)
+                        blks.Add(m_Mgr[i, j]);
+            if (m_Bests.Count == 0)
+                m_Bests = m_Mgr.DecisionMaker(blks, m_Mgr, true).ToList();
+
             m_DegreeDist = new Dictionary<Block, Dictionary<int, double>>();
             m_Quantity = new Dictionary<Block, double>();
             for (var i = 0; i < m_Mgr.TotalWidth; i++)
@@ -229,27 +252,26 @@ namespace MineSweeper
                     if (!m_Mgr[i, j].IsOpen)
                     {
                         var block = m_Mgr[i, j];
-                        if (m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Unknown)
-                            blks.Add(block);
                         var dic = m_Mgr.Solver.DistributionCond(block.Surrounding, new BlockSet<Block>(block), 0);
                         var total = dic.Aggregate(BigInteger.Zero, (cur, kvp) => cur + kvp.Value);
                         var pDic = total.IsZero
                                        ? new Dictionary<int, double>()
                                        : dic.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Over(total));
                         m_DegreeDist[block] = pDic;
-                        var q = dic.Sum(
-                                        kvp =>
-                                        {
-                                            if (kvp.Value == 0)
-                                                return 0D;
-                                            var p = pDic[kvp.Key];
-                                            return -p * Math.Log(p, 2);
-                                        });
-                        m_Quantity[block] = q;
+                        var p0 = (1 - m_Mgr.Solver.Probability[block]);
+                        var q0 = m_Mgr.Solver.TotalStates.Log2();
+                        var qu = -100D * Math.Pow(1 - p0, 2) +
+                                 dic.Sum(
+                                         kvp =>
+                                         {
+                                             if (kvp.Value == 0)
+                                                 return 0D;
+                                             var p = p0 * pDic[kvp.Key];
+                                             var q = q0 - kvp.Value.Log2();
+                                             return p * q;
+                                         });
+                        m_Quantity[block] = qu;
                     }
-
-            if (m_Bests.Count == 0)
-                m_Bests = Strategies.MixProbQuantity(blks, m_Mgr).ToList();
         }
     }
 }
