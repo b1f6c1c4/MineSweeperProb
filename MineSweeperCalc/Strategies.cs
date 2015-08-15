@@ -39,7 +39,7 @@ namespace MineSweeperCalc
         {
             var vals = lst.Select(f).ToList();
             var m = dir ? vals.Min() : vals.Max();
-            return lst.Where((t, i) => dir && vals[i] >= m || !dir && vals[i] <= m);
+            return lst.Where((t, i) => !dir && vals[i] >= m || dir && vals[i] <= m);
         }
 
         private static IEnumerable<Block> ZeroProb(IReadOnlyCollection<Block> lst, IReadOnlyDictionary<Block, IDictionary<int, BigInteger>> degreeDist, bool dir = false) => Best(lst, b => ZeroProb(degreeDist[b]), dir);
@@ -151,6 +151,18 @@ namespace MineSweeperCalc
         {
             var degreeDist = blocks.ToDist(mgr);
             return Best(blocks, b => (1 - mgr.Solver.Probability[b]) * ZeroProb(degreeDist[b]));
+        }
+
+        public static IEnumerable<Block> MixProbZeroCount(List<Block> blocks, GameMgr mgr)
+        {
+            var degreeDist = blocks.ToDist(mgr);
+            return Best(blocks, b => (1 - mgr.Solver.Probability[b]) * b.ZeroCount(degreeDist[b], mgr));
+        }
+
+        public static IEnumerable<Block> MixProbQuantity(List<Block> blocks, GameMgr mgr)
+        {
+            var degreeDist = blocks.ToDist(mgr);
+            return Best(blocks, b => (1 - mgr.Solver.Probability[b]) * Quantity(degreeDist[b]));
         }
     }
 }

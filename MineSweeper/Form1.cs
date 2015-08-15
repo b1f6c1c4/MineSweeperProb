@@ -221,6 +221,7 @@ namespace MineSweeper
                         m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                         m_Bests.Add(m_Mgr[i, j]);
 
+            var blks = new List<Block>();
             m_DegreeDist = new Dictionary<Block, Dictionary<int, double>>();
             m_Quantity = new Dictionary<Block, double>();
             for (var i = 0; i < m_Mgr.TotalWidth; i++)
@@ -228,8 +229,9 @@ namespace MineSweeper
                     if (!m_Mgr[i, j].IsOpen)
                     {
                         var block = m_Mgr[i, j];
-                        var theBlock = new BlockSet<Block>(block);
-                        var dic = m_Mgr.Solver.DistributionCond(block.Surrounding, theBlock, 0);
+                        if (m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Unknown)
+                            blks.Add(block);
+                        var dic = m_Mgr.Solver.DistributionCond(block.Surrounding, new BlockSet<Block>(block), 0);
                         var total = dic.Aggregate(BigInteger.Zero, (cur, kvp) => cur + kvp.Value);
                         var pDic = total.IsZero
                                        ? new Dictionary<int, double>()
@@ -245,6 +247,9 @@ namespace MineSweeper
                                         });
                         m_Quantity[block] = q;
                     }
+
+            if (m_Bests.Count == 0)
+                m_Bests = Strategies.MixProbQuantity(blks, m_Mgr).ToList();
         }
     }
 }
