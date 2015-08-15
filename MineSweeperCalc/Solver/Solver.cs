@@ -115,17 +115,15 @@ namespace MineSweeperCalc.Solver
                     if (newC.Any)
                     {
                         foreach (var restrain in m_Restrains)
-                        {
                             if (restrain.BlockSets.BinarySearch(i) >= 0)
                                 restrain.BlockSets.Add(m_BlockSets.Count);
-                        }
                         m_BlockSets.Add(newC);
                     }
                 }
                 if (!theSet.Any)
                     break;
             }
-            
+
             for (var i = count; i < m_BlockSets.Count; i++)
                 blkLst.Add(i);
             if (theSet.Any)
@@ -145,13 +143,15 @@ namespace MineSweeperCalc.Solver
         /// <param name="exceptA">A差B</param>
         /// <param name="exceptB">B差A</param>
         /// <param name="intersection">A交B</param>
-        private static void Overlap(IReadOnlyList<T> setA, IReadOnlyList<T> setB,
-                                    out List<T> exceptA, out List<T> exceptB, out List<T> intersection)
+        private static void Overlap<TElement>(IReadOnlyList<TElement> setA, IReadOnlyList<TElement> setB,
+                                              out List<TElement> exceptA, out List<TElement> exceptB,
+                                              out List<TElement> intersection)
+            where TElement : IComparable<TElement>
         {
             int p = 0, q = 0;
-            intersection = new List<T>();
-            exceptA = new List<T>();
-            exceptB = new List<T>();
+            intersection = new List<TElement>();
+            exceptA = new List<TElement>();
+            exceptB = new List<TElement>();
             for (; p < setA.Count && q < setB.Count;)
             {
                 var cmp = setA[p].CompareTo(setB[q]);
@@ -201,9 +201,40 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     求解
         /// </summary>
-        public void Solve()
+        /// <param name="withProb">求解概率</param>
+        public void Solve(bool withProb)
         {
-            while (ReduceRestrains()) { }
+            Solutions = null;
+            Probability = null;
+            Expectation = null;
+            TotalStates = BigInteger.MinusOne;
+
+            m_DistCache.Clear();
+            m_DistCacheLock.Clear();
+            m_DistCondCache.Clear();
+            m_DistCondCacheLock.Clear();
+
+            var flag = true;
+            while (flag)
+            {
+                while (ReduceRestrains()) { }
+
+                flag = false;
+                for (var i = 0; i < m_Restrains.Count - 1; i++)
+                {
+                    for (var j = i + 1; j < m_Restrains.Count; j++)
+                        if (SimpleOverlap(m_Restrains[i], m_Restrains[j]))
+                        {
+                            flag = true;
+                            break;
+                        }
+                    if (flag)
+                        break;
+                }
+            }
+
+            if (!withProb)
+                return;
 
             var augmentedMatrixT = GenerateMatrix();
             var minors = Gauss(augmentedMatrixT);
@@ -211,18 +242,19 @@ namespace MineSweeperCalc.Solver
             if (minors[minors.Count - 1] == m_BlockSets.Count)
                 minors.RemoveAt(minors.Count - 1);
             else
-                throw new ApplicationException("无解");
+            {
+                TotalStates = BigInteger.Zero;
+                return;
+            }
 
             var result = EnumerateSolutions(minors, augmentedMatrixT);
             if (result.Count == 0)
-                throw new ApplicationException("无解");
+            {
+                TotalStates = BigInteger.Zero;
+                return;
+            }
 
             ProcessSolutions(result);
-
-            m_DistCache.Clear();
-            m_DistCacheLock.Clear();
-            m_DistCondCache.Clear();
-            m_DistCondCacheLock.Clear();
         }
 
         /// <summary>
@@ -271,7 +303,7 @@ namespace MineSweeperCalc.Solver
                                 m_Manager.SetStatus(block, BlockStatus.Blank);
                     m_Restrains.RemoveAt(i--);
                 }
-                else if (m_Restrains[i].Mines == m_Restrains[i].BlockSets.Select(index=>cnts[index]).Sum())
+                else if (m_Restrains[i].Mines == m_Restrains[i].BlockSets.Select(index => cnts[index]).Sum())
                 {
                     for (var j = 0; j < m_BlockSets.Count; j++)
                         if (m_Restrains[i].BlockSets.BinarySearch(j) >= 0)
@@ -307,6 +339,60 @@ namespace MineSweeperCalc.Solver
                     if (restrain.BlockSets.BinarySearch(i) >= 0)
                         restrain.Mines -= mines;
             }
+
+            return flag;
+        }
+
+        /// <summary>
+        ///     两两化简约束
+        /// </summary>
+        /// <param name="first">约束</param>
+        /// <param name="second">约束</param>
+        /// <returns>是否成功化简</returns>
+        private bool SimpleOverlap(Restrain first, Restrain second)
+        {
+            List<int> exceptA, exceptB, intersection;
+            Overlap(first.BlockSets, second.BlockSets, out exceptA, out exceptB, out intersection);
+
+            var sumA = exceptA.Select(index => m_BlockSets[index].Count).Sum();
+            var sumB = exceptB.Select(index => m_BlockSets[index].Count).Sum();
+            var sumC = intersection.Select(index => m_BlockSets[index].Count).Sum();
+
+            var aL = Math.Max(0, first.Mines - sumC);
+            var aU = Math.Min(sumA, first.Mines);
+            var bL = Math.Max(0, second.Mines - sumC);
+            var bU = Math.Min(sumB, second.Mines);
+            var cL = 0;
+            var cU = sumC;
+            cL = Math.Max(cL, Math.Max(first.Mines - aU, second.Mines - bU));
+            cU = Math.Min(cU, Math.Min(first.Mines - aL, second.Mines - bL));
+            aL = Math.Max(aL, Math.Max(0, first.Mines - cU));
+            aU = Math.Min(aU, Math.Min(sumA, first.Mines - cL));
+            bL = Math.Max(bL, Math.Max(0, second.Mines - cU));
+            bU = Math.Min(bU, Math.Min(sumB, second.Mines - cL));
+            cL = Math.Max(cL, Math.Max(first.Mines - aU, second.Mines - bU));
+            cU = Math.Min(cU, Math.Min(first.Mines - aL, second.Mines - bL));
+
+            Func<List<int>, int, int, int, bool> process
+                = (sets, sum, lb, ub) =>
+                  {
+                      if (sets.Count == 0)
+                          return false;
+                      if (sum == lb)
+                          foreach (var block in sets.SelectMany(index => m_BlockSets[index].Blocks))
+                              m_Manager.SetStatus(block, BlockStatus.Mine);
+                      else if (ub == 0)
+                          foreach (var block in sets.SelectMany(index => m_BlockSets[index].Blocks))
+                              m_Manager.SetStatus(block, BlockStatus.Blank);
+                      else
+                          return false;
+                      return true;
+                  };
+
+            var flag = false;
+            flag |= process(exceptA, sumA, aL, aU);
+            flag |= process(exceptB, sumB, bL, bU);
+            flag |= process(intersection, sumC, cL, cU);
 
             return flag;
         }

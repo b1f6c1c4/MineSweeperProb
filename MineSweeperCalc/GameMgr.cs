@@ -190,12 +190,13 @@ namespace MineSweeperCalc
         /// <summary>
         ///     半自动操作一步
         /// </summary>
+        /// <param name="withProb">求解概率</param>
         /// <returns>可以继续半自动操作</returns>
-        public bool SemiAutomaticStep()
+        public bool SemiAutomaticStep(bool withProb = true)
         {
             if (!Started)
                 return false;
-            Solver.Solve();
+            Solver.Solve(withProb);
             var flag = false;
             for (var i = 0; i < TotalWidth; i++)
             {
@@ -225,7 +226,12 @@ namespace MineSweeperCalc
         {
             if (!Started)
                 return false;
-            while (SemiAutomaticStep()) { }
+            while (true)
+            {
+                while (SemiAutomaticStep(false)) { }
+                if (!SemiAutomaticStep())
+                    break;
+            }
             return Started;
         }
 

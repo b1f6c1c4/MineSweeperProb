@@ -39,7 +39,7 @@ namespace MineSweeperAnalyzer
                     {
                         var game = new GameMgr(30, 16, 99, Interlocked.Increment(ref seed), d);
                         game.Automatic(true);
-                        game.Solver.Solve();
+                        game.Solver.Solve(true);
                         return game.Solver.TotalStates.Log2();
                     },
                     dic =>
