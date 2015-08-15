@@ -15,6 +15,7 @@ namespace MineSweeper
     {
         private GameMgr m_Mgr;
         private bool m_ShowProb;
+        private bool m_CalcBest;
         private const float BlockSize = 25F;
         private readonly float m_ScaleFactor;
         private double m_AllLog2;
@@ -71,7 +72,7 @@ namespace MineSweeper
                             g.DrawString("M", m_Mgr[i, j].IsOpen ? fontO : fontC, white, i * a + 4, j * a);
                         else if (m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                             g.DrawString("B", m_Mgr[i, j].IsOpen ? fontO : fontC, black, i * a + 4, j * a);
-                        if (m_Bests.Contains(m_Mgr[i, j]))
+                        if (m_CalcBest && m_Bests.Contains(m_Mgr[i, j]))
                             g.FillEllipse(green, i * a + a / 4, j * a + a / 4, a / 2 - 1, a / 2 - 1);
                     }
             else
@@ -176,11 +177,23 @@ namespace MineSweeper
                 m_ShowProb ^= true;
                 RePaint();
             }
+            else if (e.KeyCode == Keys.Escape)
+            {
+                m_CalcBest ^= true;
+                if (!m_CalcBest)
+                {
+                    m_DegreeDist = null;
+                    m_Quantity = null;
+                    m_Bests = null;
+                }
+                RePaint();
+            }
             else if (e.KeyCode == Keys.A)
             {
                 if (m_Mgr.Started)
                 {
                     m_ShowProb = true;
+                    m_CalcBest = true;
                     var flag = false;
                     while (m_Mgr.SemiAutomaticStep())
                         flag = true;
@@ -236,6 +249,9 @@ namespace MineSweeper
                     if (!m_Mgr[i, j].IsOpen &&
                         m_Mgr.Solver[m_Mgr[i, j]] == BlockStatus.Blank)
                         m_Bests.Add(m_Mgr[i, j]);
+
+            if (!m_CalcBest)
+                return;
 
             var blks = new List<Block>();
             for (var i = 0; i < m_Mgr.TotalWidth; i++)
