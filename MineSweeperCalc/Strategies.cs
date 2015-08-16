@@ -5,8 +5,8 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using MineSweeperCalc.Solver;
-
 // ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedParameter.Global
 
 namespace MineSweeperCalc
 {
@@ -21,8 +21,8 @@ namespace MineSweeperCalc
             => lst.Aggregate(BigInteger.Zero, (c, v) => c + v);
 
         private static IDictionary<Block, IDictionary<int, BigInteger>> ToDist(this List<Block> blocks,
-                                                                               GameMgr mgr,
-                                                                               bool multiThread)
+                                                                              GameMgr mgr,
+                                                                              bool multiThread)
         {
             if (!multiThread)
                 return blocks.ToDictionary(
@@ -40,8 +40,12 @@ namespace MineSweeperCalc
 
         private static double ZeroCount(this Block block, IDictionary<int, BigInteger> dist, GameMgr mgr)
             =>
-                dist[dist.Keys.Min()].Over(dist.Values.Sum()) *
-                block.Surrounding.Blocks.Count(b => !b.IsOpen && mgr.Solver[b] == BlockStatus.Unknown);
+                dist[dist.Keys.Min()].Over(
+                                           dist.Values.Sum() *
+                                           block.Surrounding.Blocks.Count(
+                                                                          b =>
+                                                                          !b.IsOpen &&
+                                                                          mgr.Solver[b] == BlockStatus.Unknown));
 
         private static double Quantity(IDictionary<int, BigInteger> dist)
         {
@@ -93,144 +97,173 @@ namespace MineSweeperCalc
 
         #endregion
 
-        public static IEnumerable<Block> MinProb(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProb(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                 IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
             => Best(blocks, b => mgr.Solver.Probability[b], true);
 
-        public static IEnumerable<Block> MinProbMaxZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMaxZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                            IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             return ZeroProb(lst, degreeDist);
         }
 
-        public static IEnumerable<Block> MinProbMaxZeroCount(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMaxZeroCount(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                             IDictionary<Block, IDictionary<int, BigInteger>> dist =
+                                                                 null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             return ZeroCount(lst, mgr, degreeDist);
         }
 
-        public static IEnumerable<Block> MinProbMaxQuantity(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMaxQuantity(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                            IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             return Quantity(lst, degreeDist);
         }
 
-        public static IEnumerable<Block> MinProbMinQuantity(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMinQuantity(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                            IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             return Quantity(lst, degreeDist, true);
         }
 
-        public static IEnumerable<Block> MinProbMaxZeroProbMaxQuantity(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMaxZeroProbMaxQuantity(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                                       IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                           dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = ZeroProb(lst, degreeDist).ToList();
             return Quantity(lst, degreeDist);
         }
 
-        public static IEnumerable<Block> MinProbMaxZeroProbMinQuantity(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMaxZeroProbMinQuantity(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                                       IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                           dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = ZeroProb(lst, degreeDist).ToList();
             return Quantity(lst, degreeDist, true);
         }
 
         public static IEnumerable<Block> MinProbMaxZeroCountMaxQuantity(List<Block> blocks, GameMgr mgr,
-                                                                        bool multiThread)
+                                                                        bool multiThread,
+                                                                        IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                            dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = ZeroCount(lst, mgr, degreeDist).ToList();
             return Quantity(lst, degreeDist);
         }
 
         public static IEnumerable<Block> MinProbMaxZeroCountMinQuantity(List<Block> blocks, GameMgr mgr,
-                                                                        bool multiThread)
+                                                                        bool multiThread,
+                                                                        IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                            dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = ZeroCount(lst, mgr, degreeDist).ToList();
             return Quantity(lst, degreeDist, true);
         }
 
-        public static IEnumerable<Block> MinProbMaxQuantityMaxZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMaxQuantityMaxZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                                       IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                           dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = Quantity(lst, degreeDist).ToList();
             return ZeroProb(lst, degreeDist);
         }
 
         public static IEnumerable<Block> MinProbMaxQuantityMaxZeroCount(List<Block> blocks, GameMgr mgr,
-                                                                        bool multiThread)
+                                                                        bool multiThread,
+                                                                        IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                            dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = Quantity(lst, degreeDist).ToList();
             return ZeroCount(lst, mgr, degreeDist);
         }
 
-        public static IEnumerable<Block> MinProbMinQuantityMaxZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MinProbMinQuantityMaxZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                                       IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                           dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = Quantity(lst, degreeDist, true).ToList();
             return ZeroProb(lst, degreeDist);
         }
 
         public static IEnumerable<Block> MinProbMinQuantityMaxZeroCount(List<Block> blocks, GameMgr mgr,
-                                                                        bool multiThread)
+                                                                        bool multiThread,
+                                                                        IDictionary<Block, IDictionary<int, BigInteger>>
+                                                                            dist = null)
         {
             var lst = Best(blocks, b => mgr.Solver.Probability[b], true).ToList();
-            var degreeDist = lst.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? lst.ToDist(mgr, multiThread);
             lst = Quantity(lst, degreeDist, true).ToList();
             return ZeroCount(lst, mgr, degreeDist);
         }
 
-        public static IEnumerable<Block> MixProbZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MixProbZeroProb(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                         IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
-            var degreeDist = blocks.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? blocks.ToDist(mgr, multiThread);
             return Best(blocks, b => (1 - mgr.Solver.Probability[b]) * ZeroProb(degreeDist[b]));
         }
 
-        public static IEnumerable<Block> MixProbZeroCount(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MixProbZeroCount(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                          IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
-            var degreeDist = blocks.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? blocks.ToDist(mgr, multiThread);
             return Best(blocks, b => (1 - mgr.Solver.Probability[b]) * b.ZeroCount(degreeDist[b], mgr));
         }
 
-        public static IEnumerable<Block> MixProbQuantity(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> MixProbQuantity(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                         IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
-            var degreeDist = blocks.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? blocks.ToDist(mgr, multiThread);
             return Best(blocks, b => (1 - mgr.Solver.Probability[b]) * Quantity(degreeDist[b]));
         }
 
-        public static IEnumerable<Block> HalfQuantity(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> HalfQuantity(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                      IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
-            var degreeDist = blocks.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? blocks.ToDist(mgr, multiThread);
             return Best(blocks, b => Quantity(b, degreeDist[b], mgr, 0D));
         }
 
-        public static IEnumerable<Block> HalfQuantity2(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> HalfQuantity2(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                       IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
-            var degreeDist = blocks.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? blocks.ToDist(mgr, multiThread);
             return Best(blocks, b => Quantity(b, degreeDist[b], mgr, 1D));
         }
 
-        public static IEnumerable<Block> HalfQuantity3(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> HalfQuantity3(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                       IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
-            var degreeDist = blocks.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? blocks.ToDist(mgr, multiThread);
             return Best(blocks, b => Quantity(b, degreeDist[b], mgr, 10D));
         }
 
-        public static IEnumerable<Block> HalfQuantity4(List<Block> blocks, GameMgr mgr, bool multiThread)
+        public static IEnumerable<Block> HalfQuantity4(List<Block> blocks, GameMgr mgr, bool multiThread,
+                                                       IDictionary<Block, IDictionary<int, BigInteger>> dist = null)
         {
-            var degreeDist = blocks.ToDist(mgr, multiThread);
+            var degreeDist = dist ?? blocks.ToDist(mgr, multiThread);
             return Best(blocks, b => Quantity(b, degreeDist[b], mgr, 100D));
         }
     }

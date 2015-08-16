@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Numerics;
 using MineSweeperCalc.Solver;
 
 namespace MineSweeperCalc
@@ -9,7 +10,7 @@ namespace MineSweeperCalc
     /// <summary>
     ///     自动扫雷游戏
     /// </summary>
-    public sealed class GameMgr
+    public class GameMgr
     {
         /// <summary>
         ///     进行决策
@@ -17,7 +18,9 @@ namespace MineSweeperCalc
         /// <param name="blocks">格</param>
         /// <param name="mgr">游戏</param>
         /// <returns>最优格</returns>
-        public delegate IEnumerable<Block> DecideDelegate(List<Block> blocks, GameMgr mgr, bool multiThread);
+        public delegate IEnumerable<Block> DecideDelegate(
+            List<Block> blocks, GameMgr mgr, bool multiThread,
+            IDictionary<Block, IDictionary<int, BigInteger>> dist = null);
 
         /// <summary>
         ///     格
@@ -52,7 +55,7 @@ namespace MineSweeperCalc
         /// <summary>
         ///     是否胜利
         /// </summary>
-        public bool Suceed { get; private set; }
+        public bool Succeed { get; private set; }
 
         /// <summary>
         ///     待翻开格数
@@ -64,6 +67,16 @@ namespace MineSweeperCalc
         ///     求解器
         /// </summary>
         public Solver<Block> Solver { get; }
+
+        /// <summary>
+        ///     概率
+        /// </summary>
+        public virtual IDictionary<Block, double> Probability => Solver.Probability;
+
+        /// <summary>
+        ///     总状态数
+        /// </summary>
+        public virtual BigInteger TotalStates => Solver.TotalStates;
 
         /// <summary>
         ///     决策器
@@ -115,7 +128,7 @@ namespace MineSweeperCalc
             Solver.AddRestrain(new BlockSet<Block>(set), TotalMines);
 
             Started = true;
-            Suceed = false;
+            Succeed = false;
             ToOpen = TotalWidth * TotalHeight - TotalMines;
         }
 
@@ -183,8 +196,34 @@ namespace MineSweeperCalc
             if (--ToOpen == 0)
             {
                 Started = false;
-                Suceed = true;
+                Succeed = true;
             }
+        }
+
+        /// <summary>
+        ///     获取确定无雷的可翻开的格
+        /// </summary>
+        /// <returns>确定无雷的可翻开的格</returns>
+        public IEnumerable<Block> CanOpenForSureBlocks()
+        {
+            for (var i = 0; i < TotalWidth; i++)
+                for (var j = 0; j < TotalHeight; j++)
+                    if (!m_Blocks[i, j].IsOpen &&
+                        Solver[m_Blocks[i, j]] == BlockStatus.Blank)
+                        yield return m_Blocks[i, j];
+        }
+
+        /// <summary>
+        ///     获取不一定无雷的可翻开的格
+        /// </summary>
+        /// <returns>不一定无雷的可翻开的格</returns>
+        public IEnumerable<Block> CanOpenNotSureBlocks()
+        {
+            for (var i = 0; i < TotalWidth; i++)
+                for (var j = 0; j < TotalHeight; j++)
+                    if (!m_Blocks[i, j].IsOpen &&
+                        Solver[m_Blocks[i, j]] == BlockStatus.Unknown)
+                        yield return m_Blocks[i, j];
         }
 
         /// <summary>
@@ -192,28 +231,21 @@ namespace MineSweeperCalc
         /// </summary>
         /// <param name="withProb">求解概率</param>
         /// <returns>可以继续半自动操作</returns>
-        public bool SemiAutomaticStep(bool withProb = true)
+        public bool SemiAutomaticStep(bool withProb)
         {
             if (!Started)
                 return false;
             Solver.Solve(withProb);
             var flag = false;
-            for (var i = 0; i < TotalWidth; i++)
+            foreach (var block in CanOpenForSureBlocks())
             {
-                for (var j = 0; j < TotalHeight; j++)
-                    if (!m_Blocks[i, j].IsOpen &&
-                        Solver[m_Blocks[i, j]] == BlockStatus.Blank)
-                    {
-                        OpenBlock(i, j);
-                        flag = true;
-                        if (Started)
-                            continue;
-                        if (!Suceed)
-                            throw new ApplicationException("判断错误");
-                        break;
-                    }
-                if (!Started)
-                    break;
+                OpenBlock(block.X, block.Y);
+                flag = true;
+                if (Started)
+                    continue;
+                if (!Succeed)
+                    throw new ApplicationException("判断错误");
+                break;
             }
             return flag && Started;
         }
@@ -222,14 +254,14 @@ namespace MineSweeperCalc
         ///     半自动操作
         /// </summary>
         /// <returns>需要进行决策</returns>
-        public bool SemiAutomatic()
+        public virtual bool SemiAutomatic()
         {
             if (!Started)
                 return false;
             while (true)
             {
                 while (SemiAutomaticStep(false)) { }
-                if (!SemiAutomaticStep())
+                if (!SemiAutomaticStep(true))
                     break;
             }
             return Started;
@@ -239,8 +271,7 @@ namespace MineSweeperCalc
         ///     按特定策略自动操作一次
         /// </summary>
         /// <param name="multiThread"></param>
-        // ReSharper disable once MemberCanBePrivate.Global
-        public void AutomaticStep(bool multiThread)
+        public virtual void AutomaticStep(bool multiThread)
         {
             if (!Started)
                 return;
@@ -251,14 +282,7 @@ namespace MineSweeperCalc
                 return;
             }
 
-            var lst = new List<Block>();
-            for (var i = 0; i < TotalWidth; i++)
-                for (var j = 0; j < TotalHeight; j++)
-                    if (!m_Blocks[i, j].IsOpen &&
-                        Solver[m_Blocks[i, j]] == BlockStatus.Unknown)
-                        lst.Add(m_Blocks[i, j]);
-
-            var ary = DecisionMaker(lst, this, multiThread).ToArray();
+            var ary = DecisionMaker(CanOpenNotSureBlocks().ToList(), this, multiThread).ToArray();
             var blk = ary[m_Random.Next(ary.Length)];
             OpenBlock(blk.X, blk.Y);
         }
@@ -267,7 +291,7 @@ namespace MineSweeperCalc
         ///     按特定策略自动操作
         /// </summary>
         /// <param name="multiThread"></param>
-        public void Automatic(bool multiThread)
+        public virtual void Automatic(bool multiThread)
         {
             while (Started)
                 if (SemiAutomatic())
