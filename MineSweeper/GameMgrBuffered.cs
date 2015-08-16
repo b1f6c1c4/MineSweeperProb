@@ -112,6 +112,11 @@ namespace MineSweeper
         public override BigInteger TotalStates => m_TotalStates;
 
         /// <summary>
+        ///     确定最佳格
+        /// </summary>
+        public List<Block> BestsForSure { get; private set; }
+
+        /// <summary>
         ///     最佳格
         /// </summary>
         public List<Block> Bests { get; private set; }
@@ -175,6 +180,7 @@ namespace MineSweeper
             Solver.Solve(Mode.HasFlag(SolvingMode.Probability));
 
             var bests = CanOpenForSureBlocks().ToList();
+            List<Block> bestsN = null;
             Dictionary<Block, IDictionary<int, double>> degreeDist = null;
             Dictionary<Block, double> quantity = null;
 
@@ -184,7 +190,7 @@ namespace MineSweeper
             if (!Mode.HasFlag(SolvingMode.Automatic))
             {
                 if (bests.Count == 0)
-                    bests = Strategies.MinProb(CanOpenNotSureBlocks().ToList(), this, false).ToList();
+                    bestsN = Strategies.MinProb(CanOpenNotSureBlocks().ToList(), this, false).ToList();
                 goto saveResult;
             }
 
@@ -193,7 +199,7 @@ namespace MineSweeper
                 if (bests.Count == 0)
                 {
                     var lst = CanOpenNotSureBlocks().ToList();
-                    bests = (DecisionMaker?.Invoke(lst, this, false) ?? Strategies.MinProb(lst, this, false)).ToList();
+                    bestsN = (DecisionMaker?.Invoke(lst, this, false) ?? Strategies.MinProb(lst, this, false)).ToList();
                 }
                 goto saveResult;
             }
@@ -225,7 +231,7 @@ namespace MineSweeper
             if (bests.Count == 0)
             {
                 var lst = CanOpenNotSureBlocks().ToList();
-                bests =
+                bestsN =
                     (DecisionMaker?.Invoke(lst, this, false, dist) ?? Strategies.MinProb(lst, this, false, dist)).ToList
                         ();
             }
@@ -247,7 +253,8 @@ namespace MineSweeper
                     m_TotalStates = Solver.TotalStates;
                 }
 
-                Bests = bests;
+                BestsForSure = bests;
+                Bests = bestsN;
                 InferredStatuses = new Dictionary<Block, BlockStatus>();
                 for (var i = 0; i < TotalWidth; i++)
                     for (var j = 0; j < TotalHeight; j++)

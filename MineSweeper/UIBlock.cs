@@ -15,12 +15,12 @@ namespace MineSweeper
             Size = new Size(24, 24);
         }
 
-        public Block TheBlock { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+
+        public Block TheBlock => TheMgr[X, Y];
 
         public GameMgrBuffered TheMgr { get; set; }
-
-        private bool m_Best;
-        private readonly SolidBrush m_SolidBrush = new SolidBrush(Color.FromArgb(160, Color.Yellow));
 
         public static void InvokeIfRequired(ISynchronizeInvoke control, MethodInvoker action)
         {
@@ -35,7 +35,7 @@ namespace MineSweeper
             TheMgr.EnterReadLock();
 
             string str = null;
-            Color color;
+            Color color, fColor = Color.Black;
             bool best;
             try
             {
@@ -46,7 +46,12 @@ namespace MineSweeper
                     switch (TheMgr.InferredStatuses[TheBlock])
                     {
                         case BlockStatus.Mine:
-                            color = TheMgr.Started ? Color.Black : Color.Red;
+                            if (TheMgr.Started)
+                            { color = Color.Black;
+                                fColor = Color.White;
+                            }
+                            else
+                                color = Color.Red;
                             str = "M";
                             break;
                         case BlockStatus.Blank:
@@ -81,7 +86,18 @@ namespace MineSweeper
                             break;
                     }
 
-                    best = TheMgr.Bests.BinarySearch(TheBlock) >= 0;
+                    if (TheMgr.BestsForSure.BinarySearch(TheBlock) >= 0)
+                    {
+                        str = "★";
+                        fColor = Color.MediumSlateBlue;
+                    }
+                    else if (TheMgr.Mode.HasFlag(SolvingMode.Probability) && 
+                            TheMgr.Bests != null &&
+                             TheMgr.Bests.BinarySearch(TheBlock) >= 0)
+                    {
+                        str = "☆";
+                        fColor = Color.SlateBlue;
+                    }
                 }
                 else
                 {
@@ -103,8 +119,6 @@ namespace MineSweeper
                         color = TheMgr.Succeed ? Color.Green : Color.Red;
                     else
                         color = Color.DarkGray;
-
-                    best = false;
                 }
             }
             finally
@@ -118,24 +132,8 @@ namespace MineSweeper
                              {
                                  Text = str;
                                  BackColor = color;
-                                 if (m_Best != best)
-                                 {
-                                     m_Best = best;
-                                     Refresh();
-                                 }
+                                 ForeColor = fColor;
                              });
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-            if (m_Best)
-                e.Graphics.FillEllipse(
-                                       m_SolidBrush,
-                                       ClientSize.Width / 4,
-                                       ClientSize.Height / 4,
-                                       ClientSize.Width / 2,
-                                       ClientSize.Height / 2);
         }
     }
 }

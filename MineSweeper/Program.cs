@@ -13,7 +13,7 @@ namespace MineSweeper
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MineSweeper());
+            Application.Run(new MineSweeper(30, 16, 99));
         }
     }
 }

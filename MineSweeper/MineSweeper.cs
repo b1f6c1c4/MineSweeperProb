@@ -12,11 +12,15 @@ namespace MineSweeper
 {
     public partial class MineSweeper : Form
     {
+        private readonly int m_Width;
+        private readonly int m_Height;
+        private readonly int m_Mines;
+
         private GameMgrBuffered m_Mgr;
         private readonly float m_ScaleFactor;
         private double m_AllLog2;
         private Block m_CurrentBlock;
-        private List<UIBlock> m_UIBlocks;
+        private readonly List<UIBlock> m_UIBlocks;
 
         private delegate void UpdateDelegate();
 
@@ -33,8 +37,12 @@ namespace MineSweeper
         // ReSharper disable once InconsistentNaming
         private static extern bool ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
-        public MineSweeper()
+        public MineSweeper(int width, int height, int mines)
         {
+            m_Width = width;
+            m_Height = height;
+            m_Mines = mines;
+
             SetProcessDPIAware();
             InitializeComponent();
 
@@ -42,12 +50,37 @@ namespace MineSweeper
             m_ScaleFactor = GetDeviceCaps(hdc, 88) / 96F;
             ReleaseDC(IntPtr.Zero, hdc);
 
+            m_UIBlocks = new List<UIBlock>();
+            for (var i = 0; i < m_Width; i++)
+                for (var j = 0; j < m_Height; j++)
+                {
+                    var ub = new UIBlock
+                                 {
+                                     Location = new Point(i * 25, j * 25),
+                                     Font = new Font("Consolas", 16F),
+                                     X = i,
+                                     Y = j
+                                 };
+                    //ub.Scale(new SizeF(m_ScaleFactor, m_ScaleFactor));
+                    ub.MouseClick += Block_Click;
+                    ub.MouseEnter += Block_Enter;
+                    Controls.Add(ub);
+                    m_UIBlocks.Add(ub);
+                }
+
             Scale(new SizeF(m_ScaleFactor, m_ScaleFactor));
         }
 
         private void MineSweeper_Load(object sender, EventArgs e) { Reset(); }
 
         private void UpdateAll()
+        {
+            UpdateText();
+            foreach (var ub in m_UIBlocks)
+                ub.FetchState();
+        }
+
+        private void UpdateText()
         {
             m_Mgr.EnterReadLock();
             try
@@ -99,50 +132,30 @@ namespace MineSweeper
             {
                 m_Mgr.ExitReadLock();
             }
-
-            foreach (var ub in m_UIBlocks)
-                ub.FetchState();
         }
 
         private void Reset()
         {
             var mode = m_Mgr?.Mode ?? SolvingMode.Probability;
-            m_Mgr = new GameMgrBuffered(30, 16, 99, (int)DateTime.Now.Ticks, Strategies.MinProbMaxZeroProbMaxQuantity)
+            m_Mgr = new GameMgrBuffered(
+                m_Width,
+                m_Height,
+                m_Mines,
+                (int)DateTime.Now.Ticks,
+                Strategies.MinProbMaxZeroProbMaxQuantity)
                         { Mode = mode };
 
-            if (m_UIBlocks != null)
-                foreach (var ub in m_UIBlocks)
-                {
-                    Controls.Remove(ub);
-                    ub.Dispose();
-                }
+            foreach (var ub in m_UIBlocks)
+                ub.TheMgr = m_Mgr;
 
-            m_UIBlocks = new List<UIBlock>();
-            for (var i = 0; i < m_Mgr.TotalWidth; i++)
-                for (var j = 0; j < m_Mgr.TotalHeight; j++)
-                {
-                    var ub = new UIBlock
-                                 {
-                                     Location = new Point(i * 25, j * 25),
-                                     TheMgr = m_Mgr,
-                                     TheBlock = m_Mgr[i, j],
-                                     Font = new Font("Consolas", 16F)
-                                 };
-                    ub.Scale(new SizeF(m_ScaleFactor, m_ScaleFactor));
-                    ub.MouseClick += Block_Click;
-                    ub.MouseEnter += Block_Enter;
-                    Controls.Add(ub);
-                    m_UIBlocks.Add(ub);
-                }
-
-            var blocks = m_Mgr.TotalWidth * m_Mgr.TotalHeight;
+            var blocks = m_Width * m_Height;
             BinomialHelper.UpdateTo(blocks, m_Mgr.TotalMines);
 
             m_AllLog2 = BinomialHelper.Binomial(blocks, m_Mgr.TotalMines).Log2();
 
             ClientSize = new Size(
-                (int)(m_Mgr.TotalWidth * 25 * m_ScaleFactor),
-                (int)(m_Mgr.TotalHeight * 25 * m_ScaleFactor) + progressBar1.Height);
+                (int)(m_Width * 25 * m_ScaleFactor),
+                (int)(m_Height * 25 * m_ScaleFactor) + progressBar1.Height);
 
             Solve();
         }
@@ -150,7 +163,7 @@ namespace MineSweeper
         private void Block_Enter(object sender, EventArgs e)
         {
             m_CurrentBlock = ((UIBlock)sender).TheBlock;
-            UpdateAll();
+            UpdateText();
         }
 
         private void Block_Click(object sender, MouseEventArgs e)
@@ -164,7 +177,7 @@ namespace MineSweeper
                 block.TheBlock.IsOpen)
                 return;
 
-            m_Mgr.OpenBlock(block.TheBlock.X, block.TheBlock.Y);
+            m_Mgr.OpenBlock(block.X, block.Y);
             Solve();
         }
 
