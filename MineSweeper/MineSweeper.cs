@@ -16,26 +16,14 @@ namespace MineSweeper
         private readonly int m_Height;
         private readonly int m_Mines;
 
+        private readonly float ScaleFactor;
+
         private GameMgrBuffered m_Mgr;
-        private readonly float m_ScaleFactor;
         private double m_AllLog2;
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
         private delegate void UpdateDelegate();
-
-        [DllImport("user32.dll")]
-        private static extern bool SetProcessDPIAware();
-
-        [DllImport("gdi32.dll")]
-        private static extern int GetDeviceCaps(IntPtr hdc, int nIndex);
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetDC(IntPtr hWnd);
-
-        [DllImport("user32.dll")]
-        // ReSharper disable once InconsistentNaming
-        private static extern bool ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
         public MineSweeper(int width, int height, int mines)
         {
@@ -43,12 +31,13 @@ namespace MineSweeper
             m_Height = height;
             m_Mines = mines;
 
-            SetProcessDPIAware();
-            InitializeComponent();
+            var screen = Screen.FromControl(this);
+            var f = Math.Min(
+                             screen.Bounds.Width / (1.1F * m_Width * 25),
+                             screen.Bounds.Height / (1.1F * m_Height * 25));
+            ScaleFactor = f < Program.ScaleFactor ? f : Program.ScaleFactor;
 
-            var hdc = GetDC(IntPtr.Zero);
-            m_ScaleFactor = GetDeviceCaps(hdc, 88) / 96F;
-            ReleaseDC(IntPtr.Zero, hdc);
+            InitializeComponent();
 
             m_UIBlocks = new List<UIBlock>();
             for (var i = 0; i < m_Width; i++)
@@ -57,18 +46,17 @@ namespace MineSweeper
                     var ub = new UIBlock
                                  {
                                      Location = new Point(i * 25, j * 25),
-                                     Font = new Font("Consolas", 16F),
+                                     Font = new Font("Consolas", 11F * ScaleFactor),
                                      X = i,
                                      Y = j
                                  };
-                    //ub.Scale(new SizeF(m_ScaleFactor, m_ScaleFactor));
                     ub.MouseClick += Block_Click;
                     ub.MouseEnter += Block_Enter;
                     Controls.Add(ub);
                     m_UIBlocks.Add(ub);
                 }
 
-            Scale(new SizeF(m_ScaleFactor, m_ScaleFactor));
+            Scale(new SizeF(ScaleFactor, ScaleFactor));
         }
 
         private void MineSweeper_Load(object sender, EventArgs e) { Reset(); }
@@ -88,9 +76,9 @@ namespace MineSweeper
                 var sb = new StringBuilder();
                 sb.Append($"[{m_Mgr.Mode}]");
                 if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
-                    m_Mgr.Solver.Probability != null)
+                    m_Mgr.Probability != null)
                 {
-                    var curBits = m_Mgr.Solver.TotalStates.Log2();
+                    var curBits = m_Mgr.TotalStates.Log2();
                     sb.Append($" {curBits:F2}/{m_AllLog2:F2}b, {1 - curBits / m_AllLog2:P0}");
                     progressBar1.Value = (int)(2147483647 * (1 - curBits / m_AllLog2));
                 }
@@ -99,9 +87,9 @@ namespace MineSweeper
 
                 if (m_CurrentBlock != null)
                     if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
-                        m_Mgr.Solver.Probability != null)
+                        m_Mgr.Probability != null)
                     {
-                        sb.Append($" M{m_Mgr.Solver.Probability[m_CurrentBlock]:P2}");
+                        sb.Append($" M{m_Mgr.Probability[m_CurrentBlock]:P2}");
 
                         if (m_Mgr.Mode.HasFlag(SolvingMode.Extended) &&
                             (m_Mgr.DegreeDist != null &&
@@ -154,8 +142,8 @@ namespace MineSweeper
             m_AllLog2 = BinomialHelper.Binomial(blocks, m_Mgr.TotalMines).Log2();
 
             ClientSize = new Size(
-                (int)(m_Width * 25 * m_ScaleFactor),
-                (int)(m_Height * 25 * m_ScaleFactor) + progressBar1.Height);
+                (int)(m_Width * 25 * ScaleFactor),
+                (int)(m_Height * 25 * ScaleFactor) + progressBar1.Height);
 
             Solve();
         }

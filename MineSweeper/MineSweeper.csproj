@@ -48,6 +48,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Configuration.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Configuration.Designer.cs">
+      <DependentUpon>Configuration.cs</DependentUpon>
+    </Compile>
     <Compile Include="GameMgrBuffered.cs" />
     <Compile Include="MineSweeper.cs">
       <SubType>Form</SubType>
@@ -60,6 +66,9 @@
     <Compile Include="UIBlock.cs">
       <SubType>Component</SubType>
     </Compile>
+    <EmbeddedResource Include="Configuration.resx">
+      <DependentUpon>Configuration.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="MineSweeper.resx">
       <DependentUpon>MineSweeper.cs</DependentUpon>
     </EmbeddedResource>
