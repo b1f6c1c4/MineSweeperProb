@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 using MineSweeperCalc;
@@ -16,7 +15,7 @@ namespace MineSweeper
         private readonly int m_Height;
         private readonly int m_Mines;
 
-        private readonly float ScaleFactor;
+        private readonly float m_ScaleFactor;
 
         private GameMgrBuffered m_Mgr;
         private double m_AllLog2;
@@ -35,7 +34,7 @@ namespace MineSweeper
             var f = Math.Min(
                              screen.Bounds.Width / (1.1F * m_Width * 25),
                              screen.Bounds.Height / (1.1F * m_Height * 25));
-            ScaleFactor = f < Program.ScaleFactor ? f : Program.ScaleFactor;
+            m_ScaleFactor = f < Program.ScaleFactor ? f : Program.ScaleFactor;
 
             InitializeComponent();
 
@@ -46,7 +45,7 @@ namespace MineSweeper
                     var ub = new UIBlock
                                  {
                                      Location = new Point(i * 25, j * 25),
-                                     Font = new Font("Consolas", 11F * ScaleFactor),
+                                     Font = new Font("Consolas", 11F * m_ScaleFactor),
                                      X = i,
                                      Y = j
                                  };
@@ -56,7 +55,7 @@ namespace MineSweeper
                     m_UIBlocks.Add(ub);
                 }
 
-            Scale(new SizeF(ScaleFactor, ScaleFactor));
+            Scale(new SizeF(m_ScaleFactor, m_ScaleFactor));
         }
 
         private void MineSweeper_Load(object sender, EventArgs e) { Reset(); }
@@ -142,8 +141,8 @@ namespace MineSweeper
             m_AllLog2 = BinomialHelper.Binomial(blocks, m_Mgr.TotalMines).Log2();
 
             ClientSize = new Size(
-                (int)(m_Width * 25 * ScaleFactor),
-                (int)(m_Height * 25 * ScaleFactor) + progressBar1.Height);
+                (int)(m_Width * 25 * m_ScaleFactor),
+                (int)(m_Height * 25 * m_ScaleFactor) + progressBar1.Height);
 
             Solve();
         }
@@ -239,8 +238,8 @@ namespace MineSweeper
 
         private void Solve()
         {
-            UpdateAll();
             m_Mgr.Solve().ContinueWith(t => Invoke(new UpdateDelegate(UpdateAll), new object[] { }));
+            UpdateAll();
         }
     }
 }

@@ -36,7 +36,6 @@ namespace MineSweeper
 
             string str = null;
             Color color, fColor = Color.Black;
-            bool best;
             try
             {
                 if (TheMgr.Mode.HasFlag(SolvingMode.Half) &&
