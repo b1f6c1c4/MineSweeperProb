@@ -33,7 +33,8 @@ namespace MineSweeperAnalyzer
                 }
             }
             BinomialHelper.UpdateTo(30 * 16, 99);
-            Process(
+            using (var sw = new StreamWriter(@"output.txt", true))
+                Process(
                     stuff,
                     d =>
                     {
@@ -44,9 +45,9 @@ namespace MineSweeperAnalyzer
                     },
                     dic =>
                     {
-                        using (var sw = new StreamWriter(@"output.txt"))
                             foreach (var kvp in dic.OrderBy(kvp => kvp.Key.Item2))
                                 sw.WriteLine($"{kvp.Key.Item1.GetMethodInfo().Name}\t{kvp.Key.Item2:R}\t{kvp.Value}");
+                            sw.Flush();
                     });
         }
 
@@ -54,6 +55,7 @@ namespace MineSweeperAnalyzer
                                                 Action<ConcurrentDictionary<Tuple<T, TResult>, int>> damp)
             where T : class
         {
+            var rwLock = new ReaderWriterLockSlim();
             var dic = new ConcurrentDictionary<Tuple<T, TResult>, int>();
             var keys = stuff.Keys.ToArray();
 
@@ -93,10 +95,15 @@ namespace MineSweeperAnalyzer
 
                         lock (locks[index])
                             timeouts[index] = 100;
+
                         Interlocked.Increment(ref doing);
                         var result = action(flag);
-                        dic.AddOrUpdate(new Tuple<T, TResult>(flag, result), 1, (key, val) => val + 1);
                         Interlocked.Decrement(ref doing);
+
+                        rwLock.EnterReadLock();
+                        dic.AddOrUpdate(new Tuple<T, TResult>(flag, result), 1, (key, val) => val + 1);
+                        rwLock.ExitReadLock();
+
                         Interlocked.Increment(ref done);
                     }
                     lock (locks[index])
@@ -146,10 +153,18 @@ namespace MineSweeperAnalyzer
                     Console.WriteLine();
 
                 if (++elap % 60 == 0)
+                {
+                    rwLock.EnterWriteLock();
                     damp(dic);
+                    dic.Clear();
+                    rwLock.ExitWriteLock();
+                }
                 Thread.Sleep(1000);
             }
+            rwLock.EnterWriteLock();
             damp(dic);
+            dic.Clear();
+            rwLock.ExitWriteLock();
         }
     }
 }
