@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Node = MineSweeperCalc.Solver.OrthogonalList<double>.Node;
 
 namespace MineSweeperCalc.Solver
 {
@@ -236,10 +237,18 @@ namespace MineSweeperCalc.Solver
             if (!withProb)
                 return;
 
-            var augmentedMatrixT = GenerateMatrix();
-            var minors = Gauss(augmentedMatrixT);
+            if (m_BlockSets.Count == 0)
+            {
+                TotalStates = BigInteger.One;
+                ProcessSolutions(new List<Solution<T>> { new Solution<T>(new List<int>()) });
+                return;
+            }
 
-            if (minors[minors.Count - 1] == m_BlockSets.Count)
+            var augmentedMatrix = GenerateMatrix();
+            var minors = Gauss(augmentedMatrix);
+
+            if (minors.Count > 0 &&
+                minors[minors.Count - 1] == m_BlockSets.Count)
                 minors.RemoveAt(minors.Count - 1);
             else
             {
@@ -247,7 +256,7 @@ namespace MineSweeperCalc.Solver
                 return;
             }
 
-            var result = EnumerateSolutions(minors, augmentedMatrixT);
+            var result = EnumerateSolutions(minors, augmentedMatrix);
             if (result.Count == 0)
             {
                 TotalStates = BigInteger.Zero;
@@ -400,18 +409,27 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     生成矩阵
         /// </summary>
-        /// <returns>增广矩阵的转置</returns>
-        private double[,] GenerateMatrix()
+        /// <returns>增广矩阵</returns>
+        private OrthogonalList<double> GenerateMatrix()
         {
             var m = m_Restrains.Count;
             var n = m_BlockSets.Count;
 
-            var argMat = new double[n + 1, m];
+            var argMat = new OrthogonalList<double>(n + 1, m);
             for (var row = 0; row < m; row++)
             {
+                var nr = argMat[row, -1];
                 foreach (var index in m_Restrains[row].BlockSets)
-                    argMat[index, row] = 1;
-                argMat[n, row] = m_Restrains[row].Mines;
+                {
+                    Node nc;
+                    argMat.SeekDown(row, index, out nc);
+                    nr = nc.Down = nr.Right = new Node(row, index, 1D) { Left = nr, Up = nc };
+                }
+                {
+                    Node nc;
+                    argMat.SeekDown(row, n, out nc);
+                    nc.Down = nr.Right = new Node(row, n, m_Restrains[row].Mines) { Left = nr, Up = nc };
+                }
             }
             return argMat;
         }
@@ -421,47 +439,117 @@ namespace MineSweeperCalc.Solver
         /// </summary>
         /// <param name="matrix">矩阵</param>
         /// <returns>非主元列</returns>
-        private static List<int> Gauss(double[,] matrix)
+        private static List<int> Gauss(OrthogonalList<double> matrix)
         {
-            var n = matrix.GetLength(0);
-            var m = matrix.GetLength(1);
+            var n = matrix.Width;
+            var m = matrix.Height;
             var minorCol = new List<int>();
             var major = 0;
             for (var col = 0; col < n; col++)
             {
-                int biasRow;
-                for (biasRow = major; biasRow < m; biasRow++)
-                    if (Math.Abs(matrix[col, biasRow]) >= 1E-8)
-                        break;
-                if (biasRow >= m)
+                var biasNode =
+                    matrix.GetCol(col)
+                          .Where(node => node.Row >= major)
+                          .FirstOrDefault(node => !(Math.Abs(node.Val) < 1E-14));
+                if (biasNode == null)
                 {
                     minorCol.Add(col);
                     continue;
                 }
 
                 var vec = new double[m];
-                var theBiasInv = 1 / matrix[col, biasRow];
-                for (var row = 0; row < m; row++)
-                {
-                    if (row != biasRow)
-                        vec[row] = -matrix[col, row] * theBiasInv;
-                    if (row == major)
-                        matrix[col, row] = 1;
+                var theBiasInv = 1 / biasNode.Val;
+                vec[biasNode.Row] = theBiasInv;
+                foreach (var node in matrix.GetCol(col))
+                    if (node.Row != biasNode.Row)
+                    {
+                        vec[node.Row] = -node.Val * theBiasInv;
+                        matrix.Remove(node);
+                    }
                     else
-                        matrix[col, row] = 0;
+                        node.Val = 1D;
+
+                var bias = biasNode.Right;
+                while (bias != null)
+                {
+                    var biasVal = bias.Val;
+                    var nc = matrix[-1, bias.Col];
+                    for (var row = 0; row < m; row++)
+                    {
+                        double oldV;
+                        if (nc.Down == null ||
+                            nc.Down.Row > row)
+                            oldV = 0D;
+                        else
+                            oldV = nc.Down.Val;
+
+                        var val = (row != biasNode.Row ? oldV : 0D) + vec[row] * biasVal;
+
+                        if (nc.Down == null ||
+                            nc.Down.Row > row)
+                        {
+                            if (Math.Abs(val) < 1E-14)
+                                continue;
+
+                            Node nr;
+                            matrix.SeekRight(row, bias.Col, out nr);
+
+                            var node = new Node(row, bias.Col, val)
+                                           {
+                                               Left = nr,
+                                               Right = nr.Right,
+                                               Up = nc,
+                                               Down = nc.Down
+                                           };
+                            if (nr.Right != null)
+                                nr.Right.Left = node;
+                            if (nc.Down != null)
+                                nc.Down.Up = node;
+                            nc.Down = nr.Right = node;
+                            nc = node;
+                        }
+                        else if (Math.Abs(val) < 1E-14)
+                            matrix.Remove(nc.Down);
+                        else
+                        {
+                            nc = nc.Down;
+                            nc.Val = val;
+                        }
+                    }
+                    bias = bias.Right;
                 }
 
-                for (var co = col + 1; co < n; co++)
+                if (major != biasNode.Row)
                 {
-                    var swap = matrix[co, major];
-                    var bias = matrix[co, biasRow];
-                    for (var row = 0; row < m; row++)
-                        if (row == major)
-                            matrix[co, row] = bias * theBiasInv;
-                        else if (row == biasRow)
-                            matrix[co, row] = swap + vec[major] * bias;
+                    var majNode = matrix[major, -1];
+                    var biaNode = matrix[biasNode.Row, -1];
+                    while (true)
+                    {
+                        var majID = majNode.Right?.Col ?? matrix.Width;
+                        var biaID = biaNode.Right?.Col ?? matrix.Width;
+                        // ReSharper disable PossibleNullReferenceException
+                        if (majID < biaID)
+                        {
+                            biaNode = matrix.AddOrUpdate(biasNode.Row, majID, majNode.Right.Val, null);
+                            matrix.Remove(majNode.Right);
+                        }
+                        else if (majID > biaID)
+                        {
+                            majNode = matrix.AddOrUpdate(major, biaID, biaNode.Right.Val, null);
+                            matrix.Remove(biaNode.Right);
+                        }
+                        else if (majNode.Right != null)
+                        {
+                            majNode = majNode.Right;
+                            biaNode = biaNode.Right;
+                            var t = biaNode.Val;
+                            biaNode.Val = majNode.Val;
+                            majNode.Val = t;
+                        }
                         else
-                            matrix[co, row] += vec[row] * bias;
+                            break;
+                        // ReSharper restore PossibialeNullReferenceException
+                    }
                 }
                 major++;
             }
@@ -472,9 +560,9 @@ namespace MineSweeperCalc.Solver
         ///     遍历解空间
         /// </summary>
         /// <param name="minors">非主元列</param>
-        /// <param name="augmentedMatrixT">增广矩阵的转置</param>
+        /// <param name="augmentedMatrix">增广矩阵</param>
         /// <returns>所有解</returns>
-        private List<Solution<T>> EnumerateSolutions(IReadOnlyList<int> minors, double[,] augmentedMatrixT)
+        private List<Solution<T>> EnumerateSolutions(IReadOnlyList<int> minors, OrthogonalList<double> augmentedMatrix)
         {
             var n = m_BlockSets.Count;
             var counts = m_BlockSets.Select(b => b.Count).ToArray();
@@ -482,10 +570,10 @@ namespace MineSweeperCalc.Solver
             var res = new List<Solution<T>>();
             if (minors.Count == 0)
             {
-                var lst = new List<int>(n);
-                for (var i = 0; i < n; i++)
-                    lst.Add((int)Math.Round(augmentedMatrixT[n, i]));
-                res.Add(new Solution<T>(lst));
+                var lst = new int[n];
+                foreach (var node in augmentedMatrix.GetCol(n))
+                    lst[node.Row] = (int)Math.Round(node.Val);
+                res.Add(new Solution<T>(lst.ToList()));
             }
             else
             {
@@ -504,15 +592,15 @@ namespace MineSweeperCalc.Solver
                         {
                             majors[mainRow] = col;
                             cnts[mainRow] = counts[col];
-                            sums[mainRow] = augmentedMatrixT[n, mainRow];
+                            sums[mainRow] = augmentedMatrix[mainRow, n]?.Val ?? 0;
                             mainRow++;
                         }
                 }
                 Action<int, int> aggr =
                     (minor, val) =>
                     {
-                        for (var mainRow = 0; mainRow < mR; mainRow++)
-                            sums[mainRow] -= val * augmentedMatrixT[minors[minor], mainRow];
+                        foreach (var node in augmentedMatrix.GetCol(minors[minor]))
+                            sums[node.Row] -= val * node.Val;
                     };
                 var stack = new List<int>(minors.Count) { 0 }; // aggr(0, 0);
                 while (true)
