@@ -290,49 +290,5 @@ namespace MineSweeperCalc.Solver
             sb.Append("}");
             return sb.ToString();
         }
-
-        public T[,] ToArray()
-        {
-            var result = new T[Width, Height];
-            for (int col = 0; col < Width; col++)
-                foreach (var node in GetCol(col))
-                    result[col, node.Row] = node.Val;
-            return result;
-        }
-
-        public bool Correct(Node node)
-        {
-            if (node.Left == null &&
-                node.Col != -1)
-                return false;
-            if (node.Up == null &&
-                node.Row != -1)
-                return false;
-            if (node.Right != null)
-            {
-                if (node.Right.Left != node)
-                    return false;
-                if (node.Right.Row != node.Row)
-                    return false;
-                if (node.Right.Col <= node.Col)
-                    return false;
-                if (!Correct(node.Right))
-                    return false;
-            }
-            if (node.Down != null)
-            {
-                if (node.Down.Up != node)
-                    return false;
-                if (node.Down.Col != node.Col)
-                    return false;
-                if (node.Down.Row <= node.Row)
-                    return false;
-                if (!Correct(node.Down))
-                    return false;
-            }
-            return true;
-        }
-
-        public bool Correct() => Correct(m_Root);
     }
 }

@@ -306,18 +306,14 @@ namespace MineSweeperCalc.Solver
             for (var i = 0; i < m_Restrains.Count; i++)
                 if (m_Restrains[i].Mines == 0)
                 {
-                    for (var j = 0; j < m_BlockSets.Count; j++)
-                        if (m_Restrains[i].BlockSets.BinarySearch(j) >= 0)
-                            foreach (var block in m_BlockSets[j].Blocks)
-                                m_Manager.SetStatus(block, BlockStatus.Blank);
+                    foreach (var block in m_Restrains[i].BlockSets.SelectMany(index => m_BlockSets[index].Blocks))
+                        m_Manager.SetStatus(block, BlockStatus.Blank);
                     m_Restrains.RemoveAt(i--);
                 }
                 else if (m_Restrains[i].Mines == m_Restrains[i].BlockSets.Select(index => cnts[index]).Sum())
                 {
-                    for (var j = 0; j < m_BlockSets.Count; j++)
-                        if (m_Restrains[i].BlockSets.BinarySearch(j) >= 0)
-                            foreach (var block in m_BlockSets[j].Blocks)
-                                m_Manager.SetStatus(block, BlockStatus.Mine);
+                    foreach (var block in m_Restrains[i].BlockSets.SelectMany(index => m_BlockSets[index].Blocks))
+                        m_Manager.SetStatus(block, BlockStatus.Mine);
                     m_Restrains.RemoveAt(i--);
                 }
 
