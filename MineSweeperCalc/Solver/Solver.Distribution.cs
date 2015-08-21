@@ -7,7 +7,6 @@ using System.Numerics;
 namespace MineSweeperCalc.Solver
 {
     public sealed partial class Solver<T>
-        where T : IBlock<T>
     {
         /// <summary>
         ///     将一个分布叠加到另一个上

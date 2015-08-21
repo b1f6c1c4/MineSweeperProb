@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace MineSweeperCalc.Solver
@@ -8,7 +9,7 @@ namespace MineSweeperCalc.Solver
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
     public class Solution<T>
-        where T : IBlock<T>
+        where T : IEquatable<T>, IComparable<T>
     {
         internal Solution(List<int> dist) { Dist = dist; }
 

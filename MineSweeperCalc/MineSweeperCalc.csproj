@@ -40,7 +40,6 @@
     <Compile Include="Solver\BlockManager.cs" />
     <Compile Include="Solver\BlockSet.cs" />
     <Compile Include="Solver\BlockStatus.cs" />
-    <Compile Include="Solver\IBlock.cs" />
     <Compile Include="Solver\Numeric.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Solver\OrthogonalList.cs" />

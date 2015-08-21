@@ -11,7 +11,7 @@ namespace MineSweeperCalc.Solver
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
     public sealed partial class Solver<T>
-        where T : IBlock<T>
+        where T : IEquatable<T>, IComparable<T>
     {
         /// <summary>
         ///     当前状态

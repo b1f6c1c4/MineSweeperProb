@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,7 +10,7 @@ namespace MineSweeperCalc.Solver
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
     internal sealed class BlockManager<T> : IReadOnlyDictionary<T, BlockStatus>
-        where T : IBlock<T>
+        where T : IEquatable<T>, IComparable<T>
     {
         /// <summary>
         ///     各个格的状态

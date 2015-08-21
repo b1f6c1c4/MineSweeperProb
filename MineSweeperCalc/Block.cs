@@ -7,7 +7,7 @@ namespace MineSweeperCalc
     /// <summary>
     ///     实际的格
     /// </summary>
-    public sealed class Block : IBlock<Block>
+    public sealed class Block : IEquatable<Block>, IComparable<Block>
     {
         /// <summary>
         ///     横坐标

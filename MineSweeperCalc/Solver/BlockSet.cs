@@ -11,7 +11,7 @@ namespace MineSweeperCalc.Solver
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
     public class BlockSet<T> : IEnumerable, IEquatable<BlockSet<T>>
-        where T : IBlock<T>
+        where T : IEquatable<T>, IComparable<T>
     {
         /// <summary>
         ///     各个格
