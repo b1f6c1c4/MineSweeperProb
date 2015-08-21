@@ -16,6 +16,7 @@ namespace MineSweeperAnalyzer
         private static void Main(string[] args)
         {
             var seed = (int)DateTime.Now.Ticks;
+#if TRUE
             var stuff = new ConcurrentDictionary<GameMgr.DecideDelegate, int>();
             using (var sr = new StreamReader(@"config.txt"))
             {
@@ -49,11 +50,38 @@ namespace MineSweeperAnalyzer
                                 sw.WriteLine($"{kvp.Key.Item1.GetMethodInfo().Name}\t{kvp.Key.Item2:R}\t{kvp.Value}");
                             sw.Flush();
                     });
+#else
+            var stuff = new ConcurrentDictionary<int, int>();
+            using (var sr = new StreamReader(@"config.txt"))
+            {
+                m_Par = Convert.ToInt32(sr.ReadLine());
+                var n = Convert.ToInt32(sr.ReadLine());
+                var m = Convert.ToInt32(sr.ReadLine());
+                for (var i = 1; i <= m; i++)
+                    stuff[i] = n;
+            }
+            BinomialHelper.UpdateTo(30 * 16, 200);
+            using (var sw = new StreamWriter(@"output.txt", true))
+                Process(
+                    stuff,
+                    d =>
+                    {
+                        var game = new GameMgr(30, 16, d, Interlocked.Increment(ref seed), Strategies.MinProbMaxZeroProbMaxQuantity);
+                        game.Automatic(true);
+                        game.Solver.Solve(true);
+                        return game.Solver.TotalStates.Log2();
+                    },
+                    dic =>
+                    {
+                        foreach (var kvp in dic.OrderBy(kvp => kvp.Key.Item2))
+                            sw.WriteLine($"{kvp.Key.Item1}\t{kvp.Key.Item2:R}\t{kvp.Value}");
+                        sw.Flush();
+                    });
+#endif
         }
 
         private static void Process<T, TResult>(ConcurrentDictionary<T, int> stuff, Func<T, TResult> action,
                                                 Action<ConcurrentDictionary<Tuple<T, TResult>, int>> damp)
-            where T : class
         {
             var rwLock = new ReaderWriterLockSlim();
             var dic = new ConcurrentDictionary<Tuple<T, TResult>, int>();
@@ -71,7 +99,8 @@ namespace MineSweeperAnalyzer
                 {
                     while (true)
                     {
-                        T flag = null;
+                        var flag = false;
+                        var par = default(T);
                         foreach (var t in keys)
                         {
                             var val = -1;
@@ -85,23 +114,24 @@ namespace MineSweeperAnalyzer
                                               });
                             if (val >= 0)
                             {
-                                flag = t;
+                                par = t;
+                                flag = true;
                                 Interlocked.Decrement(ref todo);
                                 break;
                             }
                         }
-                        if (flag == null)
+                        if (flag == false)
                             break;
 
                         lock (locks[index])
                             timeouts[index] = 100;
 
                         Interlocked.Increment(ref doing);
-                        var result = action(flag);
+                        var result = action(par);
                         Interlocked.Decrement(ref doing);
 
                         rwLock.EnterReadLock();
-                        dic.AddOrUpdate(new Tuple<T, TResult>(flag, result), 1, (key, val) => val + 1);
+                        dic.AddOrUpdate(new Tuple<T, TResult>(par, result), 1, (key, val) => val + 1);
                         rwLock.ExitReadLock();
 
                         Interlocked.Increment(ref done);
