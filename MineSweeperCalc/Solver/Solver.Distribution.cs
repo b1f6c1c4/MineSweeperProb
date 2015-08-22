@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.Serialization;
 
 namespace MineSweeperCalc.Solver
 {
@@ -63,6 +64,7 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     条件分布的计算参数
         /// </summary>
+        [Serializable]
         private sealed class DistParameters : IEquatable<DistParameters>
         {
             public DistParameters(int[] sets, int length)
@@ -95,14 +97,14 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     分布缓存
         /// </summary>
-        private readonly ConcurrentDictionary<DistParameters, BigInteger[]> m_DistCache =
-            new ConcurrentDictionary<DistParameters, BigInteger[]>();
+        [NonSerialized]
+        private ConcurrentDictionary<DistParameters, BigInteger[]> m_DistCache;
 
         /// <summary>
         ///     分布缓存写入锁
         /// </summary>
-        private readonly ConcurrentDictionary<DistParameters, object> m_DistCacheLock =
-            new ConcurrentDictionary<DistParameters, object>();
+        [NonSerialized]
+        private ConcurrentDictionary<DistParameters, object> m_DistCacheLock;
 
         /// <summary>
         ///     计算指定格的集合的雷数的分布
@@ -244,6 +246,7 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     条件分布的计算参数
         /// </summary>
+        [Serializable]
         private sealed class DistCondParameters : IEquatable<DistCondParameters>
         {
             public DistCondParameters(int[] sets1, int[] sets2, int[] sets3, int minesCond, int length)
@@ -292,14 +295,14 @@ namespace MineSweeperCalc.Solver
         /// <summary>
         ///     条件分布缓存
         /// </summary>
-        private readonly ConcurrentDictionary<DistCondParameters, BigInteger[]> m_DistCondCache =
-            new ConcurrentDictionary<DistCondParameters, BigInteger[]>();
+        [NonSerialized]
+        private ConcurrentDictionary<DistCondParameters, BigInteger[]> m_DistCondCache;
 
         /// <summary>
         ///     条件分布缓存写入锁
         /// </summary>
-        private readonly ConcurrentDictionary<DistCondParameters, object> m_DistCondCacheLock =
-            new ConcurrentDictionary<DistCondParameters, object>();
+        [NonSerialized]
+        private ConcurrentDictionary<DistCondParameters, object> m_DistCondCacheLock;
 
         /// <summary>
         ///     计算在一定条件下指定格的集合的雷数的分布

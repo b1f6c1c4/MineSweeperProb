@@ -10,6 +10,7 @@ namespace MineSweeperCalc.Solver
     ///     格的集合
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
+    [Serializable]
     public class BlockSet<T> : IEnumerable, IEquatable<BlockSet<T>>
         where T : IEquatable<T>, IComparable<T>
     {

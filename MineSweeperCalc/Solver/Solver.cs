@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -7,9 +8,27 @@ using Node = MineSweeperCalc.Solver.OrthogonalList<double>.Node;
 namespace MineSweeperCalc.Solver
 {
     /// <summary>
+    ///     约束
+    /// </summary>
+    [Serializable]
+    internal sealed class Restrain
+    {
+        /// <summary>
+        ///     组成部分
+        /// </summary>
+        public List<int> BlockSets { get; set; }
+
+        /// <summary>
+        ///     总雷数
+        /// </summary>
+        public int Mines { get; set; }
+    }
+
+    /// <summary>
     ///     求解器
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
+    [Serializable]
     public sealed partial class Solver<T>
         where T : IEquatable<T>, IComparable<T>
     {
@@ -27,22 +46,6 @@ namespace MineSweeperCalc.Solver
         ///     约束
         /// </summary>
         private readonly List<Restrain> m_Restrains;
-
-        /// <summary>
-        ///     约束
-        /// </summary>
-        private sealed class Restrain
-        {
-            /// <summary>
-            ///     组成部分
-            /// </summary>
-            public List<int> BlockSets { get; set; }
-
-            /// <summary>
-            ///     总雷数
-            /// </summary>
-            public int Mines { get; set; }
-        }
 
         /// <summary>
         ///     解空间
@@ -82,6 +85,29 @@ namespace MineSweeperCalc.Solver
                 m_Restrains.Add(new Restrain { BlockSets = new List<int>(restrain.BlockSets), Mines = restrain.Mines });
             m_BlockSets = new List<BlockSet<T>>(other.m_BlockSets);
         }
+
+        public static Solver<T> ConvertFrom<TOther>(Solver<TOther> other, Func<TOther, T> trans, Func<T, bool> where)
+            where TOther : IEquatable<TOther>, IComparable<TOther>
+        {
+            var solver = new Solver<T>(other.m_Manager.Keys.Select(trans).Where(where));
+            foreach (
+                var kvp in
+                    other.m_Manager.Where(b => where(trans(b.Key))).Where(kvp => kvp.Value != BlockStatus.Unknown))
+                solver.m_Manager.SetStatus(trans(kvp.Key), kvp.Value);
+            solver.m_BlockSets.Clear();
+            foreach (var set in other.m_BlockSets)
+                solver.m_BlockSets.Add(new BlockSet<T>(set.Blocks.Select(trans).Where(where)));
+            solver.m_Restrains.Clear();
+            foreach (var restrain in other.m_Restrains)
+                solver.m_Restrains.Add(
+                                       new Restrain
+                                           {
+                                               BlockSets = new List<int>(restrain.BlockSets),
+                                               Mines = restrain.Mines
+                                           });
+            return solver;
+        }
+
 
         /// <summary>
         ///     准备约束
@@ -210,10 +236,10 @@ namespace MineSweeperCalc.Solver
             Expectation = null;
             TotalStates = BigInteger.MinusOne;
 
-            m_DistCache.Clear();
-            m_DistCacheLock.Clear();
-            m_DistCondCache.Clear();
-            m_DistCondCacheLock.Clear();
+            m_DistCache = new ConcurrentDictionary<DistParameters, BigInteger[]>();
+            m_DistCacheLock = new ConcurrentDictionary<DistParameters, object>();
+            m_DistCondCache = new ConcurrentDictionary<DistCondParameters, BigInteger[]>();
+            m_DistCondCacheLock = new ConcurrentDictionary<DistCondParameters, object>();
 
             var flag = true;
             while (flag)

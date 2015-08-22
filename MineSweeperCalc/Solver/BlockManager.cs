@@ -9,6 +9,7 @@ namespace MineSweeperCalc.Solver
     ///     当前状态
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
+    [Serializable]
     internal sealed class BlockManager<T> : IReadOnlyDictionary<T, BlockStatus>
         where T : IEquatable<T>, IComparable<T>
     {

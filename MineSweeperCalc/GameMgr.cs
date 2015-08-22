@@ -10,6 +10,7 @@ namespace MineSweeperCalc
     /// <summary>
     ///     вт╤╞и╗ювсно╥
     /// </summary>
+    [Serializable]
     public class GameMgr
     {
         /// <summary>

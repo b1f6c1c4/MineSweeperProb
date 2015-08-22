@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using MineSweeperCalc;
@@ -41,6 +42,7 @@ namespace MineSweeper
         Extended = 0x8 | Automatic
     }
 
+    [Serializable]
     public sealed class GameMgrBuffered : GameMgr
     {
         /// <summary>
@@ -89,6 +91,7 @@ namespace MineSweeper
         /// <summary>
         ///     求解任务
         /// </summary>
+        [NonSerialized]
         private Task m_Backgrounding;
 
         /// <summary>
@@ -139,7 +142,11 @@ namespace MineSweeper
         /// <summary>
         ///     锁
         /// </summary>
-        private readonly ReaderWriterLockSlim m_Lock = new ReaderWriterLockSlim();
+        [NonSerialized]
+        private ReaderWriterLockSlim m_Lock = new ReaderWriterLockSlim();
+
+        [OnDeserialized]
+        private void SetValuesOnDeserialized(StreamingContext context) => m_Lock = new ReaderWriterLockSlim();
 
         public void EnterReadLock() => m_Lock.EnterReadLock();
         public void ExitReadLock() => m_Lock.ExitReadLock();

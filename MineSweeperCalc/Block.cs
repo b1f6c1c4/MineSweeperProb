@@ -7,6 +7,7 @@ namespace MineSweeperCalc
     /// <summary>
     ///     实际的格
     /// </summary>
+    [Serializable]
     public sealed class Block : IEquatable<Block>, IComparable<Block>
     {
         /// <summary>

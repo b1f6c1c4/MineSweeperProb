@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Windows.Forms;
 using MineSweeperCalc;
@@ -121,16 +122,21 @@ namespace MineSweeper
             }
         }
 
-        private void Reset()
+        private void Reset(GameMgrBuffered mgr = null)
         {
-            var mode = m_Mgr?.Mode ?? SolvingMode.Probability;
-            m_Mgr = new GameMgrBuffered(
-                m_Width,
-                m_Height,
-                m_Mines,
-                (int)DateTime.Now.Ticks,
-                Strategies.MinProbMaxZeroProbMaxQuantity)
-                        { Mode = mode };
+            if (mgr == null)
+            {
+                var mode = m_Mgr?.Mode ?? SolvingMode.Probability;
+                m_Mgr = new GameMgrBuffered(
+                    m_Width,
+                    m_Height,
+                    m_Mines,
+                    (int)DateTime.Now.Ticks,
+                    Strategies.MinProbMaxZeroProbMaxQuantity)
+                            { Mode = mode };
+            }
+            else
+                m_Mgr = mgr;
 
             foreach (var ub in m_UIBlocks)
                 ub.TheMgr = m_Mgr;
@@ -172,8 +178,47 @@ namespace MineSweeper
         {
             switch (e.KeyCode)
             {
+                case Keys.O:
+                    if (e.Control)
+                    {
+                        var dialog = new OpenFileDialog
+                                         {
+                                             AddExtension = true,
+                                             CheckPathExists = true,
+                                             DefaultExt = "bin",
+                                             CheckFileExists = true,
+                                             Multiselect = false,
+                                             ShowReadOnly = false,
+                                             Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
+                                         };
+                        if (dialog.ShowDialog() == DialogResult.OK)
+                            using (var stream = dialog.OpenFile())
+                            {
+                                var formatter = new BinaryFormatter();
+                                Reset((GameMgrBuffered)formatter.Deserialize(stream));
+                            }
+                    }
+                    break;
                 case Keys.S:
-                    if (m_Mgr.Started)
+                    if (e.Control)
+                    {
+                        var dialog = new SaveFileDialog
+                                         {
+                                             OverwritePrompt = true,
+                                             AddExtension = true,
+                                             CheckPathExists = true,
+                                             DefaultExt = "bin",
+                                             Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
+                                         };
+                        if (dialog.ShowDialog() == DialogResult.OK)
+                            using (var stream = dialog.OpenFile())
+                            {
+                                var formatter = new BinaryFormatter();
+                                formatter.Serialize(stream, m_Mgr);
+                                stream.Flush();
+                            }
+                    }
+                    else if (m_Mgr.Started)
                     {
                         m_Mgr.SemiAutomaticStep();
                         Solve();

@@ -8,6 +8,7 @@ namespace MineSweeperCalc.Solver
     ///     解
     /// </summary>
     /// <typeparam name="T">单个格的类型</typeparam>
+    [Serializable]
     public class Solution<T>
         where T : IEquatable<T>, IComparable<T>
     {
