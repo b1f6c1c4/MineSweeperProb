@@ -10,7 +10,6 @@ namespace MineSweeperCalc.Solver
     /// <summary>
     ///     约束
     /// </summary>
-    [Serializable]
     internal sealed class Restrain
     {
         /// <summary>

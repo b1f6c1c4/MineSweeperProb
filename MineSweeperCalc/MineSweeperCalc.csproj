@@ -37,6 +37,7 @@
   <ItemGroup>
     <Compile Include="Block.cs" />
     <Compile Include="GameMgr.cs" />
+    <Compile Include="Drainer.cs" />
     <Compile Include="Solver\BlockManager.cs" />
     <Compile Include="Solver\BlockSet.cs" />
     <Compile Include="Solver\BlockStatus.cs" />

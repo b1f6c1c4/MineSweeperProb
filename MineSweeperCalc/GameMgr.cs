@@ -271,8 +271,9 @@ namespace MineSweeperCalc
         /// <summary>
         ///     按特定策略自动操作一次
         /// </summary>
-        /// <param name="multiThread"></param>
-        public virtual void AutomaticStep(bool multiThread)
+        /// <param name="multiThread">多线程</param>
+        /// <param name="threshold"><c>Drainer</c>的启动阈值</param>
+        public virtual void AutomaticStep(bool multiThread, double threshold = 0D)
         {
             if (!Started)
                 return;
@@ -283,7 +284,10 @@ namespace MineSweeperCalc
                 return;
             }
 
-            var ary = DecisionMaker(CanOpenNotSureBlocks().ToList(), this, multiThread).ToArray();
+            Solver.Solve(true);
+            var ary = TotalStates.Log2() < threshold
+                          ? new Drainer().Drain(this).ToArray()
+                          : DecisionMaker(CanOpenNotSureBlocks().ToList(), this, multiThread).ToArray();
             var blk = ary[m_Random.Next(ary.Length)];
             OpenBlock(blk.X, blk.Y);
         }
@@ -291,12 +295,13 @@ namespace MineSweeperCalc
         /// <summary>
         ///     按特定策略自动操作
         /// </summary>
-        /// <param name="multiThread"></param>
-        public virtual void Automatic(bool multiThread)
+        /// <param name="multiThread">多线程</param>
+        /// <param name="threshold"><c>Drainer</c>的启动阈值</param>
+        public virtual void Automatic(bool multiThread, double threshold = 0D)
         {
             while (Started)
                 if (SemiAutomatic())
-                    AutomaticStep(multiThread);
+                    AutomaticStep(multiThread, threshold);
         }
     }
 }

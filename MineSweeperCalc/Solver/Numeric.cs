@@ -39,11 +39,10 @@ namespace MineSweeperCalc.Solver
             if (m > n ||
                 m < 0)
                 return;
-            if (m == 0 ||
-                m == n)
+            if (m == 0)
                 return;
             if (m > n / 2)
-                m = n - m;
+                m = n / 2;
 
             TheLock.EnterWriteLock();
             try
@@ -196,6 +195,107 @@ namespace MineSweeperCalc.Solver
             int exp;
             val.Part(out sig, out exp);
             return Math.Log(sig, 2) + exp;
+        }
+    }
+
+    /// <summary>
+    ///     有理数
+    /// </summary>
+    public struct Rational : IComparable<Rational>, IEquatable<Rational>
+    {
+        public Rational(BigInteger numerator):this(numerator, BigInteger.One) { }
+
+        public Rational(BigInteger numerator, BigInteger denominator)
+        {
+            var b = BigInteger.GreatestCommonDivisor(numerator, denominator);
+            if (denominator.Sign == 0)
+                throw new DivideByZeroException();
+            if (denominator.Sign < 0)
+            {
+                Numerator = -numerator / b;
+                Denominator = -denominator / b;
+            }
+            else
+            {
+                Numerator = numerator / b;
+                Denominator = denominator / b;
+            }
+        }
+
+        /// <summary>
+        ///     分子
+        /// </summary>
+        public BigInteger Numerator { get; }
+
+        /// <summary>
+        ///     分母
+        /// </summary>
+        public BigInteger Denominator { get; }
+
+        public bool IsZero => Numerator.IsZero;
+
+        public override string ToString() => $"{(double)this:E2}={Numerator}/{Denominator}";
+
+        public int CompareTo(Rational other)
+            => (Numerator * other.Denominator).CompareTo(Denominator * other.Numerator);
+
+        public static implicit operator Rational(int v) => new Rational(v);
+
+        public static implicit operator Rational(BigInteger r) => new Rational(r);
+
+        public static implicit operator double(Rational r) => r.Numerator.Over(r.Denominator);
+
+        public static Rational operator +(Rational r1, Rational r2)
+            =>
+                new Rational(
+                    r1.Numerator * r2.Denominator + r2.Numerator * r1.Denominator,
+                    r1.Denominator * r2.Denominator);
+
+        public static Rational operator -(Rational r1, Rational r2)
+            =>
+                new Rational(
+                    r1.Numerator * r2.Denominator - r2.Numerator * r1.Denominator,
+                    r1.Denominator * r2.Denominator);
+
+        public static Rational operator *(Rational r1, Rational r2)
+            => new Rational(r1.Numerator * r2.Numerator, r1.Denominator * r2.Denominator);
+
+        public static Rational operator /(Rational r1, Rational r2)
+            => new Rational(r1.Numerator * r2.Denominator, r1.Denominator * r2.Numerator);
+
+        public static bool operator <(Rational r1, Rational r2)
+            => r1.CompareTo(r2) < 0;
+
+        public static bool operator >(Rational r1, Rational r2)
+            => r1.CompareTo(r2) > 0;
+
+        public static bool operator <=(Rational r1, Rational r2)
+            => r1.CompareTo(r2) <= 0;
+
+        public static bool operator >=(Rational r1, Rational r2)
+            => r1.CompareTo(r2) >= 0;
+
+        public static bool operator ==(Rational r1, Rational r2)
+            => r1.Equals(r2);
+
+        public static bool operator !=(Rational r1, Rational r2)
+            => !r1.Equals(r2);
+
+        public bool Equals(Rational other) => Numerator.Equals(other.Numerator) && Denominator.Equals(other.Denominator);
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj))
+                return false;
+            return obj is Rational && Equals((Rational)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (Numerator.GetHashCode() * 397) ^ Denominator.GetHashCode();
+            }
         }
     }
 }

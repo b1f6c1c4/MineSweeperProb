@@ -278,6 +278,10 @@ namespace MineSweeper
                 case Keys.C:
                     m_Mgr.Cancel();
                     break;
+                case Keys.D:
+                    var dr = new Drainer();
+                    dr.Drain(m_Mgr);
+                    break;
             }
         }
 

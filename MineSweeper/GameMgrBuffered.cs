@@ -122,7 +122,12 @@ namespace MineSweeper
         /// <summary>
         ///     最佳格
         /// </summary>
-        public List<Block> Bests { get; private set; }
+        public List<Block> Bests { get; set; }
+
+        /// <summary>
+        ///     概率
+        /// </summary>
+        public IDictionary<Block, double> DrainProbability;
 
         /// <summary>
         ///     周围雷数分布
@@ -313,10 +318,10 @@ namespace MineSweeper
         }
 
         /// <inheritdoc />
-        public override void Automatic(bool multiThread)
+        public override void Automatic(bool multiThread, double threshold = 0D)
         {
             if (Mode.HasFlag(SolvingMode.Automatic))
-                base.Automatic(multiThread);
+                base.Automatic(multiThread, threshold);
             else
                 SemiAutomatic();
         }
