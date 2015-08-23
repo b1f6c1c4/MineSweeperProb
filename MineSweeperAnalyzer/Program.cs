@@ -16,7 +16,7 @@ namespace MineSweeperAnalyzer
         private static void Main(string[] args)
         {
             var seed = (int)DateTime.Now.Ticks;
-#if TRUE
+#if FALSE
             var stuff = new ConcurrentDictionary<GameMgr.DecideDelegate, int>();
             using (var sr = new StreamReader(@"config.txt"))
             {
@@ -50,7 +50,7 @@ namespace MineSweeperAnalyzer
                                 sw.WriteLine($"{kvp.Key.Item1.GetMethodInfo().Name}\t{kvp.Key.Item2:R}\t{kvp.Value}");
                             sw.Flush();
                     });
-#else
+#elif FALSE
             var stuff = new ConcurrentDictionary<int, int>();
             using (var sr = new StreamReader(@"config.txt"))
             {
@@ -77,7 +77,40 @@ namespace MineSweeperAnalyzer
                             sw.WriteLine($"{kvp.Key.Item1}\t{kvp.Key.Item2:R}\t{kvp.Value}");
                         sw.Flush();
                     });
+#elif TRUE
 #endif
+            var stuff = new ConcurrentDictionary<double, int>();
+            using (var sr = new StreamReader(@"config.txt"))
+            {
+                m_Par = Convert.ToInt32(sr.ReadLine());
+                var n = Convert.ToInt32(sr.ReadLine());
+                stuff[0D] = n;
+                stuff[1.5D] = n;
+                stuff[3D] = n;
+            }
+            BinomialHelper.UpdateTo(30 * 16, 99);
+            using (var sw = new StreamWriter(@"output.txt", true))
+                Process(
+                    stuff,
+                    d =>
+                    {
+                        var game = new GameMgr(30, 16, 99, Interlocked.Increment(ref seed), Strategies.MinProbMaxZeroProbMaxQuantity);
+                        game.Automatic(true, 3D);
+                        game.Solver.Solve(true);
+                        return game.TotalStates.Log2();
+                    },
+                    dic =>
+                    {
+                        foreach (var key in stuff.Keys)
+                        {
+                            int v;
+                            if (!dic.TryGetValue(new Tuple<double, double>(key, 0D), out v))
+                                v = 0;
+                            var sum = dic.Where(kvp => kvp.Key.Item1 == key).Sum(kvp => kvp.Value);
+                            sw.WriteLine($"{key}\t{v}\t{sum}");
+                        }
+                        sw.Flush();
+                    });
         }
 
         private static void Process<T, TResult>(ConcurrentDictionary<T, int> stuff, Func<T, TResult> action,

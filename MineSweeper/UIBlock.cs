@@ -74,6 +74,11 @@ namespace MineSweeper
                                 }
                                 else
                                     color = Color.DarkGray;
+                            else if (TheMgr.DrainProbability != null)
+                            {
+                                var v = (int)(TheMgr.DrainProbability[TheBlock] * 255);
+                                color = Color.FromArgb(v, v, v);
+                            }
                             else if (TheMgr.Mode.HasFlag(SolvingMode.Probability) &&
                                      TheMgr.Probability != null)
                             {

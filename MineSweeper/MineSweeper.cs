@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using MineSweeperCalc;
 using MineSweeperCalc.Solver;
@@ -86,7 +87,7 @@ namespace MineSweeper
                     sb.Append($" {m_AllLog2:F2}b");
 
                 if (m_CurrentBlock != null)
-                    if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
+                {  if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
                         m_Mgr.Probability != null)
                     {
                         sb.Append($" M{m_Mgr.Probability[m_CurrentBlock]:P2}");
@@ -107,6 +108,12 @@ namespace MineSweeper
                             }
                         }
                     }
+                    if (m_Mgr.DrainProbability != null)
+                    {
+                        if (m_Mgr.DrainProbability.ContainsKey(m_CurrentBlock))
+                        sb.Append($" D{m_Mgr.DrainProbability[m_CurrentBlock]:P2}");
+                    }
+                }
 
                 if (!m_Mgr.Started)
                     sb.Append(m_Mgr.Succeed ? " Succeed" : " Failed");
@@ -279,8 +286,13 @@ namespace MineSweeper
                     m_Mgr.Cancel();
                     break;
                 case Keys.D:
-                    var dr = new Drainer();
-                    dr.Drain(m_Mgr);
+                    Task.Run(
+                             () =>
+                             {
+                                 var dr = new Drainer();
+                                 m_Mgr.Bests = dr.Drain(m_Mgr).ToList();
+                                 m_Mgr.DrainProbability = dr.Prob;
+                             });
                     break;
             }
         }
