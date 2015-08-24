@@ -7,9 +7,12 @@ $RECYCLE.BIN/
 
 *.suo
 *.cache
+*.sdf
+*.opensdf
 MineSweeper/bin/
 MineSweeper/obj/
 MineSweeperAnalyzer/bin/
 MineSweeperAnalyzer/obj/
 MineSweeperCalc/bin/
 MineSweeperCalc/obj/
+MineSweeperSolver/x64/
