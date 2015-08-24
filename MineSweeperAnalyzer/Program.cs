@@ -84,9 +84,13 @@ namespace MineSweeperAnalyzer
             {
                 m_Par = Convert.ToInt32(sr.ReadLine());
                 var n = Convert.ToInt32(sr.ReadLine());
-                stuff[0D] = n;
-                stuff[1.5D] = n;
-                stuff[3D] = n;
+                while (!sr.EndOfStream)
+                {
+                    var s = sr.ReadLine();
+                    if (s == null)
+                        break;
+                    stuff[Convert.ToDouble(s)] = n;
+                }
             }
             BinomialHelper.UpdateTo(30 * 16, 99);
             using (var sw = new StreamWriter(@"output.txt", true))
@@ -103,10 +107,12 @@ namespace MineSweeperAnalyzer
                     {
                         foreach (var key in stuff.Keys)
                         {
+                            var sum = dic.Where(kvp => kvp.Key.Item1 == key).Sum(kvp => kvp.Value);
+                            if (sum == 0)
+                                continue;
                             int v;
                             if (!dic.TryGetValue(new Tuple<double, double>(key, 0D), out v))
                                 v = 0;
-                            var sum = dic.Where(kvp => kvp.Key.Item1 == key).Sum(kvp => kvp.Value);
                             sw.WriteLine($"{key}\t{v}\t{sum}");
                         }
                         sw.Flush();

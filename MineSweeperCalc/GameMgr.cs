@@ -285,7 +285,7 @@ namespace MineSweeperCalc
             }
 
             Solver.Solve(true);
-            var ary = TotalStates.Log2() < threshold
+            var ary = TotalStates.Log2() <= threshold
                           ? new Drainer().Drain(this).ToArray()
                           : DecisionMaker(CanOpenNotSureBlocks().ToList(), this, multiThread).ToArray();
             var blk = ary[m_Random.Next(ary.Length)];
