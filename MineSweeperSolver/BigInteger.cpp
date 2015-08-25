@@ -1,4 +1,5 @@
 #include "BigInteger.h"
+#include <assert.h>
 
 BigInteger::BigInteger() : m_Data(1, 0), m_Bits(0) {}
 
@@ -10,11 +11,13 @@ BigInteger::BigInteger(int val)
     unsigned int v = abs(val);
     while (v != 0)
     {
-        if (!(v & 0x80))
+        if (v & 0x80)
             b = true;
         m_Data.push_back(v % 0x100);
         v /= 0x100;
     }
+    if (b || m_Data.empty())
+        m_Data.push_back(0);
 
     UpdateBits();
 }
@@ -31,10 +34,9 @@ BigInteger &BigInteger::operator+=(const BigInteger &other)
     auto itO = other.m_Data.begin();
     while (itO != other.m_Data.end())
     {
-        auto nextC = *it & *itO & 0x80;
-        *it += *itO;
-        *it += c;
-        c = nextC ? 1 : 0;
+        unsigned short val = *it + *itO + c;
+        *it = static_cast<BYTE>(val);
+        c = static_cast<BYTE>(val >> 8);
         ++it , ++itO;
     }
     if (m_Data.back() & 0x80)
@@ -51,11 +53,9 @@ BigInteger &BigInteger::operator*=(BYTE other)
     auto it = m_Data.begin();
     while (it != m_Data.end())
     {
-        unsigned short val = static_cast<unsigned short>(*it) * m;
+        unsigned short val = *it * m + c;
         *it = static_cast<BYTE>(val);
-        auto nextC = *it & c & 0x80;
-        *it += c;
-        c = (val >> 8) + (nextC ? 1 : 0);
+        c = static_cast<BYTE>(val >> 8);
         ++it;
     }
     if (m_Data.back() & 0x80)
@@ -72,7 +72,7 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
 
 
     auto shift = 0;
-    for (auto itO = other.m_Data.begin(); itO != other.m_Data.end(); ++itO)
+    for (auto itO = other.m_Data.begin(); itO != other.m_Data.end(); ++itO, ++shift)
     {
         if (*itO == 0)
             continue;
@@ -80,13 +80,23 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
         unsigned short m = *itO;
 
         BYTE c = 0;
-        for (auto it = orig.begin(), itR = m_Data.begin() + shift; it != orig.end(); ++it , ++itR)
+        auto itR = m_Data.begin() + shift;
+        for (auto it = orig.begin(); it != orig.end(); ++it , ++itR)
         {
-            unsigned short val = static_cast<unsigned short>(*it) * m;
-            *it = static_cast<BYTE>(val);
-            auto nextC = *it & c & 0x80;
-            *it += c;
-            c = (val >> 8) + (nextC ? 1 : 0);
+            unsigned short val = *it * m + *itR + c;
+            *itR = static_cast<BYTE>(val);
+            c = static_cast<BYTE>(val >> 8);
+        }
+        while (c != 0)
+        {
+            if (itR == m_Data.end())
+            {
+                m_Data.push_back(c);
+                break;
+            }
+            unsigned short val = *itR + c;
+            *itR++ = static_cast<BYTE>(val);
+            c = static_cast<BYTE>(val >> 8);
         }
     }
 
@@ -96,10 +106,16 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
 
 double BigInteger::GetSignificand() const
 {
+    if (*this == 0)
+        return 0;
     double significand = 1;
     auto p = reinterpret_cast<BYTE *>(&significand);
     auto flag = *p == 0x3F;
     BYTE lst[7];
+
+    if (!flag)
+        for (auto i = 0; i < 7 - i; ++i)
+            std::swap(p[i], p[7 - i]);
 
     auto id = 0;
     for (auto it = m_Data.rbegin(); it != m_Data.rend() && id < 7; ++it , ++id)
@@ -150,11 +166,14 @@ int BigInteger::GetExponent() const
 
 double BigInteger::Log2() const
 {
-    return m_Bits + log2(GetSignificand());
+    return m_Bits + log2(GetSignificand()) - 1;
 }
 
 void BigInteger::UpdateBits()
 {
+    while (m_Data.size() >= 2 && m_Data.back() == 0 && *++m_Data.rbegin() == 0)
+        m_Data.pop_back();
+
     m_Bits = 8 * (m_Data.size() - 1);
     auto v = m_Data.back();
     while (v != 0)
@@ -164,26 +183,60 @@ void BigInteger::UpdateBits()
     }
 }
 
-BigInteger operator+(const BigInteger &one, const BigInteger &another)
+DLL_API BigInteger operator+(const BigInteger &one, const BigInteger &another)
 {
     auto b = BigInteger(one);
     b += another;
     return b;
 }
 
-BigInteger operator*(const BigInteger &one, const BigInteger &another)
+DLL_API BigInteger operator*(const BigInteger &one, const BigInteger &another)
 {
     auto b = BigInteger(one);
     b *= another;
     return b;
 }
 
-double operator/(const BigInteger &one, const BigInteger &another)
+DLL_API double operator/(const BigInteger &one, const BigInteger &another)
 {
     return one.GetSignificand() / another.GetSignificand() * pow(2, one.m_Bits - another.m_Bits);
 }
 
-bool operator==(const BigInteger &lhs, const BigInteger &rhs)
+DLL_API bool operator<(const BigInteger& lhs, const BigInteger& rhs)
+{
+    if (lhs.m_Bits < rhs.m_Bits)
+        return true;
+    if (lhs.m_Bits > rhs.m_Bits)
+        return false;
+    auto itL = lhs.m_Data.rbegin();
+    auto itR = rhs.m_Data.rbegin();
+    while (itL != lhs.m_Data.rend())
+    {
+        if (*itL < *itR)
+            return true;
+        if (*itL > *itR)
+            return false;
+        ++itL, ++itR;
+    }
+    return false;
+}
+
+DLL_API bool operator>(const BigInteger& lhs, const BigInteger& rhs)
+{
+    return rhs < lhs;
+}
+
+DLL_API bool operator<=(const BigInteger& lhs, const BigInteger& rhs)
+{
+    return !(rhs < lhs);
+}
+
+DLL_API bool operator>=(const BigInteger& lhs, const BigInteger& rhs)
+{
+    return !(lhs < rhs);
+}
+
+DLL_API bool operator==(const BigInteger &lhs, const BigInteger &rhs)
 {
     if (lhs.m_Bits != rhs.m_Bits)
         return false;
@@ -195,7 +248,7 @@ bool operator==(const BigInteger &lhs, const BigInteger &rhs)
     return true;
 }
 
-bool operator!=(const BigInteger &lhs, const BigInteger &rhs)
+DLL_API bool operator!=(const BigInteger &lhs, const BigInteger &rhs)
 {
     return !(lhs == rhs);
 }

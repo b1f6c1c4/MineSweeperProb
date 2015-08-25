@@ -22,9 +22,19 @@ BlockStatus Solver::GetBlockStatus(Block block) const
     return m_Manager[block];
 }
 
+const BlockStatus* Solver::GetBlockStatuses() const
+{
+    return &*m_Manager.begin();
+}
+
 double Solver::GetProbability(Block block) const
 {
     return m_Probability[block];
+}
+
+const double* Solver::GetProbabilities() const
+{
+    return &*m_Probability.begin();
 }
 
 const BigInteger &Solver::GetTotalStates() const
@@ -47,7 +57,7 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
     m_Matrix.ExtendHeight(m_Matrix.GetHeight() + 1);
 
     auto col = 0;
-    auto nr = m_Matrix.GetRowHead(m_Matrix.GetHeight() - 1);
+    auto nr = &m_Matrix.GetRowHead(m_Matrix.GetHeight() - 1);
     for (auto it = m_BlockSets.begin(); it != m_BlockSets.end(); ++it , ++col)
     {
         BlockSet exceptA, exceptB, intersection;
@@ -58,7 +68,7 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
         if (exceptA.empty())
         {
             it->swap(intersection);
-            nr = m_Matrix.Add(nr, m_Matrix.GetColHead(col), 1);
+            nr = &m_Matrix.Add(*nr, m_Matrix.GetColHead(col), 1);
         }
         else
         {
@@ -67,16 +77,25 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
             {
                 m_Matrix.InsertCol(col + 1);
                 auto node = m_Matrix.GetColHead(col).Down;
-                auto nodeX = m_Matrix.GetColHead(col + 1);
+                auto nodeX = &m_Matrix.GetColHead(col + 1);
                 while (node != nullptr)
                 {
-                    nodeX = m_Matrix.Add(*node, nodeX, std::move(node->Value));
+                    nodeX = &m_Matrix.Add(*node, *nodeX, node->Value);
                     node = node->Down;
                 }
-                nr = m_Matrix.Add(nr, nodeX, 1);
+                nr = &m_Matrix.Add(*nr, *nodeX, 1);
 
-                ++it , ++col;
-                m_BlockSets.insert(it, BlockSet());
+                ++col;
+                if (++it == m_BlockSets.end())
+                {
+                    m_BlockSets.push_back(BlockSet());
+                    it = m_BlockSets.end() - 1;
+                }
+                else
+                {
+                    m_BlockSets.insert(it, BlockSet());
+                    it = m_BlockSets.begin() + col;
+                }
                 it->swap(intersection);
             }
         }
@@ -92,17 +111,18 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
         m_BlockSets.push_back(BlockSet());
         m_BlockSets.back().swap(theSet);
 
-        m_Matrix.ExtendWidth(m_Matrix.GetWidth() + 1);
-        m_Matrix.Add(nr, m_Matrix.GetColHead(m_Matrix.GetWidth() - 1), 1);
+        m_Matrix.InsertCol(m_Matrix.GetWidth() - 1);
+        m_Matrix.Add(*nr, m_Matrix.GetColHead(m_Matrix.GetWidth() - 1), 1);
     }
 
-    m_Matrix.ExtendWidth(m_Matrix.GetWidth() + 1);
-    m_Matrix.Add(nr, m_Matrix.GetColHead(m_Matrix.GetWidth() - 1), mines - dMines);
+    m_Matrix.ExtendWidth(m_BlockSets.size() + 1);
+    m_Matrix.Add(*nr, m_Matrix.GetColHead(m_BlockSets.size()), mines - dMines);
 }
 
 void Solver::Solve(bool withProb)
 {
     m_Solutions.clear();
+    m_DistCondCache.clear();
 
     auto flag = true;
     while (flag)
@@ -128,7 +148,7 @@ void Solver::Solve(bool withProb)
 
     if (!minors.empty() &&
         minors.back() == m_BlockSets.size())
-        minors.erase(minors.end() - 1);
+        minors.pop_back();
     else
     {
         m_TotalStates = BigInteger(0);
@@ -145,7 +165,7 @@ void Solver::Solve(bool withProb)
     ProcessSolutions();
 }
 
-std::map<int, BigInteger> Solver::DistributionCond(const BlockSet& set, const BlockSet& setCond, int mines)
+std::vector<BigInteger> Solver::DistributionCond(const BlockSet& set, const BlockSet& setCond, int mines, int &min)
 {
     int dMines, dBlanks;
     auto lst = BlockSet(set);
@@ -158,17 +178,14 @@ std::map<int, BigInteger> Solver::DistributionCond(const BlockSet& set, const Bl
     if (lstCond.empty())
     {
         if (dMinesCond != mines)
-            return std::map<int, BigInteger>();
+            return std::vector<BigInteger>();
     }
 
     BlockSet sets1, sets2, sets3;
     GetIntersectionCounts(lst, lstCond, sets1, sets2, sets3);
 
-    auto dist = DistCond(DistCondParameters(sets1, sets2, sets3, mines - dMinesCond, lst.size()));
-    auto dic = std::map<int, BigInteger>();
-    for (auto i = 0; i < dist.size(); i++)
-        dic.insert_or_assign(dic.end(), i + dMines, dist[i]);
-    return dic;
+    min = dMines;
+    return DistCond(DistCondParameters(sets1, sets2, sets3, mines - dMinesCond, lst.size()));
 }
 
 void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection)
@@ -219,7 +236,7 @@ std::vector<int> Solver::OverlapBlockSet(const BlockSet &set)
                 auto node = m_Matrix.GetColHead(col).Down;
                 while (node != nullptr)
                 {
-                    m_Matrix.Add(*node, m_Matrix.GetColHead(col), std::move(node->Value));
+                    m_Matrix.Add(*node, m_Matrix.GetColHead(col), node->Value);
                     node = node->Down;
                 }
 
@@ -247,14 +264,16 @@ void Solver::ReduceSet(BlockSet &set, int &mines, int &blanks) const
 {
     mines = 0;
     blanks = 0;
-    for (auto it = set.begin(); it != set.end(); ++it)
-        switch (m_Manager[*it])
+    for (auto i = 0; i < set.size(); ++i)
+        switch (m_Manager[set[i]])
         {
         case Mine:
             mines++;
+            set.erase(set.begin() + i--);
             break;
         case Blank:
             blanks++;
+            set.erase(set.begin() + i--);
             break;
         case Unknown:
         default:
@@ -331,19 +350,19 @@ bool Solver::ReduceRestrains()
         if (dMines != 0)
         {
             auto nc = m_Matrix.GetColHead(col).Down;
-            auto ncc = m_Matrix.GetColHead(m_BlockSets.size());
+            auto ncc = &m_Matrix.GetColHead(m_BlockSets.size());
             while (nc != nullptr)
             {
-                auto node = m_Matrix.SeekDown(nc->Row, ncc);
-                if (node.Down == nullptr ||
-                    node.Down->Row != nc->Row ||
-                    (node.Down->Value -= dMines) < 0)
+                auto node = &m_Matrix.SeekDown(nc->Row, *ncc);
+                if (node->Down == nullptr ||
+                    node->Down->Row != nc->Row ||
+                    (node->Down->Value -= dMines) < 0)
                 {
                     m_TotalStates = BigInteger(0);
                     return true;
                 }
                 nc = nc->Down;
-                ncc = *node.Down;
+                ncc = node->Down;
             }
         }
         if (m_BlockSets[col].empty())
@@ -422,7 +441,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
 
     auto subs = [](Iv i1, Iv i2)-> Iv
         {
-            return Iv(i2.first - i1.second, i2.second - i1.first);
+            return Iv(i1.first - i2.second, i1.second - i2.first);
         };
     auto ints = [](Iv i1, Iv i2)-> Iv
         {
@@ -483,7 +502,7 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
     auto major = 0;
     for (auto col = 0; col < n; col++)
     {
-        auto biasNode = matrix.SeekDown(major + 1, col).Down;
+        auto biasNode = matrix.SeekDown(major, col).Down;
         while (biasNode != nullptr && abs(biasNode->Value) < 1E-14)
         {
             auto tmp = biasNode->Down;
@@ -518,34 +537,34 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
         while (bias != nullptr)
         {
             auto biasVal = bias->Value;
-            auto nc = matrix.GetColHead(bias->Col);
+            auto nc = &matrix.GetColHead(bias->Col);
             for (auto row = 0; row < m; row++)
             {
                 double oldV;
-                if (nc.Down == nullptr ||
-                    nc.Down->Row > row)
+                if (nc->Down == nullptr ||
+                    nc->Down->Row > row)
                     oldV = 0;
                 else
-                    oldV = nc.Down->Value;
+                    oldV = nc->Down->Value;
 
                 auto val = (row != biasNode->Row ? oldV : 0) + vec[row] * biasVal;
 
-                if (nc.Down == nullptr ||
-                    nc.Down->Row > row)
+                if (nc->Down == nullptr ||
+                    nc->Down->Row > row)
                 {
                     if (abs(val) < 1E-14)
                         continue;
 
-                    auto nr = matrix.SeekRight(row, bias->Col);
+                    auto nr = &matrix.SeekRight(row, bias->Col);
 
-                    nc = matrix.Add(nr, nc, std::move(val));
+                    nc = &matrix.Add(*nr, *nc, val);
                 }
                 else if (abs(val) < 1E-14)
-                    matrix.Remove(*nc.Down);
+                    matrix.Remove(*nc->Down);
                 else
                 {
-                    nc = *nc.Down;
-                    nc.Value = val;
+                    nc = nc->Down;
+                    nc->Value = val;
                 }
             }
             bias = bias->Right;
@@ -553,27 +572,28 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
 
         if (major != biasNode->Row)
         {
-            auto majNode = matrix.GetRowHead(major);
-            auto biaNode = matrix.GetRowHead(biasNode->Row);
+            auto majNode = &matrix.GetRowHead(major);
+            auto biasRow = biasNode->Row;
+            auto biaNode = &matrix.GetRowHead(biasRow);
             while (true)
             {
-                auto majID = majNode.Right != nullptr ? majNode.Right->Col : n;
-                auto biaID = biaNode.Right != nullptr ? biaNode.Right->Col : n;
+                auto majID = majNode->Right != nullptr ? majNode->Right->Col : n;
+                auto biaID = biaNode->Right != nullptr ? biaNode->Right->Col : n;
                 if (majID < biaID)
                 {
-                    biaNode = matrix.Add(biasNode->Row, majID, std::move(majNode.Right->Value));
-                    matrix.Remove(*majNode.Right);
+                    biaNode = &matrix.Add(biasRow, majID, majNode->Right->Value);
+                    matrix.Remove(*majNode->Right);
                 }
                 else if (majID > biaID)
                 {
-                    majNode = matrix.Add(major, biaID, std::move(biaNode.Right->Value));
-                    matrix.Remove(*biaNode.Right);
+                    majNode = &matrix.Add(major, biaID, biaNode->Right->Value);
+                    matrix.Remove(*biaNode->Right);
                 }
-                else if (majNode.Right != nullptr)
+                else if (majNode->Right != nullptr)
                 {
-                    majNode = *majNode.Right;
-                    biaNode = *biaNode.Right;
-                    std::swap(biaNode.Value, majNode.Value);
+                    majNode = majNode->Right;
+                    biaNode = biaNode->Right;
+                    std::swap(biaNode->Value, majNode->Value);
                 }
                 else
                     break;
@@ -691,22 +711,19 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
 void Solver::ProcessSolutions()
 {
     auto exp = std::vector<BigInteger>(m_BlockSets.size(), 0);
-    auto total = BigInteger(0);
-    std::for_each(m_Solutions.begin(), m_Solutions.end(), [&total,&exp,this](Solution &so)
+    m_TotalStates = BigInteger(0);
+    std::for_each(m_Solutions.begin(), m_Solutions.end(), [&exp,this](Solution &so)
                   {
                       so.States = BigInteger(1);
                       for (auto i = 0; i < m_BlockSets.size(); ++i)
                           so.States *= Binomial(m_BlockSets[i].size(), so.Dist[i]);
-                      total += so.States;
+                      m_TotalStates += so.States;
                       for (auto i = 0; i < m_BlockSets.size(); ++i)
-                      {
-                          auto v = so.States * so.Dist[i];
-                          exp[i] += v;
-                      }
+                          exp[i] += so.States * so.Dist[i];
                   });
-    std::for_each(m_Solutions.begin(), m_Solutions.end(), [&total, this](Solution &so)
+    std::for_each(m_Solutions.begin(), m_Solutions.end(), [this](Solution &so)
                   {
-                      so.Ratio = so.States / total;
+                      so.Ratio = so.States / m_TotalStates;
                   });
     for (auto i = 0; i < m_Manager.size(); ++i)
         if (m_Manager[i] == Mine)
@@ -723,7 +740,7 @@ void Solver::ProcessSolutions()
                               m_Manager[blk] = Blank;
                           });
         }
-        else if (exp[i] == total * m_BlockSets[i].size())
+        else if (exp[i] == m_TotalStates * m_BlockSets[i].size())
         {
             std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [this](int &blk)
                           {
@@ -731,7 +748,7 @@ void Solver::ProcessSolutions()
                           });
         }
 
-        auto p = (exp[i] / total) / m_BlockSets[i].size();
+        auto p = (exp[i] / m_TotalStates) / m_BlockSets[i].size();
         std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [&p, this](int &blk)
                       {
                           m_Probability[blk] = p;
@@ -767,13 +784,14 @@ void Solver::GetIntersectionCounts(const BlockSet& set1, const BlockSet& set2, s
     {
         BlockSet exceptA, exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC, resume1, resume2;
         Overlap(m_BlockSets[i], lst1, exceptA, resume1, exceptB1T);
-        Overlap(m_BlockSets[i], lst1, exceptA, resume1, exceptB1T);
+        exceptA.clear();
+        Overlap(m_BlockSets[i], lst2, exceptA, resume2, exceptB2T);
         Overlap(exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC);
         lst1.swap(resume1);
         lst2.swap(resume2);
-        sets1[i] = exceptB1.size();
-        sets2[i] = exceptB2.size();
-        sets3[i] = exceptC.size();
+        sets1.push_back(exceptB1.size());
+        sets2.push_back(exceptB2.size());
+        sets3.push_back(exceptC.size());
     }
 }
 
@@ -798,7 +816,7 @@ std::vector<BigInteger> Solver::DistCond(const DistCondParameters& par)
             if (stack.size() == m_BlockSets.size() - 1)
             {
                 auto mns = par.MinesCond;
-                std::for_each(stack.begin(), stack.end(), [&mns](int&v) { mns += v; });
+                std::for_each(stack.begin(), stack.end(), [&mns](int&v) { mns -= v; });
                 if (mns >= 0 &&
                     mns <= max[m_BlockSets.size() - 1])
                 {
@@ -808,11 +826,8 @@ std::vector<BigInteger> Solver::DistCond(const DistCondParameters& par)
                     for (auto i = 0; i < m_BlockSets.size(); i++)
                     {
                         auto n = m_BlockSets[i].size();
-                        auto a = par.Sets1[i];
-                        auto b = par.Sets2[i];
-                        auto c = par.Sets3[i];
-                        auto m = solution.Dist[i]; // in a + b + c
-                        auto p = stack[i]; // in b + c
+                        auto a = par.Sets1[i], b = par.Sets2[i], c = par.Sets3[i];
+                        auto m = solution.Dist[i], p = stack[i];
 
                         {
                             auto cases = std::vector<BigInteger>();

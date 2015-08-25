@@ -28,12 +28,13 @@ BYTE *Random(int length)
 
 int RandomInteger(int maxExclusive)
 {
+    assert(maxExclusive > 0);
     auto bits = 0;
     auto v = maxExclusive - 1;
     while (v != 0)
     {
         ++bits;
-        v >>= 2;
+        v >>= 1;
     }
     auto lng = (bits + 7) / 8;
     auto res = maxExclusive;
@@ -46,8 +47,7 @@ int RandomInteger(int maxExclusive)
             res <<= 8;
             res |= rnd[i];
         }
-        res <<= 8;
-        res |= rnd[lng - 1] & ((1 << (bits - (lng - 1) * 8)) - 1);
+        res |= (rnd[lng - 1] & ((1 << (bits - (lng - 1) * 8)) - 1)) << (lng - 1) * 8;
         delete[] rnd;
     }
     return res;

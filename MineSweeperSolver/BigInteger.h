@@ -2,7 +2,7 @@
 #include "stdafx.h"
 #include <vector>
 
-class BigInteger
+class DLL_API BigInteger
 {
 public:
     BigInteger();
@@ -13,11 +13,15 @@ public:
     BigInteger &operator+=(const BigInteger &other);
     BigInteger &operator*=(BYTE other);
     BigInteger &operator*=(const BigInteger &other);
-    friend BigInteger operator+(const BigInteger &one, const BigInteger &another);
-    friend BigInteger operator*(const BigInteger &one, const BigInteger &another);
-    friend double operator/(const BigInteger &one, const BigInteger &another);
-    friend bool operator==(const BigInteger &lhs, const BigInteger &rhs);
-    friend bool operator!=(const BigInteger &lhs, const BigInteger &rhs);
+    friend DLL_API BigInteger operator+(const BigInteger &one, const BigInteger &another);
+    friend DLL_API BigInteger operator*(const BigInteger &one, const BigInteger &another);
+    friend DLL_API double operator/(const BigInteger &one, const BigInteger &another);
+    friend DLL_API bool operator<(const BigInteger &lhs, const BigInteger &rhs);
+    friend DLL_API bool operator>(const BigInteger &lhs, const BigInteger &rhs);
+    friend DLL_API bool operator<=(const BigInteger &lhs, const BigInteger &rhs);
+    friend DLL_API bool operator>=(const BigInteger &lhs, const BigInteger &rhs);
+    friend DLL_API bool operator==(const BigInteger &lhs, const BigInteger &rhs);
+    friend DLL_API bool operator!=(const BigInteger &lhs, const BigInteger &rhs);
 
     double GetSignificand() const;
     int GetExponent() const;
@@ -29,8 +33,12 @@ private:
     void UpdateBits();
 };
 
-BigInteger operator+(const BigInteger &one, const BigInteger &another);
-BigInteger operator*(const BigInteger &one, const BigInteger &another);
-double operator/(const BigInteger &one, const BigInteger &another);
-bool operator==(const BigInteger &lhs, const BigInteger &rhs);
-bool operator!=(const BigInteger &lhs, const BigInteger &rhs);
+DLL_API BigInteger operator+(const BigInteger &one, const BigInteger &another);
+DLL_API BigInteger operator*(const BigInteger &one, const BigInteger &another);
+DLL_API double operator/(const BigInteger &one, const BigInteger &another);
+DLL_API bool operator<(const BigInteger &lhs, const BigInteger &rhs);
+DLL_API bool operator>(const BigInteger &lhs, const BigInteger &rhs);
+DLL_API bool operator<=(const BigInteger &lhs, const BigInteger &rhs);
+DLL_API bool operator>=(const BigInteger &lhs, const BigInteger &rhs);
+DLL_API bool operator==(const BigInteger &lhs, const BigInteger &rhs);
+DLL_API bool operator!=(const BigInteger &lhs, const BigInteger &rhs);

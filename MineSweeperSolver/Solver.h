@@ -8,14 +8,15 @@
 
 enum DLL_API BlockStatus
 {
-    Unknown,
-    Mine,
-    Blank
+    Unknown = -127,
+    Mine = -1,
+    Blank = -2
 };
 
 typedef int Block;
 typedef std::vector<Block> BlockSet;
 
+class GameMgr;
 class DistCondParameters;
 
 class Solver
@@ -24,14 +25,16 @@ public:
     explicit Solver(int count);
 
     BlockStatus GetBlockStatus(Block block) const;
+    const BlockStatus *GetBlockStatuses() const;
     double GetProbability(Block block) const;
+    const double *GetProbabilities() const;
     const BigInteger &GetTotalStates() const;
 
     void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
     void Solve(bool withProb);
 
-    std::map<int, BigInteger> DistributionCond(const BlockSet &set, const BlockSet &setCond, int mines);
+    std::vector<BigInteger> DistributionCond(const BlockSet &set, const BlockSet &setCond, int mines, int &min);
 private:
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;

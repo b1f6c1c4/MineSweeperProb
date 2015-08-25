@@ -2,12 +2,15 @@
 
 static std::vector<std::vector<BigInteger>> BinomialCoeff;
 
-void CacheBinomials(int n, int m)
+DLL_API void CacheBinomials(int n, int m)
 {
+    if (BinomialCoeff.empty())
+        BinomialCoeff.push_back(std::vector<BigInteger>(1, BigInteger(1)));
+
+    n++, m++;
     if (n < 0)
         return;
-    if (m > n ||
-        m < 0)
+    if (m < 0)
         return;
     if (m == 0)
         return;
@@ -37,7 +40,7 @@ void CacheBinomials(int n, int m)
     }
 }
 
-BigInteger Binomial(int n, int m)
+DLL_API BigInteger Binomial(int n, int m)
 {
     if (n < 0)
         return BigInteger(0);
