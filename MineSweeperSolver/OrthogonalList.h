@@ -12,11 +12,11 @@ struct Node
 
     Node();
     Node(int row, int col);
-    Node(int row, int col, T&& val);
+    Node(int row, int col, T &&val);
 };
 
 template <class T>
-class MINESWEEPERSOLVER_API OrthogonalList
+class DLL_API OrthogonalList
 {
 public:
     OrthogonalList();
@@ -37,8 +37,8 @@ public:
     Node<T> &GetColHead(int col);
     const Node<T> &GetColHead(int col) const;
 
-    Node<T> &Add(int row, int col, T&& val);
-    Node<T> &Add(Node<T> &nr, Node<T> &nc, T&& val);
+    Node<T> &Add(int row, int col, T &&val);
+    Node<T> &Add(Node<T> &nr, Node<T> &nc, T &&val);
 
     void Remove(int row, int col);
     void Remove(Node<T> &nr, Node<T> &nc);
@@ -54,29 +54,19 @@ public:
     void ExtendWidth(int cols);
 private:
     std::vector<Node<T>> m_Rows, m_Cols;
-
 };
 
 template <class T>
-Node<T>::Node() : Row(-1), Col(-1)
-{
-}
+Node<T>::Node() : Row(-1), Col(-1) {}
 
 template <class T>
-Node<T>::Node(int row, int col) : Row(row), Col(col)
-{
-}
+Node<T>::Node(int row, int col) : Row(row), Col(col) {}
 
 template <class T>
-Node<T>::Node(int row, int col, T&& val) : Row(row), Col(col), Value(val)
-{
-}
+Node<T>::Node(int row, int col, T &&val) : Row(row), Col(col), Value(val) {}
 
 template <class T>
-OrthogonalList<T>::OrthogonalList()
-{
-
-}
+OrthogonalList<T>::OrthogonalList() {}
 
 template <class T>
 OrthogonalList<T>::OrthogonalList(int width, int height)
@@ -86,12 +76,12 @@ OrthogonalList<T>::OrthogonalList(int width, int height)
 }
 
 template <class T>
-OrthogonalList<T>::OrthogonalList(const OrthogonalList<T>& other)
+OrthogonalList<T>::OrthogonalList(const OrthogonalList<T> &other)
 {
     ExtendHeight(other.GetHeight());
     ExtendWidth(other.GetWidth());
 
-    for (auto i = 0; i < m_Rows.size();i++)
+    for (auto i = 0; i < m_Rows.size(); i++)
     {
         const auto n = other.GetRowHead(i).Right;
         auto nr = m_Rows[i];
@@ -104,15 +94,15 @@ template <class T>
 OrthogonalList<T>::~OrthogonalList()
 {
     std::for_each(m_Rows.begin(), m_Rows.end(), [](Node<T> &node)
-    {
-        auto n = node.Right;
-        while (n != nullptr)
-        {
-            auto tmp = n->Right;
-            delete n;
-            n = tmp;
-        }
-    });
+                  {
+                      auto n = node.Right;
+                      while (n != nullptr)
+                      {
+                          auto tmp = n->Right;
+                          delete n;
+                          n = tmp;
+                      }
+                  });
 }
 
 template <class T>
@@ -128,13 +118,13 @@ int OrthogonalList<T>::GetWidth() const
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::SeekRight(int row, int col)
+Node<T> &OrthogonalList<T>::SeekRight(int row, int col)
 {
     return SeekRight(m_Rows[row], col);
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::SeekRight(Node<T>& nr, int col)
+Node<T> &OrthogonalList<T>::SeekRight(Node<T> &nr, int col)
 {
     while (true)
     {
@@ -146,13 +136,13 @@ Node<T>& OrthogonalList<T>::SeekRight(Node<T>& nr, int col)
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::SeekDown(int row, int col)
+Node<T> &OrthogonalList<T>::SeekDown(int row, int col)
 {
     return SeekDown(row, m_Cols[col]);
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::SeekDown(int row, Node<T>& nc)
+Node<T> &OrthogonalList<T>::SeekDown(int row, Node<T> &nc)
 {
     while (true)
     {
@@ -164,37 +154,37 @@ Node<T>& OrthogonalList<T>::SeekDown(int row, Node<T>& nc)
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::GetRowHead(int row)
+Node<T> &OrthogonalList<T>::GetRowHead(int row)
 {
     return m_Rows[row];
 }
 
 template <class T>
-const Node<T>& OrthogonalList<T>::GetRowHead(int row) const
+const Node<T> &OrthogonalList<T>::GetRowHead(int row) const
 {
     return m_Rows[row];
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::GetColHead(int col)
+Node<T> &OrthogonalList<T>::GetColHead(int col)
 {
     return m_Cols[col];
 }
 
 template <class T>
-const Node<T>& OrthogonalList<T>::GetColHead(int col) const
+const Node<T> &OrthogonalList<T>::GetColHead(int col) const
 {
     return m_Cols[col];
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::Add(int row, int col, T&& val)
+Node<T> &OrthogonalList<T>::Add(int row, int col, T &&val)
 {
     return Add(GetRowHead(row), GetColHead(col), std::move(val));
 }
 
 template <class T>
-Node<T>& OrthogonalList<T>::Add(Node<T>& nr, Node<T>& nc, T&& val)
+Node<T> &OrthogonalList<T>::Add(Node<T> &nr, Node<T> &nc, T &&val)
 {
     nr = SeekRight(nr, nc.Col);
     if (nr.Down != nullptr && nr.Down->Row == nr.Row)
@@ -220,7 +210,7 @@ void OrthogonalList<T>::Remove(int row, int col)
 }
 
 template <class T>
-void OrthogonalList<T>::Remove(Node<T>& nr, Node<T>& nc)
+void OrthogonalList<T>::Remove(Node<T> &nr, Node<T> &nc)
 {
     auto left = SeekRight(nr, nc.Col);
     auto up = SeekDown(nr.Row, nc);
@@ -239,7 +229,7 @@ void OrthogonalList<T>::Remove(Node<T>& nr, Node<T>& nc)
 }
 
 template <class T>
-void OrthogonalList<T>::Remove(const Node<T>& node)
+void OrthogonalList<T>::Remove(const Node<T> &node)
 {
     Remove(node.Row, node.Col);
 }
@@ -251,15 +241,15 @@ void OrthogonalList<T>::RemoveRow(int row)
     while (nr.Right != nullptr)
         Remove(nr, m_Cols[nr.Right->Col]);
     std::for_each(m_Rows.begin() + row + 1, m_Rows.end(), [](Node<T> &node)
-    {
-        --node.Row;
-        auto n = node.Right;
-        while (n != nullptr)
-        {
-            --n->Row;
-            n = n->Right;
-        }
-    });
+                  {
+                      --node.Row;
+                      auto n = node.Right;
+                      while (n != nullptr)
+                      {
+                          --n->Row;
+                          n = n->Right;
+                      }
+                  });
     m_Rows.erase(m_Rows.begin() + row);
 }
 
@@ -270,15 +260,15 @@ void OrthogonalList<T>::RemoveCol(int col)
     while (nc.Down != nullptr)
         Remove(m_Rows[nc.Down->Row], nc);
     std::for_each(m_Cols.begin() + col + 1, m_Cols.end(), [](Node<T> &node)
-    {
-        --node.Col;
-        auto n = node.Down;
-        while (n != nullptr)
-        {
-            --n->Col;
-            n = n->Down;
-        }
-    });
+                  {
+                      --node.Col;
+                      auto n = node.Down;
+                      while (n != nullptr)
+                      {
+                          --n->Col;
+                          n = n->Down;
+                      }
+                  });
     m_Cols.erase(m_Cols.begin() + col);
 }
 
@@ -286,15 +276,15 @@ template <class T>
 void OrthogonalList<T>::InsertRow(int row)
 {
     std::for_each(m_Rows.begin() + row, m_Rows.end(), [](Node<T> &node)
-    {
-        ++node.Row;
-        auto n = node.Right;
-        while (n != nullptr)
-        {
-            ++n->Row;
-            n = n->Right;
-        }
-    });
+                  {
+                      ++node.Row;
+                      auto n = node.Right;
+                      while (n != nullptr)
+                      {
+                          ++n->Row;
+                          n = n->Right;
+                      }
+                  });
     m_Rows.insert(m_Rows.begin() + row, Node<T>(row, -1));
 }
 
@@ -302,15 +292,15 @@ template <class T>
 void OrthogonalList<T>::InsertCol(int col)
 {
     std::for_each(m_Cols.begin() + col, m_Cols.end(), [](Node<T> &node)
-    {
-        ++node.Col;
-        auto n = node.Down;
-        while (n != nullptr)
-        {
-            ++n->Col;
-            n = n->Down;
-        }
-    });
+                  {
+                      ++node.Col;
+                      auto n = node.Down;
+                      while (n != nullptr)
+                      {
+                          ++n->Col;
+                          n = n->Down;
+                      }
+                  });
     m_Cols.insert(m_Cols.begin() + col, Node<T>(-1, col));
 }
 

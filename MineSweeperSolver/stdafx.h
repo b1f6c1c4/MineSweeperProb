@@ -5,7 +5,7 @@
 #include <windows.h>
 
 #ifdef MINESWEEPERSOLVER_EXPORTS
-#define MINESWEEPERSOLVER_API __declspec(dllexport)
+#define DLL_API __declspec(dllexport)
 #else
-#define MINESWEEPERSOLVER_API __declspec(dllimport)
+#define DLL_API __declspec(dllimport)
 #endif
