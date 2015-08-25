@@ -9,19 +9,19 @@ static HCRYPTPROV hProvider = 0;
 
 void RandomInit()
 {
-    DWORD result = ::CryptAcquireContextW(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
+    DWORD result = CryptAcquireContextW(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
     assert(result);
 }
 
 void RandomClose()
 {
-    ::CryptReleaseContext(hProvider, 0);
+    CryptReleaseContext(hProvider, 0);
 }
 
 BYTE *Random(int length)
 {
     auto pbBuffer = new BYTE[length];
-    DWORD result = ::CryptGenRandom(hProvider, length, pbBuffer);
+    DWORD result = CryptGenRandom(hProvider, length, pbBuffer);
     assert(result);
     return pbBuffer;
 }
@@ -48,6 +48,7 @@ int RandomInteger(int maxExclusive)
         }
         res <<= 8;
         res |= rnd[lng - 1] & ((1 << (bits - (lng - 1) * 8)) - 1);
+        delete[] rnd;
     }
     return res;
 }

@@ -1,12 +1,19 @@
 #include "Solver.h"
 #include "BinomialHelper.h"
+#include <algorithm>
+
+static void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection);
+static std::vector<int> Gauss(OrthogonalList<double> &matrix);
+static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
+static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
+static unsigned __int64 Hash(const BlockSet &set);
 
 Solver::Solver(int count) : m_Manager(count, Unknown), m_Probability(count)
 {
     auto lst = std::vector<Block>(count);
     for (auto i = 0; i < count; ++i)
         lst[i] = i;
-    m_BlockSets.push_back(std::move(lst));
+    m_BlockSets.push_back(move(lst));
     m_Matrix.ExtendWidth(2);
 }
 
@@ -33,6 +40,7 @@ void Solver::AddRestrain(Block blk, bool isMine)
 void Solver::AddRestrain(const BlockSet &set, int mines)
 {
     auto theSet = BlockSet(set);
+    sort(theSet.begin(), theSet.end());
     auto dMines = 0, dBlanks = 0;
     ReduceSet(theSet, dMines, dBlanks);
 
@@ -137,7 +145,33 @@ void Solver::Solve(bool withProb)
     ProcessSolutions();
 }
 
-void Solver::Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection)
+std::map<int, BigInteger> Solver::DistributionCond(const BlockSet& set, const BlockSet& setCond, int mines)
+{
+    int dMines, dBlanks;
+    auto lst = BlockSet(set);
+    ReduceSet(lst, dMines, dBlanks);
+
+    int dMinesCond, dBlanksCond;
+    auto lstCond = BlockSet(setCond);
+    ReduceSet(lstCond, dMinesCond, dBlanksCond);
+
+    if (lstCond.empty())
+    {
+        if (dMinesCond != mines)
+            return std::map<int, BigInteger>();
+    }
+
+    BlockSet sets1, sets2, sets3;
+    GetIntersectionCounts(lst, lstCond, sets1, sets2, sets3);
+
+    auto dist = DistCond(DistCondParameters(sets1, sets2, sets3, mines - dMinesCond, lst.size()));
+    auto dic = std::map<int, BigInteger>();
+    for (auto i = 0; i < dist.size(); i++)
+        dic.insert_or_assign(dic.end(), i + dMines, dist[i]);
+    return dic;
+}
+
+void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection)
 {
     auto p = 0, q = 0;
     for (; p < setA.size() && q < setB.size();)
@@ -441,7 +475,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
     return flag;
 }
 
-std::vector<int> Solver::Gauss(OrthogonalList<double> &matrix)
+std::vector<int> Gauss(OrthogonalList<double> &matrix)
 {
     auto n = matrix.GetWidth();
     auto m = matrix.GetHeight();
@@ -563,7 +597,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
             lst[nc->Row] = static_cast<int>(round(nc->Value));
             nc = nc->Down;
         }
-        m_Solutions.push_back(Solution(std::move(lst)));
+        m_Solutions.push_back(Solution(move(lst)));
         return;
     }
 
@@ -626,7 +660,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 {
                     for (auto minorID = 0; minorID < minors.size(); minorID++)
                         lst[minors[minorID]] = stack[minorID];
-                    m_Solutions.push_back(Solution(std::move(lst)));
+                    m_Solutions.push_back(Solution(move(lst)));
                 }
 
                 aggr(stack.size() - 1, 1);
@@ -703,4 +737,187 @@ void Solver::ProcessSolutions()
                           m_Probability[blk] = p;
                       });
     }
+}
+
+void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to)
+{
+    for (auto i = 0; i < from.size(); ++i)
+        to[i] += from[i];
+}
+
+void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases)
+{
+    auto dicN = std::vector<BigInteger>(from.size() + cases.size() - 1, BigInteger(0));
+    for (auto i = 0; i < from.size(); i++)
+        for (auto j = 0; j < cases.size(); j++)
+            dicN[i + j] += from[i] * cases[j];
+    dicN.swap(from);
+}
+
+void Solver::GetIntersectionCounts(const BlockSet& set1, const BlockSet& set2, std::vector<int>& sets1, std::vector<int>& sets2, std::vector<int>& sets3) const
+{
+    auto lst1 = BlockSet(set1), lst2 = BlockSet(set2);
+    sets1.clear();
+    sets1.reserve(m_BlockSets.size());
+    sets2.clear();
+    sets2.reserve(m_BlockSets.size());
+    sets3.clear();
+    sets3.reserve(m_BlockSets.size());
+    for (auto i = 0; i < m_BlockSets.size();++i)
+    {
+        BlockSet exceptA, exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC, resume1, resume2;
+        Overlap(m_BlockSets[i], lst1, exceptA, resume1, exceptB1T);
+        Overlap(m_BlockSets[i], lst1, exceptA, resume1, exceptB1T);
+        Overlap(exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC);
+        lst1.swap(resume1);
+        lst2.swap(resume2);
+        sets1[i] = exceptB1.size();
+        sets2[i] = exceptB2.size();
+        sets3[i] = exceptC.size();
+    }
+}
+
+std::vector<BigInteger> Solver::DistCond(const DistCondParameters& par)
+{
+    auto &dic = m_DistCondCache[par];
+    if (!dic.empty())
+        return dic;
+
+    dic.resize(par.Length + 1);
+    std::for_each(m_Solutions.begin(), m_Solutions.end(), [&par, &dic, this](Solution &solution)
+    {
+        auto max = std::vector<int>(m_BlockSets.size());
+        for (auto i = 0; i < m_BlockSets.size(); ++i)
+            max[i] = min(solution.Dist[i], par.Sets2[i] + par.Sets3[i]);
+
+        auto stack = std::vector<int>();
+        stack.reserve(m_BlockSets.size());
+        if (m_BlockSets.size() > 1)
+            stack.push_back(0);
+        while (true)
+            if (stack.size() == m_BlockSets.size() - 1)
+            {
+                auto mns = par.MinesCond;
+                std::for_each(stack.begin(), stack.end(), [&mns](int&v) { mns += v; });
+                if (mns >= 0 &&
+                    mns <= max[m_BlockSets.size() - 1])
+                {
+                    stack.push_back(mns);
+
+                    auto dicT = std::vector<BigInteger>(1, BigInteger(1));
+                    for (auto i = 0; i < m_BlockSets.size(); i++)
+                    {
+                        auto n = m_BlockSets[i].size();
+                        auto a = par.Sets1[i];
+                        auto b = par.Sets2[i];
+                        auto c = par.Sets3[i];
+                        auto m = solution.Dist[i]; // in a + b + c
+                        auto p = stack[i]; // in b + c
+
+                        {
+                            auto cases = std::vector<BigInteger>();
+                            cases.reserve(min(p, c) + 1);
+                            for (auto j = 0; j <= p && j <= c; j++)
+                                cases.push_back(Binomial(c, j) * Binomial(b, p - j));
+
+                            Add(dicT, cases);
+                        }
+                        {
+                            auto cases = std::vector<BigInteger>();
+                            cases.reserve(min(m - p, a) + 1);
+                            for (auto j = 0; j <= m - p && j <= a; j++)
+                                cases.push_back(Binomial(a, j) * Binomial(n - a - b - c, m - p - j));
+
+                            Add(dicT, cases);
+                        }
+                    }
+                    Merge(dicT, dic);
+
+                    stack.pop_back();
+                }
+                if (stack.empty())
+                    break;
+                if (mns <= 0)
+                {
+                    stack.pop_back();
+                    if (stack.empty())
+                        break;
+                }
+                stack.back()++;
+            }
+            else if (stack.back() <= max[stack.size() - 1])
+                stack.push_back(0);
+            else
+            {
+                stack.pop_back();
+                if (stack.empty())
+                    break;
+                stack.back()++;
+            }
+    });
+    return dic;
+}
+
+DistCondParameters::DistCondParameters(const BlockSet& sets1, const BlockSet& sets2, const BlockSet& sets3, int minesCond, int length)
+    : Sets1(sets1),
+    Sets2(sets2),
+    Sets3(sets3),
+    MinesCond(minesCond),
+    Length(length)
+{
+    m_Hash = (Hash(Sets1) << 44) ^ (Hash(Sets2) << 24) ^ (Hash(Sets3) << 4) ^ MinesCond;
+}
+
+bool operator==(const DistCondParameters& lhs, const DistCondParameters& rhs) 
+{
+    if (lhs.m_Hash != rhs.m_Hash)
+        return false;
+    if (lhs.MinesCond != rhs.MinesCond)
+        return false;
+    if (lhs.Sets1 != rhs.Sets1)
+        return false;
+    if (lhs.Sets2 != rhs.Sets2)
+        return false;
+    if (lhs.Sets3 != rhs.Sets3)
+        return false;
+    return true;
+}
+
+bool operator!=(const DistCondParameters& lhs, const DistCondParameters& rhs) 
+{
+    return !(lhs == rhs);
+}
+
+bool operator<(const DistCondParameters& lhs, const DistCondParameters& rhs) 
+{
+    if (lhs.m_Hash < rhs.m_Hash)
+        return true;
+    if (lhs.m_Hash > rhs.m_Hash)
+        return false;
+    if (lhs.MinesCond < rhs.MinesCond)
+        return true;
+    if (lhs.MinesCond > rhs.MinesCond)
+        return false;
+    if (lhs.Sets1 < rhs.Sets1)
+        return true;
+    if (lhs.Sets1 > rhs.Sets1)
+        return false;
+    if (lhs.Sets2 < rhs.Sets2)
+        return true;
+    if (lhs.Sets2 > rhs.Sets2)
+        return false;
+    if (lhs.Sets3 < rhs.Sets3)
+        return true;
+    if (lhs.Sets3 > rhs.Sets3)
+        return false;
+    return false;
+}
+
+unsigned __int64 Hash(const BlockSet &set)
+{
+    unsigned __int64 hash = 5381;
+    auto it = set.begin();
+    while (it != set.end())
+        hash = (hash << 5) + hash + *it++ + 30;
+    return hash;
 }
