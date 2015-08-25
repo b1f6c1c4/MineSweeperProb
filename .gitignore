@@ -17,5 +17,6 @@ MineSweeperAnalyzer/obj/
 MineSweeperCalc/bin/
 MineSweeperCalc/obj/
 MineSweeperSolver/x64/
-/x64/Debug/
+MineSweeperSimulator/x64/
+/x64/
 /.vs/
