@@ -25,6 +25,11 @@ const BigInteger &Solver::GetTotalStates() const
     return m_TotalStates;
 }
 
+void Solver::AddRestrain(Block blk, bool isMine)
+{
+    m_Manager[blk] = isMine ? Mine : Blank;
+}
+
 void Solver::AddRestrain(const BlockSet &set, int mines)
 {
     auto theSet = BlockSet(set);

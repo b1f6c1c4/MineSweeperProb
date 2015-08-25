@@ -148,6 +148,8 @@
   <ItemGroup>
     <ClInclude Include="BigInteger.h" />
     <ClInclude Include="BinomialHelper.h" />
+    <ClInclude Include="GameMgr.h" />
+    <ClInclude Include="random.h" />
     <ClInclude Include="Solution.h" />
     <ClInclude Include="Solver.h" />
     <ClInclude Include="OrthogonalList.h" />
@@ -171,6 +173,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="GameMgr.cpp" />
+    <ClCompile Include="random.cpp" />
     <ClCompile Include="Solution.cpp" />
     <ClCompile Include="Solver.cpp" />
     <ClCompile Include="stdafx.cpp" />

@@ -1,6 +1,6 @@
 #include "BinomialHelper.h"
 
-std::vector<std::vector<BigInteger>> BinomialCoeff;
+static std::vector<std::vector<BigInteger>> BinomialCoeff;
 
 void CacheBinomials(int n, int m)
 {

@@ -26,7 +26,7 @@ BigInteger &BigInteger::operator+=(const BigInteger &other)
     if (other.m_Data.size() > m_Data.size())
         m_Data.resize(other.m_Data.size(), 0);
 
-    byte c = 0;
+    BYTE c = 0;
     auto it = m_Data.begin();
     auto itO = other.m_Data.begin();
     while (itO != other.m_Data.end())
@@ -43,16 +43,16 @@ BigInteger &BigInteger::operator+=(const BigInteger &other)
     return *this;
 }
 
-BigInteger &BigInteger::operator*=(byte other)
+BigInteger &BigInteger::operator*=(BYTE other)
 {
     unsigned short m = other;
 
-    byte c = 0;
+    BYTE c = 0;
     auto it = m_Data.begin();
     while (it != m_Data.end())
     {
         unsigned short val = static_cast<unsigned short>(*it) * m;
-        *it = static_cast<byte>(val);
+        *it = static_cast<BYTE>(val);
         auto nextC = *it & c & 0x80;
         *it += c;
         c = (val >> 8) + (nextC ? 1 : 0);
@@ -67,7 +67,7 @@ BigInteger &BigInteger::operator*=(byte other)
 
 BigInteger &BigInteger::operator*=(const BigInteger &other)
 {
-    std::vector<byte> orig((m_Bits + other.m_Bits) / 8 + 1);
+    std::vector<BYTE> orig((m_Bits + other.m_Bits) / 8 + 1);
     orig.swap(m_Data);
 
 
@@ -79,11 +79,11 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
 
         unsigned short m = *itO;
 
-        byte c = 0;
+        BYTE c = 0;
         for (auto it = orig.begin(), itR = m_Data.begin() + shift; it != orig.end(); ++it , ++itR)
         {
             unsigned short val = static_cast<unsigned short>(*it) * m;
-            *it = static_cast<byte>(val);
+            *it = static_cast<BYTE>(val);
             auto nextC = *it & c & 0x80;
             *it += c;
             c = (val >> 8) + (nextC ? 1 : 0);
@@ -97,9 +97,9 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
 double BigInteger::GetSignificand() const
 {
     double significand = 1;
-    auto p = reinterpret_cast<byte *>(&significand);
+    auto p = reinterpret_cast<BYTE *>(&significand);
     auto flag = *p == 0x3F;
-    byte lst[7];
+    BYTE lst[7];
 
     auto id = 0;
     for (auto it = m_Data.rbegin(); it != m_Data.rend() && id < 7; ++it , ++id)

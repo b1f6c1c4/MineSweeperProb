@@ -36,6 +36,12 @@
     <ClInclude Include="BinomialHelper.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="GameMgr.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="random.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -54,6 +60,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="BinomialHelper.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="GameMgr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="random.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

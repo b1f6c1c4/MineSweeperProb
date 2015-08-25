@@ -16,7 +16,7 @@ struct Node
 };
 
 template <class T>
-class DLL_API OrthogonalList
+class OrthogonalList
 {
 public:
     OrthogonalList();

@@ -15,7 +15,7 @@ enum DLL_API BlockStatus
 typedef int Block;
 typedef std::vector<Block> BlockSet;
 
-class DLL_API Solver
+class Solver
 {
 public:
     explicit Solver(int count);
@@ -24,6 +24,7 @@ public:
     double GetProbability(Block block) const;
     const BigInteger &GetTotalStates() const;
 
+    void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
     void Solve(bool withProb);
 private:

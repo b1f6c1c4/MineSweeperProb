@@ -2,17 +2,16 @@
 #include "stdafx.h"
 #include <vector>
 
-class DLL_API BigInteger
+class BigInteger
 {
 public:
-    typedef unsigned char byte;
     BigInteger();
     // ReSharper disable once CppNonExplicitConvertingConstructor
     BigInteger(int val);
     ~BigInteger();
 
     BigInteger &operator+=(const BigInteger &other);
-    BigInteger &operator*=(byte other);
+    BigInteger &operator*=(BYTE other);
     BigInteger &operator*=(const BigInteger &other);
     friend BigInteger operator+(const BigInteger &one, const BigInteger &another);
     friend BigInteger operator*(const BigInteger &one, const BigInteger &another);
@@ -24,7 +23,7 @@ public:
     int GetExponent() const;
     double Log2() const;
 private:
-    std::vector<byte> m_Data;
+    std::vector<BYTE> m_Data;
     int m_Bits;
 
     void UpdateBits();

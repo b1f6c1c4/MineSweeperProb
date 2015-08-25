@@ -3,7 +3,7 @@
 #include <vector>
 #include "BigInteger.h"
 
-class DLL_API Solution
+class Solution
 {
 public:
     explicit Solution(std::vector<int> &&dist);
