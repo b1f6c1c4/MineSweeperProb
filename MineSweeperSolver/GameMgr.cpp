@@ -67,12 +67,12 @@ int GameMgr::GetToOpen() const
     return m_ToOpen;
 }
 
-bool GameMgr::IsStarted() const
+bool GameMgr::GetStarted() const
 {
     return m_Started;
 }
 
-bool GameMgr::IsSucceed() const
+bool GameMgr::GetSucceed() const
 {
     return m_Succeed;
 }
@@ -102,14 +102,140 @@ double GameMgr::GetBlockProbability(int x, int y) const
     return m_Solver.GetProbability(GetIndex(x, y));
 }
 
-BlockStatus GameMgr::GetBlockStatus(int x, int y) const
+BlockStatus GameMgr::GetInferredStatus(int x, int y) const
 {
     return m_Solver.GetBlockStatus(GetIndex(x, y));
+}
+
+const Block* GameMgr::GetBestBlocks() const
+{
+    if (m_Best.empty())
+        return nullptr;
+    return &*m_Best.begin();
+}
+
+int GameMgr::GetBestBlockCount() const
+{
+    return m_Best.size();
+}
+
+const Block* GameMgr::GetPreferredBlocks() const
+{
+    if (m_Preferred.empty())
+        return nullptr;
+    return &*m_Preferred.begin();
+}
+
+int GameMgr::GetPreferredBlockCount() const
+{
+    return m_Preferred.size();
 }
 
 void GameMgr::OpenBlock(int x, int y)
 {
     OpenBlock(GetIndex(x, y));
+}
+
+void GameMgr::Solve(bool withProb, bool withPref)
+{
+    if (!m_Started)
+        return;
+
+    m_Best.clear();
+    m_Preferred.clear();
+
+    m_Solver.Solve(withProb);
+
+    for (auto i = 0; i < m_Blocks.size(); ++i)
+        if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == Blank)
+            m_Best.push_back(i);
+
+    if (!m_Best.empty())
+        return;
+
+    if (!withProb)
+        return;
+
+    auto probs = std::vector<double>();
+    double bestProb = 1;
+    for (auto i = 0; i < m_Blocks.size(); ++i)
+    {
+        if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != Unknown)
+            continue;
+        m_Preferred.push_back(i);
+        auto p = m_Solver.GetProbability(i);
+        probs.push_back(p);
+        if (p < bestProb)
+            bestProb = p;
+    }
+    if (m_Preferred.empty())
+        throw;
+
+    {
+        auto bProbs = std::vector<int>();
+        for (auto i = 0; i < m_Preferred.size(); ++i)
+            if (probs[i] <= bestProb)
+                bProbs.push_back(m_Preferred[i]);
+        bProbs.swap(m_Preferred);
+    }
+    if (m_Preferred.empty())
+        throw;
+
+    if (m_Preferred.size() <= 1 || !withPref)
+        return;
+
+    auto prozs = std::vector<BigInteger>();
+    auto quans = std::vector<double>();
+    BigInteger bestProz(0);
+    for (auto i = 0; i < m_Preferred.size(); ++i)
+    {
+        int m;
+        auto di = m_Solver.DistributionCond(m_BlocksR[m_Preferred[i]].Surrounding, m_BlocksR[m_Preferred[i]].Self, 0, m);
+        prozs.push_back(di[0]);
+        if (di[0] > bestProz)
+            bestProz = di[0];
+
+        BigInteger t(0);
+        for (auto j = 0; j < di.size(); ++j)
+            t += di[j];
+
+        double q = 0;
+        for (auto j = 0; j < di.size(); ++j)
+            if (di[j] != 0)
+            {
+                auto p = di[j] / t;
+                q += -p * log2(p);
+            }
+
+        quans.push_back(q);
+    }
+    { 
+        auto bProzs = std::vector<int>();
+        auto quas = std::vector<double>();
+        for (auto i = 0; i < m_Preferred.size(); ++i)
+            if (prozs[i] >= bestProz)
+            {
+                bProzs.push_back(m_Preferred[i]);
+                quas.push_back(quans[i]);
+            }
+        bProzs.swap(m_Preferred);
+        quas.swap(quans);
+    }
+    if (m_Preferred.empty())
+        throw;
+    {
+        double bestQuan = 0;
+        for (auto i = 0; i < m_Preferred.size(); ++i)
+            if (quans[i] > bestQuan)
+                bestQuan = quans[i];
+        auto bQuans = std::vector<int>();
+        for (auto i = 0; i < m_Preferred.size(); ++i)
+            if (quans[i] >= bestQuan)
+                bQuans.push_back(m_Preferred[i]);
+        bQuans.swap(m_Preferred);
+    }
+    if (m_Preferred.empty())
+        throw;
 }
 
 bool GameMgr::SemiAutomaticStep(bool withProb)
@@ -149,90 +275,11 @@ void GameMgr::AutomaticStep()
     if (!m_Started)
         return;
 
-    m_Solver.Solve(true);
-    auto ary = std::vector<int>();
-    {
-        auto vals = std::vector<double>();
-        double best = 1;
-        for (auto i = 0; i < m_Blocks.size(); ++i)
-            if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == Unknown)
-            {
-                ary.push_back(i);
-                auto p = m_Solver.GetProbability(i);
-                vals.push_back(p);
-                if (p < best)
-                    best = p;
-            }
-
-        auto tmp = std::vector<int>();
-        for (auto i = 0; i < ary.size(); ++i)
-            if (vals[i] <= best)
-                tmp.push_back(ary[i]);
-        if (tmp.empty())
-        {
-            for (auto i = 0; i < ary.size(); ++i)
-                std::cout << ary[i] << " " << vals[i] << std::endl;
-
-            throw;
-        }
-        tmp.swap(ary);
-    }
-    if (false)
-    {
-        auto vals = std::vector<BigInteger>();
-        auto vals2 = std::vector<double>();
-        BigInteger best = 1;
-        for (auto i = 0; i < ary.size(); ++i)
-        {
-            int m;
-            auto di = m_Solver.DistributionCond(m_BlocksR[ary[i]].Surrounding, m_BlocksR[ary[i]].Self, 0, m);
-            if (di.size() == 0)
-                std::cout << "FFFFFFFFFFFFF";
-            vals.push_back(di[0]);
-            if (di[0] > best)
-                best = di[0];
-
-            BigInteger t(0);
-            for (auto j = 0; j < di.size(); ++j)
-                t += di[j];
-
-            double q = 0;
-            for (auto j = 0; j < di.size();++j)
-                if (di[j] != 0)
-                {
-                    auto p = di[j] / t;
-                    q += p*log2(p);
-                }
-
-            vals2.push_back(q);
-        }
-
-        auto tmp = std::vector<int>();
-        auto tmpv = std::vector<double>();
-        for (auto i = 0; i < ary.size(); ++i)
-            if (vals[i] <= best)
-            {
-                tmp.push_back(ary[i]);
-                tmpv.push_back(vals2[i]);
-            }
-        tmp.swap(ary);
-        tmpv.swap(vals2);
-
-
-        double best2 = 0;
-        for (auto i = 0; i < ary.size(); ++i)
-            if (vals2[i] > best2)
-                best2 = vals2[i];
-        for (auto i = 0; i < ary.size(); ++i)
-            if (vals2[i] >= best2)
-                tmp.push_back(ary[i]);
-        tmp.swap(ary);
-    }
-
-    if (ary.empty())
+    Solve(true, true);
+    if (m_Preferred.empty())
         throw;
 
-    auto blk = ary.size() == 1 ? ary[0] : ary[RandomInteger(ary.size())];
+    auto blk = m_Preferred.size() == 1 ? m_Preferred[0] : m_Preferred[RandomInteger(m_Preferred.size())];
     OpenBlock(blk);
 }
 

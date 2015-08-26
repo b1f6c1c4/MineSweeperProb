@@ -90,14 +90,14 @@ namespace MineSweeper
                             break;
                     }
 
-                    if (TheMgr.BestsForSure != null && TheMgr.BestsForSure.BinarySearch(TheBlock) >= 0)
+                    if (TheMgr.BestBlocks != null && TheMgr.BestBlocks.BinarySearch(TheBlock) >= 0)
                     {
                         str = "★";
                         fColor = Color.MediumSlateBlue;
                     }
                     else if (TheMgr.Mode.HasFlag(SolvingMode.Probability) &&
-                             TheMgr.Bests != null &&
-                             TheMgr.Bests.BinarySearch(TheBlock) >= 0)
+                             TheMgr.PreferredBlocks != null &&
+                             TheMgr.PreferredBlocks.BinarySearch(TheBlock) >= 0)
                     {
                         str = "☆";
                         fColor = Color.SlateBlue;

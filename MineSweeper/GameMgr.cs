@@ -159,8 +159,6 @@ namespace MineSweeper
                 }
                 if (!m_Mode.HasFlag(SolvingMode.Automatic))
                 {
-                    if (InferredStatuses != null)
-                        Bests = CanOpenForSureBlocks().ToList();
                 }
                 if (!m_Mode.HasFlag(SolvingMode.Probability))
                 {
@@ -169,7 +167,7 @@ namespace MineSweeper
                 }
                 if (!m_Mode.HasFlag(SolvingMode.Half))
                 {
-                    Bests = null;
+                    PreferredBlocks = null;
                     InferredStatuses = null;
                 }
             }
@@ -234,12 +232,12 @@ namespace MineSweeper
         /// <summary>
         ///     确定最佳格
         /// </summary>
-        public List<Block> BestsForSure { get; private set; }
+        public List<Block> BestBlocks { get; private set; }
 
         /// <summary>
         ///     最佳格
         /// </summary>l
-        public List<Block> Bests { get; set; }
+        public List<Block> PreferredBlocks { get; set; }
 
         /// <summary>
         ///     锁
@@ -335,13 +333,6 @@ namespace MineSweeper
         }
 
         /// <summary>
-        ///     获取确定无雷的可翻开的格
-        /// </summary>
-        /// <returns>确定无雷的可翻开的格</returns>
-        public IEnumerable<Block> CanOpenForSureBlocks()
-            => m_Blocks.Where((t, i) => !t.IsOpen && InferredStatuses[i] == BlockStatus.Blank);
-
-        /// <summary>
         ///     获取不一定无雷的可翻开的格
         /// </summary>
         /// <returns>不一定无雷的可翻开的格</returns>
@@ -384,6 +375,24 @@ namespace MineSweeper
             m_Backgrounding.Start();
         }
 
+        /// <summary>
+        ///     按特定策略自动操作一次
+        /// </summary>
+        public void AutomaticStep()
+        {
+            if (Solving)
+                throw new InvalidOperationException("上一次求解未完成");
+
+            if (!Started)
+                return;
+
+            if (!Mode.HasFlag(SolvingMode.Automatic))
+                return;
+
+            m_Backgrounding = new Thread(ProcessAutomaticStep);
+            m_Backgrounding.Start();
+        }
+
         #region PInvokes
         [DllImport("MineSweeperSolver.dll")]
         static private extern void CacheBinomials(int n, int m);
@@ -411,6 +420,12 @@ namespace MineSweeper
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern bool SemiAutomatic(IntPtr mgr, bool withProb);
+
+        [DllImport("MineSweeperSolver.dll")]
+        private static extern bool AutomaticStep(IntPtr mgr);
+
+        [DllImport("MineSweeperSolver.dll")]
+        private static extern bool Automatic(IntPtr mgr);
         #endregion PInvokes
 
         #region Wrapper
@@ -470,6 +485,16 @@ namespace MineSweeper
             public IntPtr InferredStatus;
             [MarshalAs(UnmanagedType.U8)]
             public IntPtr Probabilities;
+
+
+            [MarshalAs(UnmanagedType.U4)]
+            public int BestBlockCount;
+            [MarshalAs(UnmanagedType.U8)]
+            public IntPtr BestBlocks;
+            [MarshalAs(UnmanagedType.U4)]
+            public int PreferredBlockCount;
+            [MarshalAs(UnmanagedType.U8)]
+            public IntPtr PreferredBlocks;
             // ReSharper restore MemberCanBePrivate.Local
             // ReSharper restore FieldCanBeMadeReadOnly.Local
         };
@@ -508,15 +533,21 @@ namespace MineSweeper
                     var pProb = (double*)st.Probabilities.ToPointer();
                     for (var i = 0; i < st.TotalBlocks; i++)
                     {
-                        m_Blocks[i].IsOpen = (*pProp).IsOpen;
-                        m_Blocks[i].IsMine = (*pProp).IsMine;
-                        m_Blocks[i].Degree = (*pProp).Degree;
-                        InferredStatuses.Add(*pInf);
-                        Probabilities.Add(*pProb);
-                        pProp++;
-                        pInf++;
-                        pProb++;
+                        var property = *pProp++;
+                        m_Blocks[i].IsOpen = property.IsOpen;
+                        m_Blocks[i].IsMine = property.IsMine;
+                        m_Blocks[i].Degree = property.Degree;
+                        InferredStatuses.Add(*pInf++);
+                        Probabilities.Add(*pProb++);
                     }
+                    BestBlocks = new List<Block>(st.BestBlockCount);
+                    var pBest = (int*)st.BestBlocks.ToPointer();
+                    for (var i = 0; i < st.BestBlockCount; i++)
+                        BestBlocks.Add(m_Blocks[*pBest++]);
+                    PreferredBlocks = new List<Block>(st.PreferredBlockCount);
+                    var pPref = (int*)st.PreferredBlocks.ToPointer();
+                    for (var i = 0; i < st.PreferredBlockCount; i++)
+                        PreferredBlocks.Add(m_Blocks[*pPref++]);
                 }
             }
             finally
@@ -533,10 +564,6 @@ namespace MineSweeper
             try
             {
                 UpdateStatus();
-
-                var bests = CanOpenForSureBlocks().ToList();
-
-                BestsForSure = bests;
             }
             finally
             {
@@ -557,6 +584,13 @@ namespace MineSweeper
         {
             Solving = true;
             SemiAutomatic(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
+            ProcessSolve();
+        }
+
+        private void ProcessAutomaticStep()
+        {
+            Solving = true;
+            AutomaticStep(m_NativeObject);
             ProcessSolve();
         }
 

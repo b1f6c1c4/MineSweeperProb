@@ -225,25 +225,26 @@ namespace MineSweeper
                         m_Mgr.SemiAutomatic();
                     }
                     break;
-                //case Keys.A:
-                //    if (m_Mgr.Started &&
-                //        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
-                //    {
-                //        if (!m_Mgr.SemiAutomaticStep())
-                //            m_Mgr.AutomaticStep(true);
-                //    }
-                //    break;
-                //case Keys.Z:
-                //    if (m_Mgr.Started &&
-                //        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
-                //    {
-                //        var flag = false;
-                //        while (m_Mgr.SemiAutomaticStep())
-                //            flag = true;
-                //        if (!flag)
-                //            m_Mgr.AutomaticStep(true);
-                //    }
-                //    break;
+                case Keys.A:
+                    if (m_Mgr.Started &&
+                        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
+                    {
+                        if (m_Mgr.BestBlocks.Any())
+                            m_Mgr.SemiAutomaticStep();
+                        else
+                            m_Mgr.AutomaticStep();
+                    }
+                    break;
+                case Keys.Z:
+                    if (m_Mgr.Started &&
+                        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
+                    {
+                        if (m_Mgr.BestBlocks.Any())
+                            m_Mgr.SemiAutomatic();
+                        else
+                            m_Mgr.AutomaticStep();
+                    }
+                    break;
                 case Keys.R:
                     Reset();
                     break;
@@ -275,7 +276,7 @@ namespace MineSweeper
                 //             () =>
                 //             {
                 //                 var dr = new Drainer();
-                //                 m_Mgr.Bests = dr.Drain(m_Mgr).ToList();
+                //                 m_Mgr.PreferredBlocks = dr.Drain(m_Mgr).ToList();
                 //                 m_Mgr.DrainProbability = dr.Prob;
                 //             });
                 //    break;

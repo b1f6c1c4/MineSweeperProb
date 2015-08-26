@@ -26,9 +26,14 @@ struct DLL_API GameStatus
     double Bits, AllBits;
     int ToOpen;
 
-    const BlockProperty *Blocks;
+    const BlockProperty *BlockProperties;
     const BlockStatus *InferredStatus;
     const double *Probabilities;
+
+    int BestBlockCount;
+    const Block *BestBlocks;
+    int PreferredBlockCount;
+    const Block *PreferredBlocks;
 };
 
 extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines)
@@ -47,24 +52,31 @@ extern "C" DLL_API void OpenBlock(GameMgr *mgr, int x, int y)
     mgr->OpenBlock(x, y);
 }
 
-extern "C" DLL_API void Solve(GameMgr *mgr, bool withProb)
+extern "C" DLL_API void Solve(GameMgr *mgr, bool withProb, bool withPref)
 {
-    mgr->GetSolver().Solve(withProb);
+    mgr->Solve(withProb, withPref);
 }
 
 extern "C" DLL_API GameStatus *GetGameStatus(GameMgr *mgr)
 {
     auto st = new GameStatus;
-    st->TotalWidth = mgr->GetTotalWidth();
-    st->TotalHeight = mgr->GetTotalHeight();
+
+#define ST(name) st->name = mgr->Get##name();
+    ST(TotalWidth);
+    ST(TotalHeight);
+    ST(TotalMines);
+    ST(Started);
+    ST(Succeed);
+    ST(Bits);
+    ST(AllBits);
+    ST(ToOpen);
+    ST(BlockProperties);
+    ST(BestBlockCount);
+    ST(BestBlocks);
+    ST(PreferredBlockCount);
+    ST(PreferredBlocks);
+
     st->TotalBlocks = st->TotalWidth * st->TotalHeight;
-    st->TotalMines = mgr->GetTotalMines();
-    st->Started = mgr->IsStarted();
-    st->Succeed = mgr->IsSucceed();
-    st->Bits = mgr->GetBits();
-    st->AllBits = mgr->GetAllBits();
-    st->ToOpen = mgr->GetToOpen();
-    st->Blocks = mgr->GetBlockProperties();
     st->InferredStatus = mgr->GetSolver().GetBlockStatuses();
     st->Probabilities = mgr->GetSolver().GetProbabilities();
 
@@ -84,4 +96,14 @@ extern "C" DLL_API bool SemiAutomaticStep(GameMgr *mgr, bool withProb)
 extern "C" DLL_API bool SemiAutomatic(GameMgr *mgr, bool withProb)
 {
     return mgr->SemiAutomatic(withProb);
+}
+
+extern "C" DLL_API void AutomaticStep(GameMgr *mgr)
+{
+    mgr->AutomaticStep();
+}
+
+extern "C" DLL_API void Automatic(GameMgr *mgr)
+{
+    mgr->Automatic();
 }

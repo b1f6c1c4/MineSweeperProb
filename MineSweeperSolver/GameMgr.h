@@ -32,17 +32,24 @@ public:
     int GetTotalHeight() const;
     int GetTotalMines() const;
     int GetToOpen() const;
-    bool IsStarted() const;
-    bool IsSucceed() const;
+    bool GetStarted() const;
+    bool GetSucceed() const;
     double GetBits() const;
     double GetAllBits() const;
 
     const BlockProperty &GetBlockProperty(int x, int y) const;
     const BlockProperty *GetBlockProperties() const;
     double GetBlockProbability(int x, int y) const;
-    BlockStatus GetBlockStatus(int x, int y) const;
+    BlockStatus GetInferredStatus(int x, int y) const;
+
+    const Block *GetBestBlocks() const;
+    int GetBestBlockCount() const;
+    const Block *GetPreferredBlocks() const;
+    int GetPreferredBlockCount() const;
 
     void OpenBlock(int x, int y);
+
+    void Solve(bool withProb, bool withPref);
 
     bool SemiAutomaticStep(bool withProb);
     bool SemiAutomatic(bool withProb);
@@ -56,6 +63,7 @@ private:
     int m_ToOpen;
     Solver m_Solver;
     double m_AllBits;
+    std::vector<Block> m_Best, m_Preferred;
 
     int GetIndex(int x, int y) const;
 
