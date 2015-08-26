@@ -1,7 +1,5 @@
 #include "GameMgr.h"
 #include "random.h"
-#include <assert.h>
-#include <iostream>
 #include "BinomialHelper.h"
 
 GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height)
@@ -147,7 +145,7 @@ void GameMgr::Solve(bool withProb, bool withPref)
     m_Solver.Solve(withProb);
 
     for (auto i = 0; i < m_Blocks.size(); ++i)
-        if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == Blank)
+        if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
             m_Best.push_back(i);
 
     if (!m_Best.empty())
@@ -160,7 +158,7 @@ void GameMgr::Solve(bool withProb, bool withPref)
     double bestProb = 1;
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
-        if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != Unknown)
+        if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Unknown)
             continue;
         m_Preferred.push_back(i);
         auto p = m_Solver.GetProbability(i);
@@ -259,7 +257,7 @@ bool GameMgr::SemiAutomaticStep(bool withProb)
     auto flag = false;
     for (auto i = 0; i < m_Blocks.size();++i)
     {
-        if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != Blank)
+        if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Blank)
             continue;
         OpenBlock(i);
         flag = true;
@@ -289,6 +287,7 @@ void GameMgr::AutomaticStep()
         return;
 
     Solve(true, true);
+    OpenOptimalBlocks();
 }
 
 void GameMgr::Automatic()

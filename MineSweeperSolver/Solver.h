@@ -6,7 +6,7 @@
 #include <set>
 #include <map>
 
-enum DLL_API BlockStatus
+enum class BlockStatus
 {
     Unknown = -127,
     Mine = -1,
@@ -16,7 +16,6 @@ enum DLL_API BlockStatus
 typedef int Block;
 typedef std::vector<Block> BlockSet;
 
-class GameMgr;
 class DistCondParameters;
 
 class Solver

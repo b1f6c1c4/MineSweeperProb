@@ -11,7 +11,7 @@ static unsigned __int64 Hash(const BlockSet &set);
 template <class T>
 static unsigned __int64 HashCol(const Node<T> *ptr);
 
-Solver::Solver(int count) : m_Manager(count, Unknown), m_Probability(count)
+Solver::Solver(int count) : m_Manager(count, BlockStatus::Unknown), m_Probability(count)
 {
     auto lst = std::vector<Block>(count);
     for (auto i = 0; i < count; ++i)
@@ -47,7 +47,7 @@ const BigInteger &Solver::GetTotalStates() const
 
 void Solver::AddRestrain(Block blk, bool isMine)
 {
-    m_Manager[blk] = isMine ? Mine : Blank;
+    m_Manager[blk] = isMine ? BlockStatus::Mine : BlockStatus::Blank;
 }
 
 void Solver::AddRestrain(const BlockSet &set, int mines)
@@ -271,15 +271,15 @@ void Solver::ReduceSet(BlockSet &set, int &mines, int &blanks) const
     for (auto i = 0; i < set.size(); ++i)
         switch (m_Manager[set[i]])
         {
-        case Mine:
+        case BlockStatus::Mine:
             mines++;
             set.erase(set.begin() + i--);
             break;
-        case Blank:
+        case BlockStatus::Blank:
             blanks++;
             set.erase(set.begin() + i--);
             break;
-        case Unknown:
+        case BlockStatus::Unknown:
         default:
             break;
         }
@@ -338,7 +338,7 @@ bool Solver::ReduceRestrains()
                 auto col = nr->Col;
                 std::for_each(m_BlockSets[col].begin(), m_BlockSets[col].end(), [this](Block &blk)
                               {
-                                  m_Manager[blk] = Blank;
+                                  m_Manager[blk] = BlockStatus::Blank;
                               });
                 nr = nr->Right;
                 flag = true;
@@ -371,7 +371,7 @@ bool Solver::ReduceRestrains()
                 auto col = nr->Col;
                 std::for_each(m_BlockSets[col].begin(), m_BlockSets[col].end(), [this](Block &blk)
                               {
-                                  m_Manager[blk] = Mine;
+                                  m_Manager[blk] = BlockStatus::Mine;
                               });
                 nr = nr->Right;
                 flag = true;
@@ -513,7 +513,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
                               {
                                   std::for_each(m_BlockSets[id].begin(), m_BlockSets[id].end(), [this](const int &blk)
                                                 {
-                                                    m_Manager[blk] = Mine;
+                                                    m_Manager[blk] = BlockStatus::Mine;
                                                 });
                               });
                 flag = true;
@@ -524,7 +524,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
                               {
                                   std::for_each(m_BlockSets[id].begin(), m_BlockSets[id].end(), [this](const int &blk)
                                                 {
-                                                    m_Manager[blk] = Blank;
+                                                    m_Manager[blk] = BlockStatus::Blank;
                                                 });
                               });
                 flag = true;
@@ -770,9 +770,9 @@ void Solver::ProcessSolutions()
                       so.Ratio = so.States / m_TotalStates;
                   });
     for (auto i = 0; i < m_Manager.size(); ++i)
-        if (m_Manager[i] == Mine)
+        if (m_Manager[i] == BlockStatus::Mine)
             m_Probability[i] = 1;
-        else if (m_Manager[i] == Blank)
+        else if (m_Manager[i] == BlockStatus::Blank)
             m_Probability[i] = 0;
 
     for (auto i = 0; i < m_BlockSets.size(); ++i)
@@ -784,14 +784,14 @@ void Solver::ProcessSolutions()
         {
             std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [this](int &blk)
                           {
-                              m_Manager[blk] = Blank;
+                              m_Manager[blk] = BlockStatus::Blank;
                           });
         }
         else if (exp[i] == prod)
         {
             std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [this](int &blk)
             {
-                m_Manager[blk] = Mine;
+                m_Manager[blk] = BlockStatus::Mine;
             });
         }
 
