@@ -2,6 +2,7 @@
 #include "random.h"
 #include <assert.h>
 #include <iostream>
+#include "BinomialHelper.h"
 
 GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height)
 {
@@ -13,23 +14,27 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
         for (auto j = 0; j < height;++j)
         {
             BlockProperty blk;
+            BlockRelationship blkR;
             blk.Index = GetIndex(i, j);
             blk.X = i;
             blk.Y = j;
             blk.IsOpen = false;
             blk.IsMine = false;
-            blk.Self.push_back(blk.Index);
-            blk.Surrounding.reserve(8);
+            blkR.Self.push_back(blk.Index);
+            blkR.Surrounding.reserve(8);
             for (auto di = -1; di <= 1; di++)
                 if (i + di >= 0 && i + di < width)
                     for (auto dj = -1; dj <= 1; dj++)
                         if (j + dj >= 0 && j + dj < height)
                             if (di != 0 || dj != 0)
-                                blk.Surrounding.push_back(GetIndex(i + di, j + dj));
+                                blkR.Surrounding.push_back(GetIndex(i + di, j + dj));
             lst.push_back(blk.Index);
             m_Blocks.push_back(std::move(blk));
+            m_BlocksR.push_back(std::move(blkR));
         }
     m_Solver.AddRestrain(lst, totalMines);
+
+    m_AllBits = Binomial(width * height, totalMines).Log2();
 }
 
 Solver& GameMgr::GetSolver()
@@ -40,6 +45,26 @@ Solver& GameMgr::GetSolver()
 const Solver& GameMgr::GetSolver() const
 {
     return m_Solver;
+}
+
+int GameMgr::GetTotalWidth() const
+{
+    return m_TotalWidth;
+}
+
+int GameMgr::GetTotalHeight() const
+{
+    return m_TotalHeight;
+}
+
+int GameMgr::GetTotalMines() const
+{
+    return m_TotalMines;
+}
+
+int GameMgr::GetToOpen() const
+{
+    return m_ToOpen;
 }
 
 bool GameMgr::IsStarted() const
@@ -57,9 +82,19 @@ double GameMgr::GetBits() const
     return m_Solver.GetTotalStates().Log2();
 }
 
+double GameMgr::GetAllBits() const
+{
+    return m_AllBits;
+}
+
 const BlockProperty& GameMgr::GetBlockProperty(int x, int y) const
 {
     return m_Blocks[GetIndex(x, y)];
+}
+
+const BlockProperty* GameMgr::GetBlockProperties() const
+{
+    return &*m_Blocks.begin();
 }
 
 double GameMgr::GetBlockProbability(int x, int y) const
@@ -133,9 +168,16 @@ void GameMgr::AutomaticStep()
         for (auto i = 0; i < ary.size(); ++i)
             if (vals[i] <= best)
                 tmp.push_back(ary[i]);
+        if (tmp.empty())
+        {
+            for (auto i = 0; i < ary.size(); ++i)
+                std::cout << ary[i] << " " << vals[i] << std::endl;
+
+            throw;
+        }
         tmp.swap(ary);
     }
-
+    if (false)
     {
         auto vals = std::vector<BigInteger>();
         auto vals2 = std::vector<double>();
@@ -143,7 +185,7 @@ void GameMgr::AutomaticStep()
         for (auto i = 0; i < ary.size(); ++i)
         {
             int m;
-            auto di = m_Solver.DistributionCond(m_Blocks[ary[i]].Surrounding, m_Blocks[ary[i]].Self, 0, m);
+            auto di = m_Solver.DistributionCond(m_BlocksR[ary[i]].Surrounding, m_BlocksR[ary[i]].Self, 0, m);
             if (di.size() == 0)
                 std::cout << "FFFFFFFFFFFFF";
             vals.push_back(di[0]);
@@ -187,6 +229,9 @@ void GameMgr::AutomaticStep()
         tmp.swap(ary);
     }
 
+    if (ary.empty())
+        throw;
+
     auto blk = ary.size() == 1 ? ary[0] : ary[RandomInteger(ary.size())];
     OpenBlock(blk);
 }
@@ -218,17 +263,17 @@ void GameMgr::SettleMines(int initID)
     }
     m_Settled = true;
 
-    std::for_each(m_Blocks.begin(), m_Blocks.end(), [this](BlockProperty &blk)
+    for (auto i = 0; i < m_Blocks.size();++i)
     {
-        if (blk.IsMine)
+        if (m_Blocks[i].IsMine)
             return;
-        blk.Degree = 0;
-        std::for_each(blk.Surrounding.begin(), blk.Surrounding.end(), [&blk,this](int &id)
+        m_Blocks[i].Degree = 0;
+        std::for_each(m_BlocksR[i].Surrounding.begin(), m_BlocksR[i].Surrounding.end(), [i,this](int &id)
         {
             if (m_Blocks[id].IsMine)
-                ++blk.Degree;
+                ++m_Blocks[i].Degree;
         });
-    });
+    }
 }
 
 void GameMgr::OpenBlock(int id)
@@ -251,12 +296,12 @@ void GameMgr::OpenBlock(int id)
     m_Solver.AddRestrain(id, false);
     if (m_Blocks[id].Degree == 0)
     {
-        std::for_each(m_Blocks[id].Surrounding.begin(), m_Blocks[id].Surrounding.end(), [this](int &blk)
+        std::for_each(m_BlocksR[id].Surrounding.begin(), m_BlocksR[id].Surrounding.end(), [this](int &blk)
         {
             OpenBlock(blk);
         });
     }
-    m_Solver.AddRestrain(m_Blocks[id].Surrounding, m_Blocks[id].Degree);
+    m_Solver.AddRestrain(m_BlocksR[id].Surrounding, m_Blocks[id].Degree);
 
     if (--m_ToOpen == 0)
     {

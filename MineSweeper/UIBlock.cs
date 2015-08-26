@@ -1,8 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Drawing;
 using System.Windows.Forms;
-using MineSweeperCalc;
-using MineSweeperCalc.Solver;
 
 namespace MineSweeper
 {
@@ -20,7 +18,7 @@ namespace MineSweeper
 
         public Block TheBlock => TheMgr[X, Y];
 
-        public GameMgrBuffered TheMgr { get; set; }
+        public GameMgr TheMgr { get; set; }
 
         public static void InvokeIfRequired(ISynchronizeInvoke control, MethodInvoker action)
         {
@@ -42,11 +40,12 @@ namespace MineSweeper
                     !TheMgr.Succeed &&
                     TheMgr.InferredStatuses != null)
                 {
-                    switch (TheMgr.InferredStatuses[TheBlock])
+                    switch (TheMgr.InferredStatuses[TheBlock.Index])
                     {
                         case BlockStatus.Mine:
                             if (TheMgr.Started)
-                            { color = Color.Black;
+                            {
+                                color = Color.Black;
                                 fColor = Color.White;
                             }
                             else
@@ -74,15 +73,15 @@ namespace MineSweeper
                                 }
                                 else
                                     color = Color.DarkGray;
-                            else if (TheMgr.DrainProbability != null)
-                            {
-                                var v = (int)(TheMgr.DrainProbability[TheBlock] * 255);
-                                color = Color.FromArgb(v, v, v);
-                            }
+                            //else if (TheMgr.DrainProbability != null)
+                            //{
+                            //    var v = (int)(TheMgr.DrainProbability[TheBlock] * 255);
+                            //    color = Color.FromArgb(v, v, v);
+                            //}
                             else if (TheMgr.Mode.HasFlag(SolvingMode.Probability) &&
-                                     TheMgr.Probability != null)
+                                     TheMgr.Probabilities != null)
                             {
-                                var v = (int)((1 - TheMgr.Probability[TheBlock]) * 255);
+                                var v = (int)((1 - TheMgr.Probabilities[TheBlock.Index]) * 255);
                                 color = Color.FromArgb(v, v, v);
                             }
                             else
@@ -95,7 +94,7 @@ namespace MineSweeper
                         str = "★";
                         fColor = Color.MediumSlateBlue;
                     }
-                    else if (TheMgr.Mode.HasFlag(SolvingMode.Probability) && 
+                    else if (TheMgr.Mode.HasFlag(SolvingMode.Probability) &&
                             TheMgr.Bests != null &&
                              TheMgr.Bests.BinarySearch(TheBlock) >= 0)
                     {

@@ -28,7 +28,6 @@ BYTE *Random(int length)
 
 int RandomInteger(int maxExclusive)
 {
-    assert(maxExclusive > 0);
     auto bits = 0;
     auto v = maxExclusive - 1;
     while (v != 0)

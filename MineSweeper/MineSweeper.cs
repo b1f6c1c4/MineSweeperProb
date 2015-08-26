@@ -6,8 +6,6 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using MineSweeperCalc;
-using MineSweeperCalc.Solver;
 
 namespace MineSweeper
 {
@@ -19,8 +17,7 @@ namespace MineSweeper
 
         private readonly float m_ScaleFactor;
 
-        private GameMgrBuffered m_Mgr;
-        private double m_AllLog2;
+        private GameMgr m_Mgr;
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
@@ -77,42 +74,42 @@ namespace MineSweeper
                 var sb = new StringBuilder();
                 sb.Append($"[{m_Mgr.Mode}]");
                 if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
-                    m_Mgr.Probability != null)
+                    m_Mgr.Probabilities != null)
                 {
-                    var curBits = m_Mgr.TotalStates.Log2();
-                    sb.Append($" {curBits:F2}/{m_AllLog2:F2}b, {1 - curBits / m_AllLog2:P0}");
-                    progressBar1.Value = (int)(2147483647 * (1 - curBits / m_AllLog2));
+                    sb.Append($" {m_Mgr.Bits:F2}/{m_Mgr.AllBits:F2}b, {1 - m_Mgr.Bits / m_Mgr.AllBits:P0}");
+                    progressBar1.Value = (int)(2147483647 * (1 - m_Mgr.Bits / m_Mgr.AllBits));
                 }
                 else
-                    sb.Append($" {m_AllLog2:F2}b");
+                    sb.Append($" {m_Mgr.AllBits:F2}b");
 
                 if (m_CurrentBlock != null)
-                {  if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
-                        m_Mgr.Probability != null)
+                {
+                    if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
+                         m_Mgr.Probabilities != null)
                     {
-                        sb.Append($" M{m_Mgr.Probability[m_CurrentBlock]:P2}");
+                        sb.Append($" M{m_Mgr.Probabilities[m_CurrentBlock.Index]:P2}");
 
-                        if (m_Mgr.Mode.HasFlag(SolvingMode.Extended) &&
-                            (m_Mgr.DegreeDist != null &&
-                             m_Mgr.Quantity != null))
-                        {
-                            sb.Append($"Q{m_Mgr.Quantity[m_CurrentBlock]:F2}b: ");
+                        //if (m_Mgr.Mode.HasFlag(SolvingMode.Extended) &&
+                        //    (m_Mgr.DegreeDist != null &&
+                        //     m_Mgr.Quantity != null))
+                        //{
+                        //    sb.Append($"Q{m_Mgr.Quantity[m_CurrentBlock]:F2}b: ");
 
-                            var dist = m_Mgr.DegreeDist[m_CurrentBlock];
-                            if (dist != null)
-                            {
-                                foreach (var kvp in dist.OrderBy(kvp => kvp.Key))
-                                    sb.Append($"{kvp.Value:P1}[{kvp.Key}],");
-                                if (dist.Count > 0)
-                                    sb.Remove(sb.Length - 1, 1);
-                            }
-                        }
+                        //    var dist = m_Mgr.DegreeDist[m_CurrentBlock];
+                        //    if (dist != null)
+                        //    {
+                        //        foreach (var kvp in dist.OrderBy(kvp => kvp.Key))
+                        //            sb.Append($"{kvp.Value:P1}[{kvp.Key}],");
+                        //        if (dist.Count > 0)
+                        //            sb.Remove(sb.Length - 1, 1);
+                        //    }
+                        //}
                     }
-                    if (m_Mgr.DrainProbability != null)
-                    {
-                        if (m_Mgr.DrainProbability.ContainsKey(m_CurrentBlock))
-                        sb.Append($" D{m_Mgr.DrainProbability[m_CurrentBlock]:P2}");
-                    }
+                    //if (m_Mgr.DrainProbability != null)
+                    //{
+                    //    if (m_Mgr.DrainProbability.ContainsKey(m_CurrentBlock))
+                    //        sb.Append($" D{m_Mgr.DrainProbability[m_CurrentBlock]:P2}");
+                    //}
                 }
 
                 if (!m_Mgr.Started)
@@ -129,29 +126,21 @@ namespace MineSweeper
             }
         }
 
-        private void Reset(GameMgrBuffered mgr = null)
+        private void Reset(GameMgr mgr = null)
         {
             if (mgr == null)
             {
                 var mode = m_Mgr?.Mode ?? SolvingMode.Probability;
-                m_Mgr = new GameMgrBuffered(
-                    m_Width,
-                    m_Height,
-                    m_Mines,
-                    (int)DateTime.Now.Ticks,
-                    Strategies.MinProbMaxZeroProbMaxQuantity)
-                            { Mode = mode };
+                m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
             }
             else
                 m_Mgr = mgr;
 
+            m_Mgr.StatusUpdated += () => Invoke(new UpdateDelegate(UpdateAll), new object[] { });
+            m_Mgr.UpdateStatus();
+
             foreach (var ub in m_UIBlocks)
                 ub.TheMgr = m_Mgr;
-
-            var blocks = m_Width * m_Height;
-            BinomialHelper.UpdateTo(blocks, m_Mgr.TotalMines);
-
-            m_AllLog2 = BinomialHelper.Binomial(blocks, m_Mgr.TotalMines).Log2();
 
             ClientSize = new Size(
                 (int)(m_Width * 25 * m_ScaleFactor),
@@ -189,20 +178,20 @@ namespace MineSweeper
                     if (e.Control)
                     {
                         var dialog = new OpenFileDialog
-                                         {
-                                             AddExtension = true,
-                                             CheckPathExists = true,
-                                             DefaultExt = "bin",
-                                             CheckFileExists = true,
-                                             Multiselect = false,
-                                             ShowReadOnly = false,
-                                             Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
-                                         };
+                        {
+                            AddExtension = true,
+                            CheckPathExists = true,
+                            DefaultExt = "bin",
+                            CheckFileExists = true,
+                            Multiselect = false,
+                            ShowReadOnly = false,
+                            Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
+                        };
                         if (dialog.ShowDialog() == DialogResult.OK)
                             using (var stream = dialog.OpenFile())
                             {
                                 var formatter = new BinaryFormatter();
-                                Reset((GameMgrBuffered)formatter.Deserialize(stream));
+                                Reset((GameMgr)formatter.Deserialize(stream));
                             }
                     }
                     break;
@@ -210,13 +199,13 @@ namespace MineSweeper
                     if (e.Control)
                     {
                         var dialog = new SaveFileDialog
-                                         {
-                                             OverwritePrompt = true,
-                                             AddExtension = true,
-                                             CheckPathExists = true,
-                                             DefaultExt = "bin",
-                                             Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
-                                         };
+                        {
+                            OverwritePrompt = true,
+                            AddExtension = true,
+                            CheckPathExists = true,
+                            DefaultExt = "bin",
+                            Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
+                        };
                         if (dialog.ShowDialog() == DialogResult.OK)
                             using (var stream = dialog.OpenFile())
                             {
@@ -225,40 +214,40 @@ namespace MineSweeper
                                 stream.Flush();
                             }
                     }
-                    else if (m_Mgr.Started)
-                    {
-                        m_Mgr.SemiAutomaticStep();
-                        Solve();
-                    }
+                    //else if (m_Mgr.Started)
+                    //{
+                    //    m_Mgr.SemiAutomaticStep();
+                    //    Solve();
+                    //}
                     break;
-                case Keys.X:
-                    if (m_Mgr.Started)
-                    {
-                        m_Mgr.SemiAutomatic();
-                        Solve();
-                    }
-                    break;
-                case Keys.A:
-                    if (m_Mgr.Started &&
-                        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
-                    {
-                        if (!m_Mgr.SemiAutomaticStep())
-                            m_Mgr.AutomaticStep(true);
-                        Solve();
-                    }
-                    break;
-                case Keys.Z:
-                    if (m_Mgr.Started &&
-                        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
-                    {
-                        var flag = false;
-                        while (m_Mgr.SemiAutomaticStep())
-                            flag = true;
-                        if (!flag)
-                            m_Mgr.AutomaticStep(true);
-                        Solve();
-                    }
-                    break;
+                //case Keys.X:
+                //    if (m_Mgr.Started)
+                //    {
+                //        m_Mgr.SemiAutomatic();
+                //        Solve();
+                //    }
+                //    break;
+                //case Keys.A:
+                //    if (m_Mgr.Started &&
+                //        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
+                //    {
+                //        if (!m_Mgr.SemiAutomaticStep())
+                //            m_Mgr.AutomaticStep(true);
+                //        Solve();
+                //    }
+                //    break;
+                //case Keys.Z:
+                //    if (m_Mgr.Started &&
+                //        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
+                //    {
+                //        var flag = false;
+                //        while (m_Mgr.SemiAutomaticStep())
+                //            flag = true;
+                //        if (!flag)
+                //            m_Mgr.AutomaticStep(true);
+                //        Solve();
+                //    }
+                //    break;
                 case Keys.R:
                     Reset();
                     break;
@@ -285,22 +274,22 @@ namespace MineSweeper
                 case Keys.C:
                     m_Mgr.Cancel();
                     break;
-                case Keys.D:
-                    Task.Run(
-                             () =>
-                             {
-                                 var dr = new Drainer();
-                                 m_Mgr.Bests = dr.Drain(m_Mgr).ToList();
-                                 m_Mgr.DrainProbability = dr.Prob;
-                             });
-                    break;
+                //case Keys.D:
+                //    Task.Run(
+                //             () =>
+                //             {
+                //                 var dr = new Drainer();
+                //                 m_Mgr.Bests = dr.Drain(m_Mgr).ToList();
+                //                 m_Mgr.DrainProbability = dr.Prob;
+                //             });
+                //    break;
             }
         }
 
         private void Solve()
         {
-            m_Mgr.Solve().ContinueWith(t => Invoke(new UpdateDelegate(UpdateAll), new object[] { }));
-            UpdateAll();
+            m_Mgr.Solve();
+            UpdateText();
         }
     }
 }
