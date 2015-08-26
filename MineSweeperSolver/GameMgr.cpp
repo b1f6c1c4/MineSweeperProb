@@ -266,7 +266,7 @@ void GameMgr::SettleMines(int initID)
     for (auto i = 0; i < m_Blocks.size();++i)
     {
         if (m_Blocks[i].IsMine)
-            return;
+            continue;
         m_Blocks[i].Degree = 0;
         std::for_each(m_BlocksR[i].Surrounding.begin(), m_BlocksR[i].Surrounding.end(), [i,this](int &id)
         {

@@ -1,6 +1,7 @@
 #include "Solver.h"
 #include "BinomialHelper.h"
 #include <algorithm>
+#include <assert.h>
 
 static void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection);
 static std::vector<int> Gauss(OrthogonalList<double> &matrix);
@@ -286,12 +287,12 @@ bool Solver::ReduceRestrains()
     auto flag = false;
     auto row = 0;
     auto n = m_Matrix.GetColHead(m_BlockSets.size()).Down;
-    while (row >= m_Matrix.GetHeight())
+    while (row < m_Matrix.GetHeight())
     {
         if (n == nullptr || n->Row > row || n->Value == 0)
         {
             auto nr = m_Matrix.GetRowHead(row).Right;
-            while (nr != nullptr)
+            while (nr->Col != n->Col)
             {
                 auto col = nr->Col;
                 std::for_each(m_BlockSets[col].begin(), m_BlockSets[col].end(), [this](Block &blk)
@@ -310,7 +311,7 @@ bool Solver::ReduceRestrains()
         auto count = 0;
         {
             auto nr = m_Matrix.GetRowHead(row).Right;
-            while (nr != nullptr)
+            while (nr != n)
             {
                 count += m_BlockSets[nr->Col].size();
                 nr = nr->Right;
@@ -324,7 +325,7 @@ bool Solver::ReduceRestrains()
         if (n->Value == count)
         {
             auto nr = m_Matrix.GetRowHead(row).Right;
-            while (nr != nullptr)
+            while (nr != n)
             {
                 auto col = nr->Col;
                 std::for_each(m_BlockSets[col].begin(), m_BlockSets[col].end(), [this](Block &blk)
@@ -334,12 +335,14 @@ bool Solver::ReduceRestrains()
                 nr = nr->Right;
                 flag = true;
             }
-            if (n != nullptr && n->Row == row)
-                n = n->Down;
+            assert(n != nullptr && n->Row == row);
+            n = n->Down;
 
             m_Matrix.RemoveRow(row);
             continue;
         }
+        assert(n != nullptr && n->Row == row);
+        n = n->Down;
         row++;
     }
 
@@ -391,7 +394,7 @@ bool Solver::SimpleOverlap()
 
         for (auto i = 0; i < indexes.size() - 1; ++i)
             for (auto j = i + 1; j < indexes.size(); ++j)
-                flag |= SimpleOverlap(i, j);
+                flag |= SimpleOverlap(indexes[i], indexes[j]);
     }
 
     return flag;

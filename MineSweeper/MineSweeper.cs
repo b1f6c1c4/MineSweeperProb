@@ -74,7 +74,8 @@ namespace MineSweeper
                 var sb = new StringBuilder();
                 sb.Append($"[{m_Mgr.Mode}]");
                 if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
-                    m_Mgr.Probabilities != null)
+                    m_Mgr.Probabilities != null &&
+                    m_Mgr.Bits >= 0)
                 {
                     sb.Append($" {m_Mgr.Bits:F2}/{m_Mgr.AllBits:F2}b, {1 - m_Mgr.Bits / m_Mgr.AllBits:P0}");
                     progressBar1.Value = (int)(2147483647 * (1 - m_Mgr.Bits / m_Mgr.AllBits));
@@ -130,14 +131,11 @@ namespace MineSweeper
         {
             if (mgr == null)
             {
-                var mode = m_Mgr?.Mode ?? SolvingMode.Probability;
+                var mode = m_Mgr?.Mode ?? SolvingMode.None;
                 m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
             }
             else
                 m_Mgr = mgr;
-
-            m_Mgr.StatusUpdated += () => Invoke(new UpdateDelegate(UpdateAll), new object[] { });
-            m_Mgr.UpdateStatus();
 
             foreach (var ub in m_UIBlocks)
                 ub.TheMgr = m_Mgr;
@@ -145,6 +143,9 @@ namespace MineSweeper
             ClientSize = new Size(
                 (int)(m_Width * 25 * m_ScaleFactor),
                 (int)(m_Height * 25 * m_ScaleFactor) + progressBar1.Height);
+
+            m_Mgr.StatusUpdated += () => Invoke(new UpdateDelegate(UpdateAll), new object[] { });
+            m_Mgr.FetchStatus();
 
             Solve();
         }

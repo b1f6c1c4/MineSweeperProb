@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Drawing;
+using System.Globalization;
 using System.Windows.Forms;
 
 namespace MineSweeper
@@ -32,7 +33,7 @@ namespace MineSweeper
         {
             TheMgr.EnterReadLock();
 
-            string str = null;
+            var str = string.Empty;
             Color color, fColor = Color.Black;
             try
             {
@@ -89,13 +90,13 @@ namespace MineSweeper
                             break;
                     }
 
-                    if (TheMgr.BestsForSure.BinarySearch(TheBlock) >= 0)
+                    if (TheMgr.BestsForSure != null && TheMgr.BestsForSure.BinarySearch(TheBlock) >= 0)
                     {
                         str = "★";
                         fColor = Color.MediumSlateBlue;
                     }
                     else if (TheMgr.Mode.HasFlag(SolvingMode.Probability) &&
-                            TheMgr.Bests != null &&
+                             TheMgr.Bests != null &&
                              TheMgr.Bests.BinarySearch(TheBlock) >= 0)
                     {
                         str = "☆";
@@ -115,7 +116,7 @@ namespace MineSweeper
                             color = Color.White;
                             var deg = TheBlock.Degree;
                             if (deg != 0)
-                                str = deg.ToString();
+                                str = deg.ToString(CultureInfo.InvariantCulture);
                         }
                     else if (!TheMgr.Started &&
                              TheBlock.IsMine)

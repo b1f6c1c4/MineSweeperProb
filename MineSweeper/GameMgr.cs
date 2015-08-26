@@ -38,7 +38,7 @@ namespace MineSweeper
         Extended = 0x8 | Automatic
     }
 
-    public sealed class Block
+    public sealed class Block : IComparable<Block>
     {
         /// <summary>
         ///     横坐标
@@ -113,6 +113,8 @@ namespace MineSweeper
             Y = y;
             m_Mgr = mgr;
         }
+
+        public int CompareTo(Block other) => Index.CompareTo(other.Index);
     }
 
 
@@ -156,7 +158,10 @@ namespace MineSweeper
                     //Quantity = null;
                 }
                 if (!m_Mode.HasFlag(SolvingMode.Automatic))
-                    Bests = CanOpenForSureBlocks().ToList();
+                {
+                    if (InferredStatuses != null)
+                        Bests = CanOpenForSureBlocks().ToList();
+                }
                 if (!m_Mode.HasFlag(SolvingMode.Probability))
                 {
                     Probabilities = null;
@@ -259,8 +264,10 @@ namespace MineSweeper
             TotalWidth = width;
             TotalHeight = height;
             TotalMines = totalMines;
+            CacheBinomials(width * height, totalMines);
             m_NativeObject = CreateGameMgr(width, height, totalMines);
 
+            m_Blocks = new List<Block>();
             for (var i = 0; i < width; i++)
                 for (var j = 0; j < height; j++)
                     m_Blocks.Add(new Block(i, j, this));
@@ -285,6 +292,7 @@ namespace MineSweeper
                 throw new InvalidOperationException("游戏已结束");
 
             OpenBlock(m_NativeObject, x, y);
+            FetchStatus();
         }
 
         /// <summary>
@@ -302,6 +310,7 @@ namespace MineSweeper
                 return;
 
             m_Backgrounding = new Thread(Process);
+            m_Backgrounding.Start();
         }
 
         /// <summary>
@@ -336,6 +345,9 @@ namespace MineSweeper
             => m_Blocks.Where((t, i) => !t.IsOpen && InferredStatuses[i] == BlockStatus.Unknown);
 
         #region PInvokes
+        [DllImport("MineSweeperSolver.dll")]
+        static private extern void CacheBinomials(int n, int m);
+
         [DllImport("MineSweeperSolver.dll")]
         static private extern IntPtr CreateGameMgr(int width, int height, int totalMines);
 
@@ -416,49 +428,55 @@ namespace MineSweeper
             // ReSharper restore FieldCanBeMadeReadOnly.Local
         };
 
-        public void UpdateStatus()
+        public void FetchStatus()
         {
             m_Lock.EnterWriteLock();
             try
             {
-                var ptr = GetGameStatus(m_NativeObject);
-                try
-                {
-                    unsafe
-                    {
-                        var st = *(GameStatus*)ptr.ToPointer();
-                        Started = st.Started;
-                        Succeed = st.Succeed;
-                        ToOpen = st.ToOpen;
-                        AllBits = st.AllBits;
-                        Bits = st.Bits;
-                        InferredStatuses = new List<BlockStatus>(st.TotalBlocks);
-                        Probabilities = new List<double>(st.TotalBlocks);
-                        var pProp = (BlockProperty*)st.Blocks.ToPointer();
-                        var pInf = (BlockStatus*)st.InferredStatus.ToPointer();
-                        var pProb = (double*)st.Probabilities.ToPointer();
-                        for (var i = 0; i < st.TotalBlocks; i++)
-                        {
-                            m_Blocks[i].IsOpen = (*pProp).IsOpen;
-                            if (m_Blocks[i].IsOpen || !Started)
-                                m_Blocks[i].IsMine = (*pProp).IsMine;
-                            if (m_Blocks[i].IsOpen)
-                                m_Blocks[i].Degree = (*pProp).Degree;
-                            InferredStatuses.Add(*pInf);
-                            Probabilities.Add(pProb[i]);
-                        }
-                    }
-                }
-                finally
-                {
-                    ReleaseGameStatus(ptr);
-                }
+                UpdateStatus();
             }
             finally
             {
                 m_Lock.ExitWriteLock();
             }
             OnStatusUpdated();
+        }
+
+        private void UpdateStatus()
+        {
+            var ptr = GetGameStatus(m_NativeObject);
+            try
+            {
+                unsafe
+                {
+                    var st = *(GameStatus*)ptr.ToPointer();
+                    Started = st.Started;
+                    Succeed = st.Succeed;
+                    ToOpen = st.ToOpen;
+                    AllBits = st.AllBits;
+                    Bits = st.Bits;
+                    InferredStatuses = new List<BlockStatus>(st.TotalBlocks);
+                    Probabilities = new List<double>(st.TotalBlocks);
+                    var pProp = (BlockProperty*)st.Blocks.ToPointer();
+                    var pInf = (BlockStatus*)st.InferredStatus.ToPointer();
+                    var pProb = (double*)st.Probabilities.ToPointer();
+                    for (var i = 0; i < st.TotalBlocks; i++)
+                    {
+                        m_Blocks[i].IsOpen = (*pProp).IsOpen;
+                        m_Blocks[i].IsMine = (*pProp).IsMine;
+                        m_Blocks[i].Degree = (*pProp).Degree;
+                        InferredStatuses.Add(*pInf);
+                        Probabilities.Add(*pProb);
+                        pProp++;
+                        pInf++;
+                        pProb++;
+                    }
+                }
+            }
+            finally
+            {
+                ReleaseGameStatus(ptr);
+            }
         }
 
         /// <summary>
@@ -468,8 +486,23 @@ namespace MineSweeper
         {
             Solving = true;
             Solve(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
-            UpdateStatus();
+            m_Lock.EnterWriteLock();
+            try
+            {
+                UpdateStatus();
+
+                var bests = CanOpenForSureBlocks().ToList();
+
+                BestsForSure = bests;
+            }
+            finally
+            {
+                m_Lock.ExitWriteLock();
+                Solving = false;
+            }
+            OnStatusUpdated();
         }
+
 
         public void Dispose() => Dispose(true);
 
