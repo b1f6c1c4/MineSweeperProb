@@ -107,3 +107,8 @@ extern "C" DLL_API void Automatic(GameMgr *mgr)
 {
     mgr->Automatic();
 }
+
+extern "C" DLL_API void OpenOptimalBlocks(GameMgr *mgr)
+{
+    mgr->OpenOptimalBlocks();
+}

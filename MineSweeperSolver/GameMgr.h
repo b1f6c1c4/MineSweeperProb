@@ -51,6 +51,8 @@ public:
 
     void Solve(bool withProb, bool withPref);
 
+    void OpenOptimalBlocks();
+
     bool SemiAutomaticStep(bool withProb);
     bool SemiAutomatic(bool withProb);
     void AutomaticStep();

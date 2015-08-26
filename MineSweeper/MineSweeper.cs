@@ -131,7 +131,7 @@ namespace MineSweeper
         {
             if (mgr == null)
             {
-                var mode = m_Mgr?.Mode ?? SolvingMode.None;
+                var mode = m_Mgr?.Mode ?? SolvingMode.Automatic;
                 m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
             }
             else

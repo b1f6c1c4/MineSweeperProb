@@ -168,9 +168,6 @@ void GameMgr::Solve(bool withProb, bool withPref)
         if (p < bestProb)
             bestProb = p;
     }
-    if (m_Preferred.empty())
-        throw;
-
     {
         auto bProbs = std::vector<int>();
         for (auto i = 0; i < m_Preferred.size(); ++i)
@@ -178,8 +175,6 @@ void GameMgr::Solve(bool withProb, bool withPref)
                 bProbs.push_back(m_Preferred[i]);
         bProbs.swap(m_Preferred);
     }
-    if (m_Preferred.empty())
-        throw;
 
     if (m_Preferred.size() <= 1 || !withPref)
         return;
@@ -221,8 +216,6 @@ void GameMgr::Solve(bool withProb, bool withPref)
         bProzs.swap(m_Preferred);
         quas.swap(quans);
     }
-    if (m_Preferred.empty())
-        throw;
     {
         double bestQuan = 0;
         for (auto i = 0; i < m_Preferred.size(); ++i)
@@ -234,8 +227,28 @@ void GameMgr::Solve(bool withProb, bool withPref)
                 bQuans.push_back(m_Preferred[i]);
         bQuans.swap(m_Preferred);
     }
+}
+
+void GameMgr::OpenOptimalBlocks()
+{
+    if (!m_Best.empty())
+    {
+        for (auto i = 0; i < m_Best.size(); ++i)
+        {
+            OpenBlock(m_Best[i]);
+            if (!m_Started)
+                break;
+        }
+        m_Best.clear();
+        return;
+    }
+
     if (m_Preferred.empty())
-        throw;
+        return;
+
+    auto blk = m_Preferred.size() == 1 ? m_Preferred[0] : m_Preferred[RandomInteger(m_Preferred.size())];
+    m_Preferred.clear();
+    OpenBlock(blk);
 }
 
 bool GameMgr::SemiAutomaticStep(bool withProb)
@@ -276,11 +289,6 @@ void GameMgr::AutomaticStep()
         return;
 
     Solve(true, true);
-    if (m_Preferred.empty())
-        throw;
-
-    auto blk = m_Preferred.size() == 1 ? m_Preferred[0] : m_Preferred[RandomInteger(m_Preferred.size())];
-    OpenBlock(blk);
 }
 
 void GameMgr::Automatic()

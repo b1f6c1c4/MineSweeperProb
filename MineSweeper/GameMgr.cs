@@ -426,6 +426,9 @@ namespace MineSweeper
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern bool Automatic(IntPtr mgr);
+
+        [DllImport("MineSweeperSolver.dll")]
+        private static extern bool OpenOptimalBlocks(IntPtr mgr);
         #endregion PInvokes
 
         #region Wrapper
@@ -576,13 +579,18 @@ namespace MineSweeper
         private void ProcessSemiAutomaticStep()
         {
             Solving = true;
-            SemiAutomaticStep(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
+            if (BestBlocks.Any())
+                OpenOptimalBlocks(m_NativeObject);
+            else
+                SemiAutomaticStep(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
             ProcessSolve();
         }
 
         private void ProcessSemiAutomatic()
         {
             Solving = true;
+            if (BestBlocks.Any())
+                OpenOptimalBlocks(m_NativeObject);
             SemiAutomatic(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
             ProcessSolve();
         }
@@ -590,6 +598,8 @@ namespace MineSweeper
         private void ProcessAutomaticStep()
         {
             Solving = true;
+            if (BestBlocks.Any() || PreferredBlocks.Any())
+                OpenOptimalBlocks(m_NativeObject);
             AutomaticStep(m_NativeObject);
             ProcessSolve();
         }
