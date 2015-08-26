@@ -34,7 +34,7 @@ public:
     void AddRestrain(const BlockSet &set, int mines);
     void Solve(bool withProb);
 
-    std::vector<BigInteger> DistributionCond(const BlockSet &set, const BlockSet &setCond, int mines, int &min);
+    const std::vector<BigInteger> &DistributionCond(const BlockSet &set, const BlockSet &setCond, int mines, int &min);
 private:
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;
@@ -43,10 +43,11 @@ private:
     std::vector<double> m_Probability;
     std::set<std::pair<int, int>> m_Pairs;
     BigInteger m_TotalStates;
-    std::map<DistCondParameters, std::vector<BigInteger>> m_DistCondCache;
+    std::multimap<unsigned __int64, std::pair<DistCondParameters, std::vector<BigInteger>>> m_DistCondCache;
 
     std::vector<int> OverlapBlockSet(const BlockSet &set);
     void ReduceSet(BlockSet &set, int &outMines, int &outBlanks) const;
+    void MergeSets();
     bool ReduceRestrains();
     bool SimpleOverlap();
     bool SimpleOverlap(int r1, int r2);
@@ -55,7 +56,7 @@ private:
 
     void GetIntersectionCounts(const BlockSet &set1, const BlockSet &set2, std::vector<int> &sets1, std::vector<int> &sets2, std::vector<int> &sets3) const;
 
-    std::vector<BigInteger> DistCond(const DistCondParameters &par);
+    const std::vector<BigInteger> &DistCond(const DistCondParameters &par);
 };
 
 class DistCondParameters

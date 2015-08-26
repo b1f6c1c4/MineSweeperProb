@@ -8,6 +8,8 @@ static std::vector<int> Gauss(OrthogonalList<double> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
 static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
 static unsigned __int64 Hash(const BlockSet &set);
+template <class T>
+static unsigned __int64 HashCol(const Node<T> *ptr);
 
 Solver::Solver(int count) : m_Manager(count, Unknown), m_Probability(count)
 {
@@ -131,6 +133,7 @@ void Solver::Solve(bool withProb)
         while (ReduceRestrains()) {}
         flag = SimpleOverlap();
     }
+    MergeSets();
 
     if (!withProb)
         return;
@@ -166,7 +169,7 @@ void Solver::Solve(bool withProb)
     ProcessSolutions();
 }
 
-std::vector<BigInteger> Solver::DistributionCond(const BlockSet& set, const BlockSet& setCond, int mines, int &min)
+const std::vector<BigInteger> &Solver::DistributionCond(const BlockSet& set, const BlockSet& setCond, int mines, int &min)
 {
     int dMines, dBlanks;
     auto lst = BlockSet(set);
@@ -179,7 +182,7 @@ std::vector<BigInteger> Solver::DistributionCond(const BlockSet& set, const Bloc
     if (lstCond.empty())
     {
         if (dMinesCond != mines)
-            return std::vector<BigInteger>();
+            throw;
     }
 
     BlockSet sets1, sets2, sets3;
@@ -280,6 +283,44 @@ void Solver::ReduceSet(BlockSet &set, int &mines, int &blanks) const
         default:
             break;
         }
+}
+
+void Solver::MergeSets()
+{
+    std::multimap<unsigned __int64, int> hash;
+    for (auto i = 0; i < m_BlockSets.size(); ++i)
+    {
+        auto h = HashCol(m_Matrix.GetColHead(i).Down);
+        auto itp = hash.equal_range(h);
+        auto flag = false;
+        for (auto it = itp.first; it != itp.second; ++it)
+        {
+            auto nc1 = m_Matrix.GetColHead(it->second).Down;
+            auto nc2 = m_Matrix.GetColHead(i).Down;
+            while (nc1 != nullptr && nc2 != nullptr)
+            {
+                if (nc1->Row != nc2->Row)
+                    break;
+                nc1 = nc1->Down;
+                nc2 = nc2->Down;
+            }
+            if (nc1 == nullptr && nc2 == nullptr)
+            {
+                flag = true;
+                m_BlockSets[it->second].reserve(m_BlockSets[it->second].size() + m_BlockSets[i].size());
+                std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [&it, this](int &blk)
+                {
+                    m_BlockSets[it->second].push_back(blk);
+                });
+                m_BlockSets.erase(m_BlockSets.begin() + i);
+                m_Matrix.RemoveCol(i);
+                --i;
+                break;
+            }
+        }
+        if (flag)
+            hash.insert(std::make_pair(h, i));
+    }
 }
 
 bool Solver::ReduceRestrains()
@@ -736,6 +777,9 @@ void Solver::ProcessSolutions()
 
     for (auto i = 0; i < m_BlockSets.size(); ++i)
     {
+        auto prod = m_TotalStates * m_BlockSets[i].size();
+        if (prod < exp[i])
+            throw;
         if (exp[i] == 0)
         {
             std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [this](int &blk)
@@ -743,15 +787,15 @@ void Solver::ProcessSolutions()
                               m_Manager[blk] = Blank;
                           });
         }
-        else if (exp[i] == m_TotalStates * m_BlockSets[i].size())
+        else if (exp[i] == prod)
         {
             std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [this](int &blk)
-                          {
-                              m_Manager[blk] = Mine;
-                          });
+            {
+                m_Manager[blk] = Mine;
+            });
         }
 
-        auto p = (exp[i] / m_TotalStates) / m_BlockSets[i].size();
+        auto p = exp[i] / prod;
         std::for_each(m_BlockSets[i].begin(), m_BlockSets[i].end(), [&p, this](int &blk)
                       {
                           m_Probability[blk] = p;
@@ -798,13 +842,15 @@ void Solver::GetIntersectionCounts(const BlockSet& set1, const BlockSet& set2, s
     }
 }
 
-std::vector<BigInteger> Solver::DistCond(const DistCondParameters& par)
+const std::vector<BigInteger> &Solver::DistCond(const DistCondParameters& par)
 {
-    auto &dic = m_DistCondCache[par];
-    if (!dic.empty())
-        return dic;
-
-    dic.resize(par.Length + 1);
+    auto itp = m_DistCondCache.equal_range(par.m_Hash);
+    for (auto it = itp.first; it != itp.second; ++it)
+    {
+        if (it->second.first == par)
+            return it->second.second;
+    }
+    std::vector<BigInteger> dic(par.Length + 1);
     std::for_each(m_Solutions.begin(), m_Solutions.end(), [&par, &dic, this](Solution &solution)
     {
         auto max = std::vector<int>(m_BlockSets.size());
@@ -873,7 +919,8 @@ std::vector<BigInteger> Solver::DistCond(const DistCondParameters& par)
                 stack.back()++;
             }
     });
-    return dic;
+    auto it = m_DistCondCache.insert(std::move(std::make_pair(par.m_Hash, std::make_pair(par, dic))));
+    return it->second.second;
 }
 
 DistCondParameters::DistCondParameters(const BlockSet& sets1, const BlockSet& sets2, const BlockSet& sets3, int minesCond, int length)
@@ -937,5 +984,17 @@ unsigned __int64 Hash(const BlockSet &set)
     auto it = set.begin();
     while (it != set.end())
         hash = (hash << 5) + hash + *it++ + 30;
+    return hash;
+}
+
+template <class T>
+unsigned __int64 HashCol(const Node<T> *ptr)
+{
+    unsigned __int64 hash = 5381;
+    while (ptr != nullptr)
+    {
+        hash = (hash << 5) + hash + ptr->Row;
+        ptr = ptr->Down;
+    }
     return hash;
 }

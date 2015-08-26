@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MineSweeper", "MineSweeper\MineSweeper.csproj", "{273ABFA6-1A14-4BF2-92BF-3810911BB917}"
+	ProjectSection(ProjectDependencies) = postProject
+		{B0BB7DC3-F3CD-456A-AE21-2D32D7338B59} = {B0BB7DC3-F3CD-456A-AE21-2D32D7338B59}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MineSweeperCalc", "MineSweeperCalc\MineSweeperCalc.csproj", "{1E0A1BFE-76BE-4CD3-9C29-4A417A7F3C2E}"
 EndProject

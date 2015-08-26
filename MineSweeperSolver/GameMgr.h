@@ -45,7 +45,7 @@ public:
     void OpenBlock(int x, int y);
 
     bool SemiAutomaticStep(bool withProb);
-    bool SemiAutomatic();
+    bool SemiAutomatic(bool withProb);
     void AutomaticStep();
     void Automatic();
 private:

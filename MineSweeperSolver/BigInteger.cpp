@@ -37,10 +37,20 @@ BigInteger &BigInteger::operator+=(const BigInteger &other)
         unsigned short val = *it + *itO + c;
         *it = static_cast<BYTE>(val);
         c = static_cast<BYTE>(val >> 8);
-        ++it , ++itO;
+        ++it, ++itO;
     }
-    if (m_Data.back() & 0x80)
-        m_Data.push_back(0);
+    while (c != 0)
+    {
+        if (it == m_Data.end())
+        {
+            m_Data.push_back(c);
+            break;
+        }
+        unsigned short val = *it + c;
+        *it++ = static_cast<BYTE>(val);
+        c = static_cast<BYTE>(val >> 8);
+    }
+
     UpdateBits();
     return *this;
 }
@@ -54,12 +64,20 @@ BigInteger &BigInteger::operator*=(BYTE other)
     while (it != m_Data.end())
     {
         unsigned short val = *it * m + c;
-        *it = static_cast<BYTE>(val);
+        *it++ = static_cast<BYTE>(val);
         c = static_cast<BYTE>(val >> 8);
-        ++it;
     }
-    if (m_Data.back() & 0x80)
-        m_Data.push_back(0);
+    while (c != 0)
+    {
+        if (it == m_Data.end())
+        {
+            m_Data.push_back(c);
+            break;
+        }
+        unsigned short val = *it + c;
+        *it++ = static_cast<BYTE>(val);
+        c = static_cast<BYTE>(val >> 8);
+    }
 
     UpdateBits();
     return *this;
@@ -69,7 +87,6 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
 {
     std::vector<BYTE> orig((m_Bits + other.m_Bits) / 8 + 1);
     orig.swap(m_Data);
-
 
     auto shift = 0;
     for (auto itO = other.m_Data.begin(); itO != other.m_Data.end(); ++itO, ++shift)
@@ -171,8 +188,10 @@ double BigInteger::Log2() const
 
 void BigInteger::UpdateBits()
 {
-    while (m_Data.size() >= 2 && m_Data.back() == 0 && *++m_Data.rbegin() == 0)
+    while (m_Data.size() >= 2 && m_Data.back() == 0 && !(*++m_Data.rbegin() & 0x80))
         m_Data.pop_back();
+    if (m_Data.back() & 0x80)
+        m_Data.push_back(0);
 
     m_Bits = 8 * (m_Data.size() - 1);
     auto v = m_Data.back();

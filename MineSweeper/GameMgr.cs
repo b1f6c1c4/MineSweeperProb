@@ -288,11 +288,15 @@ namespace MineSweeper
         /// <param name="y">纵坐标</param>
         public void OpenBlock(int x, int y)
         {
+            if (Solving)
+                throw new InvalidOperationException("上一次求解未完成");
+
             if (!Started)
                 throw new InvalidOperationException("游戏已结束");
 
             OpenBlock(m_NativeObject, x, y);
             FetchStatus();
+            Solve();
         }
 
         /// <summary>
@@ -309,7 +313,7 @@ namespace MineSweeper
             if (!Mode.HasFlag(SolvingMode.Half))
                 return;
 
-            m_Backgrounding = new Thread(Process);
+            m_Backgrounding = new Thread(ProcessSolve);
             m_Backgrounding.Start();
         }
 
@@ -344,6 +348,42 @@ namespace MineSweeper
         public IEnumerable<Block> CanOpenNotSureBlocks()
             => m_Blocks.Where((t, i) => !t.IsOpen && InferredStatuses[i] == BlockStatus.Unknown);
 
+        /// <summary>
+        ///     半自动操作一步
+        /// </summary>
+        public void SemiAutomaticStep()
+        {
+            if (Solving)
+                throw new InvalidOperationException("上一次求解未完成");
+
+            if (!Started)
+                return;
+
+            if (!Mode.HasFlag(SolvingMode.Half))
+                return;
+            
+            m_Backgrounding = new Thread(ProcessSemiAutomaticStep);
+            m_Backgrounding.Start();
+        }
+
+        /// <summary>
+        ///     半自动操作
+        /// </summary>
+        public void SemiAutomatic()
+        {
+            if (Solving)
+                throw new InvalidOperationException("上一次求解未完成");
+
+            if (!Started)
+                return;
+
+            if (!Mode.HasFlag(SolvingMode.Half))
+                return;
+
+            m_Backgrounding = new Thread(ProcessSemiAutomatic);
+            m_Backgrounding.Start();
+        }
+
         #region PInvokes
         [DllImport("MineSweeperSolver.dll")]
         static private extern void CacheBinomials(int n, int m);
@@ -365,6 +405,12 @@ namespace MineSweeper
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern void ReleaseGameStatus(IntPtr status);
+
+        [DllImport("MineSweeperSolver.dll")]
+        private static extern bool SemiAutomaticStep(IntPtr mgr, bool withProb);
+
+        [DllImport("MineSweeperSolver.dll")]
+        private static extern bool SemiAutomatic(IntPtr mgr, bool withProb);
         #endregion PInvokes
 
         #region Wrapper
@@ -478,11 +524,8 @@ namespace MineSweeper
                 ReleaseGameStatus(ptr);
             }
         }
-
-        /// <summary>
-        ///     求解
-        /// </summary>
-        private void Process()
+        
+        private void ProcessSolve()
         {
             Solving = true;
             Solve(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
@@ -503,6 +546,19 @@ namespace MineSweeper
             OnStatusUpdated();
         }
 
+        private void ProcessSemiAutomaticStep()
+        {
+            Solving = true;
+            SemiAutomaticStep(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
+            ProcessSolve();
+        }
+
+        private void ProcessSemiAutomatic()
+        {
+            Solving = true;
+            SemiAutomatic(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
+            ProcessSolve();
+        }
 
         public void Dispose() => Dispose(true);
 

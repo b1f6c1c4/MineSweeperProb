@@ -131,14 +131,14 @@ bool GameMgr::SemiAutomaticStep(bool withProb)
     return flag && m_Started;
 }
 
-bool GameMgr::SemiAutomatic()
+bool GameMgr::SemiAutomatic(bool withProb)
 {
     if (!m_Started)
         return false;
     while (true)
     {
         while (SemiAutomaticStep(false)) {}
-        if (!SemiAutomaticStep(true))
+        if (!withProb || !SemiAutomaticStep(true))
             break;
     }
     return m_Started;
@@ -239,7 +239,7 @@ void GameMgr::AutomaticStep()
 void GameMgr::Automatic()
 {
     while (m_Started)
-        if (SemiAutomatic())
+        if (SemiAutomatic(true))
             AutomaticStep();
 }
 

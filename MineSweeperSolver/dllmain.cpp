@@ -76,3 +76,12 @@ extern "C" DLL_API void ReleaseGameStatus(GameStatus *status)
     if (status != nullptr)
         delete status;
 }
+extern "C" DLL_API bool SemiAutomaticStep(GameMgr *mgr, bool withProb)
+{
+    return mgr->SemiAutomaticStep(withProb);
+}
+
+extern "C" DLL_API bool SemiAutomatic(GameMgr *mgr, bool withProb)
+{
+    return mgr->SemiAutomatic(withProb);
+}

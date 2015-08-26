@@ -168,7 +168,6 @@ namespace MineSweeper
                 return;
 
             m_Mgr.OpenBlock(block.X, block.Y);
-            Solve();
         }
 
         private void Form1_KeyUp(object sender, KeyEventArgs e)
@@ -215,26 +214,23 @@ namespace MineSweeper
                                 stream.Flush();
                             }
                     }
-                    //else if (m_Mgr.Started)
-                    //{
-                    //    m_Mgr.SemiAutomaticStep();
-                    //    Solve();
-                    //}
+                    else if (m_Mgr.Started)
+                    {
+                        m_Mgr.SemiAutomaticStep();
+                    }
                     break;
-                //case Keys.X:
-                //    if (m_Mgr.Started)
-                //    {
-                //        m_Mgr.SemiAutomatic();
-                //        Solve();
-                //    }
-                //    break;
+                case Keys.X:
+                    if (m_Mgr.Started)
+                    {
+                        m_Mgr.SemiAutomatic();
+                    }
+                    break;
                 //case Keys.A:
                 //    if (m_Mgr.Started &&
                 //        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
                 //    {
                 //        if (!m_Mgr.SemiAutomaticStep())
                 //            m_Mgr.AutomaticStep(true);
-                //        Solve();
                 //    }
                 //    break;
                 //case Keys.Z:
@@ -246,7 +242,6 @@ namespace MineSweeper
                 //            flag = true;
                 //        if (!flag)
                 //            m_Mgr.AutomaticStep(true);
-                //        Solve();
                 //    }
                 //    break;
                 case Keys.R:
