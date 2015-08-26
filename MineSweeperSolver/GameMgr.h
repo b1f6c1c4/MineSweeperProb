@@ -3,7 +3,8 @@
 #include "Solver.h"
 #include <vector>
 
-struct DLL_API BlockProperty
+struct
+    DLL_API BlockProperty
 {
     int Index;
     int X, Y;
@@ -20,7 +21,8 @@ struct BlockRelationship
 
 struct GameStatus;
 
-class DLL_API GameMgr
+class
+    DLL_API GameMgr
 {
 public:
     GameMgr(int width, int height, int totalMines);

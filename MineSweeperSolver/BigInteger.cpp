@@ -37,7 +37,7 @@ BigInteger &BigInteger::operator+=(const BigInteger &other)
         unsigned short val = *it + *itO + c;
         *it = static_cast<BYTE>(val);
         c = static_cast<BYTE>(val >> 8);
-        ++it, ++itO;
+        ++it , ++itO;
     }
     while (c != 0)
     {
@@ -89,7 +89,7 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
     orig.swap(m_Data);
 
     auto shift = 0;
-    for (auto itO = other.m_Data.begin(); itO != other.m_Data.end(); ++itO, ++shift)
+    for (auto itO = other.m_Data.begin(); itO != other.m_Data.end(); ++itO , ++shift)
     {
         if (*itO == 0)
             continue;
@@ -221,7 +221,7 @@ DLL_API double operator/(const BigInteger &one, const BigInteger &another)
     return one.GetSignificand() / another.GetSignificand() * pow(2, one.m_Bits - another.m_Bits);
 }
 
-DLL_API bool operator<(const BigInteger& lhs, const BigInteger& rhs)
+DLL_API bool operator<(const BigInteger &lhs, const BigInteger &rhs)
 {
     if (lhs.m_Bits < rhs.m_Bits)
         return true;
@@ -235,22 +235,22 @@ DLL_API bool operator<(const BigInteger& lhs, const BigInteger& rhs)
             return true;
         if (*itL > *itR)
             return false;
-        ++itL, ++itR;
+        ++itL , ++itR;
     }
     return false;
 }
 
-DLL_API bool operator>(const BigInteger& lhs, const BigInteger& rhs)
+DLL_API bool operator>(const BigInteger &lhs, const BigInteger &rhs)
 {
     return rhs < lhs;
 }
 
-DLL_API bool operator<=(const BigInteger& lhs, const BigInteger& rhs)
+DLL_API bool operator<=(const BigInteger &lhs, const BigInteger &rhs)
 {
     return !(rhs < lhs);
 }
 
-DLL_API bool operator>=(const BigInteger& lhs, const BigInteger& rhs)
+DLL_API bool operator>=(const BigInteger &lhs, const BigInteger &rhs)
 {
     return !(lhs < rhs);
 }

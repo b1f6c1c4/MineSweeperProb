@@ -19,7 +19,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
     return TRUE;
 }
 
-struct DLL_API GameStatus
+struct
+    DLL_API GameStatus
 {
     int TotalWidth, TotalHeight, TotalBlocks, TotalMines;
     bool Started, Succeed;
@@ -88,6 +89,7 @@ extern "C" DLL_API void ReleaseGameStatus(GameStatus *status)
     if (status != nullptr)
         delete status;
 }
+
 extern "C" DLL_API bool SemiAutomaticStep(GameMgr *mgr, bool withProb)
 {
     return mgr->SemiAutomaticStep(withProb);

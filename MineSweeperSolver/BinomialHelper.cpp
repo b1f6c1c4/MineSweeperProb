@@ -7,7 +7,7 @@ DLL_API void CacheBinomials(int n, int m)
     if (BinomialCoeff.empty())
         BinomialCoeff.push_back(std::vector<BigInteger>(1, BigInteger(1)));
 
-    n++, m++;
+    n++ , m++;
     if (n < 0)
         return;
     if (m < 0)

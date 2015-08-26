@@ -2,7 +2,8 @@
 #include "stdafx.h"
 #include <vector>
 
-class DLL_API BigInteger
+class
+    DLL_API BigInteger
 {
 public:
     BigInteger();

@@ -96,11 +96,9 @@ OrthogonalList<T>::OrthogonalList(const OrthogonalList<T> &other)
 template <class T>
 OrthogonalList<T>::~OrthogonalList()
 {
-    std::for_each(m_Rows.begin(), m_Rows.end(), [this](Node<T> &node)
-                  {
-                      while (node.Right != nullptr)
-                          Remove(*node.Right);
-                  });
+    for (auto &node : m_Rows)
+        while (node.Right != nullptr)
+            Remove(*node.Right);
 }
 
 template <class T>
