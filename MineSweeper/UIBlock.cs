@@ -90,7 +90,8 @@ namespace MineSweeper
                             break;
                     }
 
-                    if (TheMgr.BestBlocks != null && TheMgr.BestBlocks.BinarySearch(TheBlock) >= 0)
+                    if (TheMgr.BestBlocks != null &&
+                        TheMgr.BestBlocks.BinarySearch(TheBlock) >= 0)
                     {
                         str = "★";
                         fColor = Color.MediumSlateBlue;
@@ -103,27 +104,24 @@ namespace MineSweeper
                         fColor = Color.SlateBlue;
                     }
                 }
-                else
-                {
-                    if (TheBlock.IsOpen)
-                        if (TheBlock.IsMine)
-                        {
-                            color = Color.Red;
-                            str = "X";
-                        }
-                        else
-                        {
-                            color = Color.White;
-                            var deg = TheBlock.Degree;
-                            if (deg != 0)
-                                str = deg.ToString(CultureInfo.InvariantCulture);
-                        }
-                    else if (!TheMgr.Started &&
-                             TheBlock.IsMine)
-                        color = TheMgr.Succeed ? Color.Green : Color.Red;
+                else if (TheBlock.IsOpen)
+                    if (TheBlock.IsMine)
+                    {
+                        color = Color.Red;
+                        str = "X";
+                    }
                     else
-                        color = Color.DarkGray;
-                }
+                    {
+                        color = Color.White;
+                        var deg = TheBlock.Degree;
+                        if (deg != 0)
+                            str = deg.ToString(CultureInfo.InvariantCulture);
+                    }
+                else if (!TheMgr.Started &&
+                         TheBlock.IsMine)
+                    color = TheMgr.Succeed ? Color.Green : Color.Red;
+                else
+                    color = Color.DarkGray;
             }
             finally
             {

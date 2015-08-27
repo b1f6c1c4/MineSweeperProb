@@ -6,7 +6,6 @@ namespace MineSweeper
 {
     internal static class Program
     {
-
         [DllImport("user32.dll")]
         private static extern bool SetProcessDPIAware();
 

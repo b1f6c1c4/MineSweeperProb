@@ -124,7 +124,7 @@ namespace MineSweeper
         Mine = -1,
         Blank = -2
     };
-    
+
     public sealed class GameMgr : IDisposable
     {
         /// <summary>
@@ -157,9 +157,7 @@ namespace MineSweeper
                     //DegreeDist = null;
                     //Quantity = null;
                 }
-                if (!m_Mode.HasFlag(SolvingMode.Automatic))
-                {
-                }
+                if (!m_Mode.HasFlag(SolvingMode.Automatic)) { }
                 if (!m_Mode.HasFlag(SolvingMode.Probability))
                 {
                     Probabilities = null;
@@ -236,7 +234,8 @@ namespace MineSweeper
 
         /// <summary>
         ///     最佳格
-        /// </summary>l
+        /// </summary>
+        /// l
         public List<Block> PreferredBlocks { get; set; }
 
         /// <summary>
@@ -312,6 +311,7 @@ namespace MineSweeper
                 return;
 
             m_Backgrounding = new Thread(ProcessSolve);
+            Solving = true;
             m_Backgrounding.Start();
         }
 
@@ -333,13 +333,6 @@ namespace MineSweeper
         }
 
         /// <summary>
-        ///     获取不一定无雷的可翻开的格
-        /// </summary>
-        /// <returns>不一定无雷的可翻开的格</returns>
-        public IEnumerable<Block> CanOpenNotSureBlocks()
-            => m_Blocks.Where((t, i) => !t.IsOpen && InferredStatuses[i] == BlockStatus.Unknown);
-
-        /// <summary>
         ///     半自动操作一步
         /// </summary>
         public void SemiAutomaticStep()
@@ -352,8 +345,9 @@ namespace MineSweeper
 
             if (!Mode.HasFlag(SolvingMode.Half))
                 return;
-            
+
             m_Backgrounding = new Thread(ProcessSemiAutomaticStep);
+            Solving = true;
             m_Backgrounding.Start();
         }
 
@@ -372,6 +366,7 @@ namespace MineSweeper
                 return;
 
             m_Backgrounding = new Thread(ProcessSemiAutomatic);
+            Solving = true;
             m_Backgrounding.Start();
         }
 
@@ -390,18 +385,20 @@ namespace MineSweeper
                 return;
 
             m_Backgrounding = new Thread(ProcessAutomaticStep);
+            Solving = true;
             m_Backgrounding.Start();
         }
 
         #region PInvokes
-        [DllImport("MineSweeperSolver.dll")]
-        static private extern void CacheBinomials(int n, int m);
 
         [DllImport("MineSweeperSolver.dll")]
-        static private extern IntPtr CreateGameMgr(int width, int height, int totalMines);
+        private static extern void CacheBinomials(int n, int m);
 
         [DllImport("MineSweeperSolver.dll")]
-        static private extern void DisposeGameMgr(IntPtr mgr);
+        private static extern IntPtr CreateGameMgr(int width, int height, int totalMines);
+
+        [DllImport("MineSweeperSolver.dll")]
+        private static extern void DisposeGameMgr(IntPtr mgr);
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern void OpenBlock(IntPtr mgr, int x, int y);
@@ -429,9 +426,11 @@ namespace MineSweeper
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern bool OpenOptimalBlocks(IntPtr mgr);
+
         #endregion PInvokes
 
         #region Wrapper
+
         /// <summary>
         ///     非托管对象
         /// </summary>
@@ -442,18 +441,12 @@ namespace MineSweeper
         {
             // ReSharper disable FieldCanBeMadeReadOnly.Local
             // ReSharper disable MemberCanBePrivate.Local
-            [MarshalAs(UnmanagedType.U4)]
-            public int Index;
-            [MarshalAs(UnmanagedType.U4)]
-            public int X;
-            [MarshalAs(UnmanagedType.U4)]
-            public int Y;
-            [MarshalAs(UnmanagedType.U4)]
-            public int Degree;
-            [MarshalAs(UnmanagedType.U4)]
-            public bool IsOpen;
-            [MarshalAs(UnmanagedType.U4)]
-            public bool IsMine;
+            [MarshalAs(UnmanagedType.U4)] public int Index;
+            [MarshalAs(UnmanagedType.U4)] public int X;
+            [MarshalAs(UnmanagedType.U4)] public int Y;
+            [MarshalAs(UnmanagedType.U4)] public int Degree;
+            [MarshalAs(UnmanagedType.U4)] public bool IsOpen;
+            [MarshalAs(UnmanagedType.U4)] public bool IsMine;
             // ReSharper restore MemberCanBePrivate.Local
             // ReSharper restore FieldCanBeMadeReadOnly.Local
         }
@@ -463,41 +456,25 @@ namespace MineSweeper
         {
             // ReSharper disable FieldCanBeMadeReadOnly.Local
             // ReSharper disable MemberCanBePrivate.Local
-            [MarshalAs(UnmanagedType.U4)]
-            public int TotalWidth;
-            [MarshalAs(UnmanagedType.U4)]
-            public int TotalHeight;
-            [MarshalAs(UnmanagedType.U4)]
-            public int TotalBlocks;
-            [MarshalAs(UnmanagedType.U4)]
-            public int TotalMines;
-            [MarshalAs(UnmanagedType.U4)]
-            public bool Started;
-            [MarshalAs(UnmanagedType.U4)]
-            public bool Succeed;
-            [MarshalAs(UnmanagedType.U8)]
-            public double Bits;
-            [MarshalAs(UnmanagedType.U8)]
-            public double AllBits;
-            [MarshalAs(UnmanagedType.U4)]
-            public int ToOpen;
+            [MarshalAs(UnmanagedType.U4)] public int TotalWidth;
+            [MarshalAs(UnmanagedType.U4)] public int TotalHeight;
+            [MarshalAs(UnmanagedType.U4)] public int TotalBlocks;
+            [MarshalAs(UnmanagedType.U4)] public int TotalMines;
+            [MarshalAs(UnmanagedType.U4)] public bool Started;
+            [MarshalAs(UnmanagedType.U4)] public bool Succeed;
+            [MarshalAs(UnmanagedType.U8)] public double Bits;
+            [MarshalAs(UnmanagedType.U8)] public double AllBits;
+            [MarshalAs(UnmanagedType.U4)] public int ToOpen;
 
-            [MarshalAs(UnmanagedType.U8)]
-            public IntPtr Blocks;
-            [MarshalAs(UnmanagedType.U8)]
-            public IntPtr InferredStatus;
-            [MarshalAs(UnmanagedType.U8)]
-            public IntPtr Probabilities;
+            [MarshalAs(UnmanagedType.U8)] public IntPtr Blocks;
+            [MarshalAs(UnmanagedType.U8)] public IntPtr InferredStatus;
+            [MarshalAs(UnmanagedType.U8)] public IntPtr Probabilities;
 
 
-            [MarshalAs(UnmanagedType.U4)]
-            public int BestBlockCount;
-            [MarshalAs(UnmanagedType.U8)]
-            public IntPtr BestBlocks;
-            [MarshalAs(UnmanagedType.U4)]
-            public int PreferredBlockCount;
-            [MarshalAs(UnmanagedType.U8)]
-            public IntPtr PreferredBlocks;
+            [MarshalAs(UnmanagedType.U4)] public int BestBlockCount;
+            [MarshalAs(UnmanagedType.U8)] public IntPtr BestBlocks;
+            [MarshalAs(UnmanagedType.U4)] public int PreferredBlockCount;
+            [MarshalAs(UnmanagedType.U8)] public IntPtr PreferredBlocks;
             // ReSharper restore MemberCanBePrivate.Local
             // ReSharper restore FieldCanBeMadeReadOnly.Local
         };
@@ -511,6 +488,7 @@ namespace MineSweeper
             }
             finally
             {
+                Solving = false;
                 m_Lock.ExitWriteLock();
             }
             OnStatusUpdated();
@@ -558,37 +536,29 @@ namespace MineSweeper
                 ReleaseGameStatus(ptr);
             }
         }
-        
+
         private void ProcessSolve()
         {
-            Solving = true;
             Solve(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
-            m_Lock.EnterWriteLock();
-            try
-            {
-                UpdateStatus();
-            }
-            finally
-            {
-                m_Lock.ExitWriteLock();
-                Solving = false;
-            }
-            OnStatusUpdated();
+            FetchStatus();
         }
 
         private void ProcessSemiAutomaticStep()
         {
-            Solving = true;
             if (BestBlocks.Any())
+            {
                 OpenOptimalBlocks(m_NativeObject);
+                ProcessSolve();
+            }
             else
+            {
                 SemiAutomaticStep(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
-            ProcessSolve();
+                FetchStatus();
+            }
         }
 
         private void ProcessSemiAutomatic()
         {
-            Solving = true;
             if (BestBlocks.Any())
                 OpenOptimalBlocks(m_NativeObject);
             SemiAutomatic(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
@@ -597,11 +567,17 @@ namespace MineSweeper
 
         private void ProcessAutomaticStep()
         {
-            Solving = true;
-            if (BestBlocks.Any() || PreferredBlocks.Any())
+            if (BestBlocks.Any() ||
+                PreferredBlocks.Any())
+            {
                 OpenOptimalBlocks(m_NativeObject);
-            AutomaticStep(m_NativeObject);
-            ProcessSolve();
+                ProcessSolve();
+            }
+            else
+            {
+                AutomaticStep(m_NativeObject);
+                FetchStatus();
+            }
         }
 
         public void Dispose() => Dispose(true);
@@ -618,10 +594,8 @@ namespace MineSweeper
                 GC.SuppressFinalize(this);
         }
 
-        ~GameMgr()
-        {
-            Dispose(false);
-        }
+        ~GameMgr() { Dispose(false); }
+
         #endregion
 
         private void OnStatusUpdated() { StatusUpdated?.Invoke(); }

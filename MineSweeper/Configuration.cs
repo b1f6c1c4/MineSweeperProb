@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
-using System.Diagnostics;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace MineSweeper
@@ -16,7 +10,7 @@ namespace MineSweeper
         public Configuration()
         {
             InitializeComponent();
-            
+
             Scale(new SizeF(Program.ScaleFactor, Program.ScaleFactor));
 
             foreach (var control in Controls)

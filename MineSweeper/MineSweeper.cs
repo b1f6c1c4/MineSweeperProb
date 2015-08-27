@@ -4,7 +4,6 @@ using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace MineSweeper
@@ -84,10 +83,8 @@ namespace MineSweeper
                     sb.Append($" {m_Mgr.AllBits:F2}b");
 
                 if (m_CurrentBlock != null)
-                {
                     if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
-                         m_Mgr.Probabilities != null)
-                    {
+                        m_Mgr.Probabilities != null)
                         sb.Append($" M{m_Mgr.Probabilities[m_CurrentBlock.Index]:P2}");
 
                         //if (m_Mgr.Mode.HasFlag(SolvingMode.Extended) &&
@@ -105,13 +102,11 @@ namespace MineSweeper
                         //            sb.Remove(sb.Length - 1, 1);
                         //    }
                         //}
-                    }
                     //if (m_Mgr.DrainProbability != null)
                     //{
                     //    if (m_Mgr.DrainProbability.ContainsKey(m_CurrentBlock))
                     //        sb.Append($" D{m_Mgr.DrainProbability[m_CurrentBlock]:P2}");
                     //}
-                }
 
                 if (!m_Mgr.Started)
                     sb.Append(m_Mgr.Succeed ? " Succeed" : " Failed");
@@ -147,7 +142,8 @@ namespace MineSweeper
             m_Mgr.StatusUpdated += () => Invoke(new UpdateDelegate(UpdateAll), new object[] { });
             m_Mgr.FetchStatus();
 
-            Solve();
+            m_Mgr.Solve();
+            UpdateText();
         }
 
         private void Block_Enter(object sender, EventArgs e)
@@ -168,6 +164,7 @@ namespace MineSweeper
                 return;
 
             m_Mgr.OpenBlock(block.X, block.Y);
+            UpdateText();
         }
 
         private void Form1_KeyUp(object sender, KeyEventArgs e)
@@ -178,15 +175,15 @@ namespace MineSweeper
                     if (e.Control)
                     {
                         var dialog = new OpenFileDialog
-                        {
-                            AddExtension = true,
-                            CheckPathExists = true,
-                            DefaultExt = "bin",
-                            CheckFileExists = true,
-                            Multiselect = false,
-                            ShowReadOnly = false,
-                            Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
-                        };
+                                         {
+                                             AddExtension = true,
+                                             CheckPathExists = true,
+                                             DefaultExt = "bin",
+                                             CheckFileExists = true,
+                                             Multiselect = false,
+                                             ShowReadOnly = false,
+                                             Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
+                                         };
                         if (dialog.ShowDialog() == DialogResult.OK)
                             using (var stream = dialog.OpenFile())
                             {
@@ -199,13 +196,13 @@ namespace MineSweeper
                     if (e.Control)
                     {
                         var dialog = new SaveFileDialog
-                        {
-                            OverwritePrompt = true,
-                            AddExtension = true,
-                            CheckPathExists = true,
-                            DefaultExt = "bin",
-                            Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
-                        };
+                                         {
+                                             OverwritePrompt = true,
+                                             AddExtension = true,
+                                             CheckPathExists = true,
+                                             DefaultExt = "bin",
+                                             Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
+                                         };
                         if (dialog.ShowDialog() == DialogResult.OK)
                             using (var stream = dialog.OpenFile())
                             {
@@ -215,77 +212,64 @@ namespace MineSweeper
                             }
                     }
                     else if (m_Mgr.Started)
-                    {
                         m_Mgr.SemiAutomaticStep();
-                    }
                     break;
                 case Keys.X:
                     if (m_Mgr.Started)
-                    {
                         m_Mgr.SemiAutomatic();
-                    }
                     break;
                 case Keys.A:
                     if (m_Mgr.Started &&
                         m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
-                    {
                         if (m_Mgr.BestBlocks.Any())
                             m_Mgr.SemiAutomaticStep();
                         else
                             m_Mgr.AutomaticStep();
-                    }
                     break;
                 case Keys.Z:
                     if (m_Mgr.Started &&
                         m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
-                    {
                         if (m_Mgr.BestBlocks.Any())
                             m_Mgr.SemiAutomatic();
                         else
                             m_Mgr.AutomaticStep();
-                    }
                     break;
                 case Keys.R:
                     Reset();
                     break;
                 case Keys.D0:
                     m_Mgr.Mode = SolvingMode.None;
-                    Solve();
+                    m_Mgr.Solve();
                     break;
                 case Keys.D1:
                     m_Mgr.Mode = SolvingMode.Half;
-                    Solve();
+                    m_Mgr.Solve();
                     break;
                 case Keys.D2:
                     m_Mgr.Mode = SolvingMode.Probability;
-                    Solve();
+                    m_Mgr.Solve();
                     break;
                 case Keys.D3:
                     m_Mgr.Mode = SolvingMode.Automatic;
-                    Solve();
+                    m_Mgr.Solve();
                     break;
                 case Keys.D4:
                     m_Mgr.Mode = SolvingMode.Extended;
-                    Solve();
+                    m_Mgr.Solve();
                     break;
                 case Keys.C:
                     m_Mgr.Cancel();
                     break;
-                //case Keys.D:
-                //    Task.Run(
-                //             () =>
-                //             {
-                //                 var dr = new Drainer();
-                //                 m_Mgr.PreferredBlocks = dr.Drain(m_Mgr).ToList();
-                //                 m_Mgr.DrainProbability = dr.Prob;
-                //             });
-                //    break;
+                    //case Keys.D:
+                    //    Task.Run(
+                    //             () =>
+                    //             {
+                    //                 var dr = new Drainer();
+                    //                 m_Mgr.PreferredBlocks = dr.Drain(m_Mgr).ToList();
+                    //                 m_Mgr.DrainProbability = dr.Prob;
+                    //             });
+                    //    break;
             }
-        }
-
-        private void Solve()
-        {
-            m_Mgr.Solve();
             UpdateText();
         }
     }
