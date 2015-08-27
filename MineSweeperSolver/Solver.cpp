@@ -13,10 +13,10 @@ static unsigned __int64 HashCol(const Node<T> *ptr);
 
 Solver::Solver(int count) : m_Manager(count, BlockStatus::Unknown), m_Probability(count)
 {
-    auto lst = std::vector<Block>(count);
+    m_BlockSets.emplace_back(count);
+    auto &lst = m_BlockSets.back();
     for (auto i = 0; i < count; ++i)
         lst[i] = i;
-    m_BlockSets.push_back(move(lst));
     m_Matrix.ExtendWidth(2);
 }
 
@@ -91,7 +91,7 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
                 ++col;
                 if (++it == m_BlockSets.end())
                 {
-                    m_BlockSets.push_back(BlockSet());
+                    m_BlockSets.emplace_back();
                     it = m_BlockSets.end() - 1;
                 }
                 else
@@ -111,7 +111,7 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
 
     if (!theSet.empty())
     {
-        m_BlockSets.push_back(BlockSet());
+        m_BlockSets.emplace_back();
         m_BlockSets.back().swap(theSet);
 
         m_Matrix.InsertCol(m_Matrix.GetWidth() - 1);
@@ -143,7 +143,7 @@ void Solver::Solve(bool withProb)
     {
         m_TotalStates = BigInteger(1);
 
-        m_Solutions.push_back(std::move(Solution(std::vector<int>())));
+        m_Solutions.emplace_back(std::vector<int>());
         ProcessSolutions();
         return;
     }
@@ -275,7 +275,7 @@ std::vector<int> Solver::OverlapBlockSet(const BlockSet &set)
 
 
     blkLst.push_back(col);
-    m_BlockSets.push_back(BlockSet());
+    m_BlockSets.emplace_back();
     m_BlockSets.back().swap(theSet);
 
     return blkLst;
@@ -662,7 +662,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
             lst[nc->Row] = static_cast<int>(round(nc->Value));
             nc = nc->Down;
         }
-        m_Solutions.push_back(Solution(move(lst)));
+        m_Solutions.emplace_back(move(lst));
         return;
     }
 
@@ -725,7 +725,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 {
                     for (auto minorID = 0; minorID < minors.size(); minorID++)
                         lst[minors[minorID]] = stack[minorID];
-                    m_Solutions.push_back(Solution(move(lst)));
+                    m_Solutions.emplace_back(move(lst));
                 }
 
                 aggr(stack.size() - 1, 1);
@@ -900,7 +900,10 @@ const std::vector<BigInteger> &Solver::DistCond(const DistCondParameters &par)
                             auto cases = std::vector<BigInteger>();
                             cases.reserve(min(p, c) + 1);
                             for (auto j = 0; j <= p && j <= c; j++)
-                                cases.push_back(Binomial(c, j) * Binomial(b, p - j));
+                            {
+                                cases.emplace_back(Binomial(c, j));
+                                cases.back() *= Binomial(b, p - j);
+                            }
 
                             Add(dicT, cases);
                         }
@@ -908,7 +911,10 @@ const std::vector<BigInteger> &Solver::DistCond(const DistCondParameters &par)
                             auto cases = std::vector<BigInteger>();
                             cases.reserve(min(m - p, a) + 1);
                             for (auto j = 0; j <= m - p && j <= a; j++)
-                                cases.push_back(Binomial(a, j) * Binomial(n - a - b - c, m - p - j));
+                            {
+                                cases.emplace_back(Binomial(a, j));
+                                cases.back() *= Binomial(n - a - b - c, m - p - j);
+                            }
 
                             Add(dicT, cases);
                         }
@@ -962,7 +968,10 @@ const std::vector<BigInteger> &Solver::DistCondQ(const DistCondQParameters &par)
             auto cases = std::vector<BigInteger>();
             cases.reserve(min(m, a) + 1);
             for (auto j = 0; j <= m && j <= a; j++)
-                cases.push_back(Binomial(a, j) * Binomial(n - a - b, m - j));
+            {
+                cases.emplace_back(Binomial(a, j));
+                cases.back() *= Binomial(n - a - b, m - j);
+            }
 
             Add(dicT, cases);
         }

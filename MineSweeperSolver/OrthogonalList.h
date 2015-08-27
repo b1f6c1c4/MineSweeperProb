@@ -313,7 +313,7 @@ void OrthogonalList<T>::ExtendHeight(int rows)
     m_Rows.reserve(rows);
 
     for (auto i = size; i < rows; ++i)
-        m_Rows.push_back(Node<T>(i, -1));
+        m_Rows.emplace_back(i, -1);
 }
 
 template <class T>
@@ -327,5 +327,5 @@ void OrthogonalList<T>::ExtendWidth(int cols)
     m_Cols.reserve(cols);
 
     for (auto i = size; i < cols; ++i)
-        m_Cols.push_back(Node<T>(-1, i));
+        m_Cols.emplace_back(-1, i);
 }

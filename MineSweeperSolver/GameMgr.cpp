@@ -11,8 +11,10 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
     for (auto i = 0; i < width; ++i)
         for (auto j = 0; j < height; ++j)
         {
-            BlockProperty blk;
-            BlockRelationship blkR;
+            m_Blocks.emplace_back();
+            m_BlocksR.emplace_back();
+            auto &blk = m_Blocks.back();
+            auto &blkR = m_BlocksR.back();
             blk.Index = GetIndex(i, j);
             blk.X = i;
             blk.Y = j;
@@ -27,8 +29,6 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
                             if (di != 0 || dj != 0)
                                 blkR.Surrounding.push_back(GetIndex(i + di, j + dj));
             lst.push_back(blk.Index);
-            m_Blocks.push_back(std::move(blk));
-            m_BlocksR.push_back(std::move(blkR));
         }
     m_Solver.AddRestrain(lst, totalMines);
 

@@ -5,7 +5,7 @@ static std::vector<std::vector<BigInteger>> BinomialCoeff;
 DLL_API void CacheBinomials(int n, int m)
 {
     if (BinomialCoeff.empty())
-        BinomialCoeff.push_back(std::vector<BigInteger>(1, BigInteger(1)));
+        BinomialCoeff.emplace_back(1, BigInteger(1));
 
     n++ , m++;
     if (n < 0)
@@ -20,23 +20,26 @@ DLL_API void CacheBinomials(int n, int m)
     if (BinomialCoeff.back().size() * 2 < m)
         for (auto i = 0; i < BinomialCoeff.size(); ++i)
         {
-            BinomialCoeff[i].reserve(min((i + 1) / 2, m + 1));
-            for (auto j = BinomialCoeff[i].size(); j <= (i - 1) / 2 && j < m; j++)
-                BinomialCoeff[i].push_back(
-                                           BinomialCoeff[i - 1][j - 1] +
-                                           (j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j]));
+            auto &lst = BinomialCoeff[i];
+            lst.reserve(min((i + 1) / 2, m + 1));
+            for (auto j = lst.size(); j <= (i - 1) / 2 && j < m; j++)
+            {
+                lst.emplace_back(BinomialCoeff[i - 1][j - 1]);
+                lst.back() += j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j];
+            }
         }
     BinomialCoeff.reserve(n);
     for (auto i = BinomialCoeff.size(); i < n; i++)
     {
-        auto lst = std::vector<BigInteger>();
+        BinomialCoeff.emplace_back();
+        auto &lst = BinomialCoeff.back();
         lst.reserve(min((i - 1) / 2 + 1, m));
         lst.push_back(1 + BinomialCoeff[i - 1][0]);
         for (auto j = 1; j <= (i - 1) / 2 && j < m; j++)
-            lst.push_back(
-                          BinomialCoeff[i - 1][j - 1] +
-                          (j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j]));
-        BinomialCoeff.push_back(lst);
+        {
+            lst.emplace_back(BinomialCoeff[i - 1][j - 1]);
+            lst.back() += j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j];
+        }
     }
 }
 
