@@ -148,7 +148,18 @@ void Solver::Solve(bool withProb)
         return;
     }
 
-    auto augmentedMatrix = OrthogonalList<double>(m_Matrix);
+    OrthogonalList<double> augmentedMatrix(m_Matrix.GetWidth(), m_Matrix.GetHeight());
+    for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
+    {
+        auto node = m_Matrix.GetRowHead(row).Right;
+        auto nr = &augmentedMatrix.GetRowHead(row);
+        while (node != nullptr)
+        {
+            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), node->Value);
+            node = node->Right;
+        }
+    }
+
     auto minors = Gauss(augmentedMatrix);
 
     if (!minors.empty() &&

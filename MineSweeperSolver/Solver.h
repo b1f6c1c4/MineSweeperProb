@@ -39,7 +39,7 @@ public:
 private:
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;
-    OrthogonalList<double> m_Matrix;
+    OrthogonalList<int> m_Matrix;
     std::vector<Solution> m_Solutions;
     std::vector<double> m_Probability;
     std::set<std::pair<int, int>> m_Pairs;
