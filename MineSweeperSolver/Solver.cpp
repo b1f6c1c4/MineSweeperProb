@@ -590,10 +590,9 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
 std::vector<int> Gauss(OrthogonalList<double> &matrix)
 {
     auto n = matrix.GetWidth();
-    auto m = matrix.GetHeight();
     auto minorCol = std::vector<int>();
     auto major = 0;
-    for (auto col = 0; col < n; col++)
+    for (auto col = 0; col < n; ++col)
     {
         auto biasNode = matrix.SeekDown(major, col).Down;
         while (biasNode != nullptr && abs(biasNode->Value) < 1E-14)
@@ -608,21 +607,22 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
             continue;
         }
 
-        auto vec = std::vector<double>(m);
-        vec.resize(m, 0);
+        auto vec = std::vector<std::pair<int, double>>();
         auto theBiasInv = 1 / biasNode->Value;
-        vec[biasNode->Row] = theBiasInv;
         auto node = matrix.GetColHead(col).Down;
         while (node != nullptr)
         {
             auto tmp = node->Down;
             if (node->Row != biasNode->Row)
             {
-                vec[node->Row] = -node->Value * theBiasInv;
+                vec.emplace_back(node->Row, -node->Value * theBiasInv);
                 matrix.Remove(*node);
             }
             else
+            {
+                vec.emplace_back(node->Row, theBiasInv);
                 node->Value = 1;
+            }
             node = tmp;
         }
 
@@ -631,25 +631,27 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
         {
             auto biasVal = bias->Value;
             auto nc = &matrix.GetColHead(bias->Col);
-            for (auto row = 0; row < m; row++)
+            for (auto it = vec.begin(); it != vec.end(); ++it)
             {
+                while (nc->Down != nullptr && nc->Down->Row < it->first)
+                    nc = nc->Down;
+
                 double oldV;
                 if (nc->Down == nullptr ||
-                    nc->Down->Row > row)
+                    nc->Down->Row > it->first)
                     oldV = 0;
                 else
                     oldV = nc->Down->Value;
 
-                auto val = (row != biasNode->Row ? oldV : 0) + vec[row] * biasVal;
+                auto val = (it->first != biasNode->Row ? oldV : 0) + it->second * biasVal;
 
                 if (nc->Down == nullptr ||
-                    nc->Down->Row > row)
+                    nc->Down->Row > it->first)
                 {
                     if (abs(val) < 1E-14)
                         continue;
 
-                    auto nr = &matrix.SeekRight(row, bias->Col);
-
+                    auto nr = &matrix.SeekRight(it->first, bias->Col);
                     nc = &matrix.Add(*nr, *nc, val);
                 }
                 else if (abs(val) < 1E-14)
