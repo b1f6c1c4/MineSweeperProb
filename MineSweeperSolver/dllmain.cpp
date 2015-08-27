@@ -92,7 +92,7 @@ extern "C" DLL_API void ReleaseGameStatus(GameStatus *status)
 
 extern "C" DLL_API bool SemiAutomaticStep(GameMgr *mgr, bool withProb)
 {
-    return mgr->SemiAutomaticStep(withProb);
+    return mgr->SemiAutomaticStep(true, withProb);
 }
 
 extern "C" DLL_API bool SemiAutomatic(GameMgr *mgr, bool withProb)

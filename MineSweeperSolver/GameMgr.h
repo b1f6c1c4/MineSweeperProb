@@ -55,7 +55,7 @@ public:
 
     void OpenOptimalBlocks();
 
-    bool SemiAutomaticStep(bool withProb);
+    bool SemiAutomaticStep(bool withOverlap, bool withProb);
     bool SemiAutomatic(bool withProb);
     void AutomaticStep();
     void Automatic();

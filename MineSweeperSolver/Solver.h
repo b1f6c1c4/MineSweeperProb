@@ -19,7 +19,7 @@ typedef std::vector<Block> BlockSet;
 class DistCondParameters;
 class DistCondQParameters;
 
-class Solver
+class DLL_API Solver
 {
 public:
     explicit Solver(int count);
@@ -32,57 +32,32 @@ public:
 
     void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
-    void Solve(bool withProb);
+    void Solve(bool withOverlap, bool withProb);
 
-    const std::vector<BigInteger> &DistributionCond(const BlockSet &set, const BlockSet &setCond, int mines, int &min);
     const std::vector<BigInteger> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
 private:
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;
+    std::vector<int> m_SetIDs;
     OrthogonalList<int> m_Matrix;
     std::vector<Solution> m_Solutions;
     std::vector<double> m_Probability;
     std::set<std::pair<int, int>> m_Pairs;
     BigInteger m_TotalStates;
-    std::multimap<unsigned __int64, std::pair<DistCondParameters, std::vector<BigInteger>>> m_DistCondCache;
     std::multimap<unsigned __int64, std::pair<DistCondQParameters, std::vector<BigInteger>>> m_DistCondQCache;
 
-    std::vector<int> OverlapBlockSet(const BlockSet &set);
     void ReduceSet(BlockSet &set, int &outMines, int &outBlanks) const;
     void MergeSets();
     bool ReduceRestrains();
-    bool SimpleOverlap();
+    bool SimpleOverlapAll();
     bool SimpleOverlap(int r1, int r2, bool &rowRemoved);
     void EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<int> &augmentedMatrix);
     void ProcessSolutions();
 
-    void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1) const;
-    void GetIntersectionCounts(const BlockSet &set1, const BlockSet &set2, std::vector<int> &sets1, std::vector<int> &sets2, std::vector<int> &sets3) const;
+    void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines, int &blanks) const;
 
-    const std::vector<BigInteger> &DistCond(const DistCondParameters &par);
     const std::vector<BigInteger> &DistCondQ(const DistCondQParameters &par);
 };
-
-class DistCondParameters
-{
-public:
-    friend class Solver;
-private:
-    DistCondParameters(const std::vector<int> &sets1, const std::vector<int> &sets2, const std::vector<int> &sets3, int minesCond, int length);
-
-    const std::vector<int> &Sets1, &Sets2, &Sets3;
-    int MinesCond;
-    int Length;
-    unsigned __int64 m_Hash;
-
-    friend bool operator==(const DistCondParameters &lhs, const DistCondParameters &rhs);
-    friend bool operator!=(const DistCondParameters &lhs, const DistCondParameters &rhs);
-    friend bool operator<(const DistCondParameters &lhs, const DistCondParameters &rhs);
-};
-
-bool operator==(const DistCondParameters &lhs, const DistCondParameters &rhs);
-bool operator!=(const DistCondParameters &lhs, const DistCondParameters &rhs);
-bool operator<(const DistCondParameters &lhs, const DistCondParameters &rhs);
 
 class DistCondQParameters
 {

@@ -142,7 +142,7 @@ void GameMgr::Solve(bool withProb, bool withPref)
     m_Best.clear();
     m_Preferred.clear();
 
-    m_Solver.Solve(withProb);
+    m_Solver.Solve(true, withProb);
 
     for (auto i = 0; i < m_Blocks.size(); ++i)
         if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
@@ -249,11 +249,11 @@ void GameMgr::OpenOptimalBlocks()
     OpenBlock(blk);
 }
 
-bool GameMgr::SemiAutomaticStep(bool withProb)
+bool GameMgr::SemiAutomaticStep(bool withOverlap, bool withProb)
 {
     if (!m_Started)
         return false;
-    m_Solver.Solve(withProb);
+    m_Solver.Solve(withOverlap, withProb);
     auto flag = false;
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
@@ -274,8 +274,10 @@ bool GameMgr::SemiAutomatic(bool withProb)
         return false;
     while (true)
     {
-        while (SemiAutomaticStep(false)) {}
-        if (!withProb || !SemiAutomaticStep(true))
+        while (SemiAutomaticStep(false, false)) {}
+        if (SemiAutomaticStep(true, false))
+            continue;
+        if (!withProb || !SemiAutomaticStep(false, true))
             break;
     }
     return m_Started;

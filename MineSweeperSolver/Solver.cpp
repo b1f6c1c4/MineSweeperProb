@@ -1,9 +1,7 @@
 #include "Solver.h"
 #include "BinomialHelper.h"
-#include <algorithm>
 #include <assert.h>
 
-static void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection);
 static std::vector<int> Gauss(OrthogonalList<int> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
 static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
@@ -17,6 +15,7 @@ Solver::Solver(int count) : m_Manager(count, BlockStatus::Unknown), m_Probabilit
     auto &lst = m_BlockSets.back();
     for (auto i = 0; i < count; ++i)
         lst[i] = i;
+    m_SetIDs.resize(count, 0);
     m_Matrix.ExtendWidth(2);
 }
 
@@ -52,94 +51,77 @@ void Solver::AddRestrain(Block blk, bool isMine)
 
 void Solver::AddRestrain(const BlockSet &set, int mines)
 {
-    auto theSet = BlockSet(set);
-    sort(theSet.begin(), theSet.end());
     auto dMines = 0, dBlanks = 0;
-    ReduceSet(theSet, dMines, dBlanks);
+    std::vector<int> bin;
+    GetIntersectionCounts(set, bin, dMines, dBlanks);
 
     m_Matrix.ExtendHeight(m_Matrix.GetHeight() + 1);
 
-    auto col = 0;
     auto nr = &m_Matrix.GetRowHead(m_Matrix.GetHeight() - 1);
-    for (auto it = m_BlockSets.begin(); it != m_BlockSets.end(); ++it , ++col)
+    for (auto col = 0; col < bin.size(); ++col)
     {
-        BlockSet exceptA, exceptB, intersection;
-        Overlap(*it, theSet, exceptA, exceptB, intersection);
-        if (intersection.empty())
+        if (bin[col] == 0)
             continue;
 
-        if (exceptA.empty())
+        if (bin[col] == m_BlockSets[col].size())
         {
-            it->swap(intersection);
             nr = &m_Matrix.Add(*nr, m_Matrix.GetColHead(col), 1);
+            continue;
         }
-        else
+        
+        m_Matrix.InsertCol(m_Matrix.GetWidth() - 1);
+        auto node = m_Matrix.GetColHead(col).Down;
+        auto nodeX = &m_Matrix.GetColHead(m_Matrix.GetWidth() - 2);
+        while (node != nullptr)
         {
-            it->swap(exceptA);
-            if (!intersection.empty())
-            {
-                m_Matrix.InsertCol(col + 1);
-                auto node = m_Matrix.GetColHead(col).Down;
-                auto nodeX = &m_Matrix.GetColHead(col + 1);
-                while (node != nullptr)
-                {
-                    nodeX = &m_Matrix.Add(*node, *nodeX, node->Value);
-                    node = node->Down;
-                }
-                nr = &m_Matrix.Add(*nr, *nodeX, 1);
+            nodeX = &m_Matrix.Add(*node, *nodeX, node->Value);
+            node = node->Down;
+        }
+        m_Matrix.Add(*nr, *nodeX, 1);
 
-                ++col;
-                if (++it == m_BlockSets.end())
-                {
-                    m_BlockSets.emplace_back();
-                    it = m_BlockSets.end() - 1;
-                }
-                else
-                {
-                    m_BlockSets.insert(it, BlockSet());
-                    it = m_BlockSets.begin() + col;
-                }
-                it->swap(intersection);
+        m_BlockSets.emplace_back();
+        auto &it = m_BlockSets.back();
+        it.reserve(bin[col]);
+
+        auto p = 0, q = 0;
+        for (; p < set.size() && q < m_BlockSets[col].size();)
+        {
+            if (set[p] < m_BlockSets[col][q])
+                ++p;
+            else if (set[p] > m_BlockSets[col][q])
+                ++q;
+            else
+            {
+                it.push_back(set[p]);
+                m_BlockSets[col].erase(m_BlockSets[col].begin() + q);
+                m_SetIDs[set[p++]] = m_BlockSets.size() - 1;
             }
         }
-        theSet.swap(exceptB);
-
-        if (theSet.empty())
-            break;
     }
 
-
-    if (!theSet.empty())
-    {
-        m_BlockSets.emplace_back();
-        m_BlockSets.back().swap(theSet);
-
-        m_Matrix.InsertCol(m_Matrix.GetWidth() - 1);
-        m_Matrix.Add(*nr, m_Matrix.GetColHead(m_Matrix.GetWidth() - 1), 1);
-    }
-
-    m_Matrix.ExtendWidth(m_BlockSets.size() + 1);
     m_Matrix.Add(*nr, m_Matrix.GetColHead(m_BlockSets.size()), mines - dMines);
 }
 
-void Solver::Solve(bool withProb)
+void Solver::Solve(bool withOverlap, bool withProb)
 {
     m_Solutions.clear();
-    m_DistCondCache.clear();
     m_DistCondQCache.clear();
 
     auto flag = true;
     while (flag)
     {
         while (ReduceRestrains()) {}
-        flag = SimpleOverlap();
+        if (withOverlap)
+            flag = SimpleOverlapAll();
+        else
+            flag = false;
     }
     MergeSets();
 
     if (!withProb)
         return;
 
-    if (m_BlockSets.size() == 0)
+    if (m_BlockSets.empty())
     {
         m_TotalStates = BigInteger(1);
 
@@ -148,8 +130,7 @@ void Solver::Solve(bool withProb)
         return;
     }
 
-    OrthogonalList<int> augmentedMatrix(m_Matrix);
-
+    auto augmentedMatrix(m_Matrix);
     auto minors = Gauss(augmentedMatrix);
 
     if (!minors.empty() &&
@@ -171,43 +152,17 @@ void Solver::Solve(bool withProb)
     ProcessSolutions();
 }
 
-const std::vector<BigInteger> &Solver::DistributionCond(const BlockSet &set, const BlockSet &setCond, int mines, int &min)
-{
-    int dMines, dBlanks;
-    auto lst = BlockSet(set);
-    ReduceSet(lst, dMines, dBlanks);
-
-    int dMinesCond, dBlanksCond;
-    auto lstCond = BlockSet(setCond);
-    ReduceSet(lstCond, dMinesCond, dBlanksCond);
-
-    if (lstCond.empty())
-        if (dMinesCond != mines)
-            throw;
-
-    BlockSet sets1, sets2, sets3;
-    GetIntersectionCounts(lst, lstCond, sets1, sets2, sets3);
-
-    min = dMines;
-    return DistCond(DistCondParameters(sets1, sets2, sets3, mines - dMinesCond, lst.size()));
-}
-
 const std::vector<BigInteger> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
 {
     int dMines, dBlanks;
-    auto lst = BlockSet(set);
-    ReduceSet(lst, dMines, dBlanks);
-
-    int id;
-    for (id = 0; id < m_BlockSets.size(); ++id)
-        if (std::binary_search(m_BlockSets[id].begin(), m_BlockSets[id].end(), blk))
-            break;
-
     BlockSet sets1;
-    GetIntersectionCounts(lst, sets1);
+    GetIntersectionCounts(set, sets1, dMines, dBlanks);
+    auto length = 0;
+    for (auto b : sets1)
+        length += b;
 
     min = dMines;
-    return DistCondQ(DistCondQParameters(sets1, id, lst.size()));
+    return DistCondQ(DistCondQParameters(sets1, m_SetIDs[blk], length));
 }
 
 void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection)
@@ -230,56 +185,6 @@ void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, Bloc
         exceptA.push_back(setA[p++]);
     while (q < setB.size())
         exceptB.push_back(setB[q++]);
-}
-
-std::vector<int> Solver::OverlapBlockSet(const BlockSet &set)
-{
-    auto theSet = BlockSet(set);
-    auto blkLst = std::vector<int>();
-    blkLst.reserve(m_BlockSets.size());
-    auto col = 0;
-    for (auto it = m_BlockSets.begin(); it != m_BlockSets.end(); ++it , ++col)
-    {
-        BlockSet exceptA, exceptB, intersection;
-        Overlap(*it, theSet, exceptA, exceptB, intersection);
-        if (intersection.empty())
-            continue;
-
-        if (exceptA.empty())
-        {
-            it->swap(intersection);
-            blkLst.push_back(col);
-        }
-        else
-        {
-            it->swap(exceptA);
-            if (!intersection.empty())
-            {
-                auto node = m_Matrix.GetColHead(col).Down;
-                while (node != nullptr)
-                {
-                    m_Matrix.Add(*node, m_Matrix.GetColHead(col), node->Value);
-                    node = node->Down;
-                }
-
-                ++it , ++col;
-                m_BlockSets.insert(it, BlockSet());
-                it->swap(intersection);
-                blkLst.push_back(col);
-            }
-        }
-        if (exceptB.empty())
-            return blkLst;
-
-        theSet.swap(exceptB);
-    }
-
-
-    blkLst.push_back(col);
-    m_BlockSets.emplace_back();
-    m_BlockSets.back().swap(theSet);
-
-    return blkLst;
 }
 
 void Solver::ReduceSet(BlockSet &set, int &mines, int &blanks) const
@@ -329,6 +234,11 @@ void Solver::MergeSets()
                 for (auto &blk : m_BlockSets[i])
                     m_BlockSets[it->second].push_back(blk);
                 m_BlockSets.erase(m_BlockSets.begin() + i);
+                for (auto &id : m_SetIDs)
+                    if (id > i)
+                        --id;
+                    else if (id == i)
+                        id = it->second;
                 m_Matrix.RemoveCol(i);
                 --i;
                 break;
@@ -373,10 +283,7 @@ bool Solver::ReduceRestrains()
             }
         }
         if (n->Value > count)
-        {
-            m_TotalStates = BigInteger(0);
-            return true;
-        }
+            throw;
         if (n->Value == count)
         {
             auto nr = m_Matrix.GetRowHead(row).Right;
@@ -425,12 +332,15 @@ bool Solver::ReduceRestrains()
         {
             m_Matrix.RemoveCol(col);
             m_BlockSets.erase(m_BlockSets.begin() + col);
+            for (auto &id : m_SetIDs)
+                if (id > col)
+                    --id;
         }
     }
     return flag;
 }
 
-bool Solver::SimpleOverlap()
+bool Solver::SimpleOverlapAll()
 {
     auto flag = false;
     m_Pairs.clear();
@@ -846,6 +756,8 @@ void Solver::ProcessSolutions()
 
 void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to)
 {
+    if (from.size() > to.size())
+        throw;
     for (auto i = 0; i < from.size(); ++i)
         to[i] += from[i];
 }
@@ -859,144 +771,29 @@ void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases)
     dicN.swap(from);
 }
 
-void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1) const
+void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines, int &blanks) const
 {
     auto lst1 = BlockSet(set1);
     sets1.clear();
-    sets1.reserve(m_BlockSets.size());
-    for (auto &set : m_BlockSets)
-    {
-        auto inter = 0;
+    sets1.resize(m_BlockSets.size(), 0);
 
-        auto p = 0, q = 0;
-        for (; p < set.size() && q < lst1.size();)
+    for (auto blk : set1)
+    {
+        switch (m_Manager[blk])
         {
-            if (set[p] < lst1[q])
-                ++p;
-            else if (set[p] > lst1[q])
-                ++q;
-            else
-            {
-                ++inter;
-                ++p;
-                lst1.erase(lst1.begin() + q);
-            }
+        case BlockStatus::Mine:
+            mines++;
+            break;
+        case BlockStatus::Blank:
+            blanks++;
+            break;
+        case BlockStatus::Unknown:
+            ++sets1[m_SetIDs[blk]];
+            break;
+        default:
+            break;
         }
-
-        sets1.push_back(inter);
     }
-}
-
-void Solver::GetIntersectionCounts(const BlockSet &set1, const BlockSet &set2, std::vector<int> &sets1, std::vector<int> &sets2, std::vector<int> &sets3) const
-{
-    auto lst1 = BlockSet(set1), lst2 = BlockSet(set2);
-    sets1.clear();
-    sets1.reserve(m_BlockSets.size());
-    sets2.clear();
-    sets2.reserve(m_BlockSets.size());
-    sets3.clear();
-    sets3.reserve(m_BlockSets.size());
-    for (auto &set : m_BlockSets)
-    {
-        BlockSet exceptA, exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC, resume1, resume2;
-        Overlap(set, lst1, exceptA, resume1, exceptB1T);
-        exceptA.clear();
-        Overlap(set, lst2, exceptA, resume2, exceptB2T);
-        Overlap(exceptB1T, exceptB2T, exceptB1, exceptB2, exceptC);
-        lst1.swap(resume1);
-        lst2.swap(resume2);
-        sets1.push_back(exceptB1.size());
-        sets2.push_back(exceptB2.size());
-        sets3.push_back(exceptC.size());
-    }
-}
-
-const std::vector<BigInteger> &Solver::DistCond(const DistCondParameters &par)
-{
-    auto itp = m_DistCondCache.equal_range(par.m_Hash);
-    for (auto it = itp.first; it != itp.second; ++it)
-    {
-        if (it->second.first == par)
-            return it->second.second;
-    }
-    std::vector<BigInteger> dic(par.Length + 1);
-    for (auto &solution : m_Solutions)
-    {
-        auto max = std::vector<int>(m_BlockSets.size());
-        for (auto i = 0; i < m_BlockSets.size(); ++i)
-            max[i] = min(solution.Dist[i], par.Sets2[i] + par.Sets3[i]);
-
-        auto stack = std::vector<int>();
-        stack.reserve(m_BlockSets.size());
-        if (m_BlockSets.size() > 1)
-            stack.push_back(0);
-        while (true)
-            if (stack.size() == m_BlockSets.size() - 1)
-            {
-                auto mns = par.MinesCond;
-                for (auto v : stack)
-                    mns -= v;
-                if (mns >= 0 &&
-                    mns <= max[m_BlockSets.size() - 1])
-                {
-                    stack.push_back(mns);
-
-                    auto dicT = std::vector<BigInteger>(1, BigInteger(1));
-                    for (auto i = 0; i < m_BlockSets.size(); i++)
-                    {
-                        auto n = m_BlockSets[i].size();
-                        auto a = par.Sets1[i], b = par.Sets2[i], c = par.Sets3[i];
-                        auto m = solution.Dist[i], p = stack[i];
-
-                        {
-                            auto cases = std::vector<BigInteger>();
-                            cases.reserve(min(p, c) + 1);
-                            for (auto j = 0; j <= p && j <= c; j++)
-                            {
-                                cases.emplace_back(Binomial(c, j));
-                                cases.back() *= Binomial(b, p - j);
-                            }
-
-                            Add(dicT, cases);
-                        }
-                        {
-                            auto cases = std::vector<BigInteger>();
-                            cases.reserve(min(m - p, a) + 1);
-                            for (auto j = 0; j <= m - p && j <= a; j++)
-                            {
-                                cases.emplace_back(Binomial(a, j));
-                                cases.back() *= Binomial(n - a - b - c, m - p - j);
-                            }
-
-                            Add(dicT, cases);
-                        }
-                    }
-                    Merge(dicT, dic);
-
-                    stack.pop_back();
-                }
-                if (stack.empty())
-                    break;
-                if (mns <= 0)
-                {
-                    stack.pop_back();
-                    if (stack.empty())
-                        break;
-                }
-                stack.back()++;
-            }
-            else if (stack.back() <= max[stack.size() - 1])
-                stack.push_back(0);
-            else
-            {
-                stack.pop_back();
-                if (stack.empty())
-                    break;
-                stack.back()++;
-            }
-    }
-    auto it = m_DistCondCache.insert(std::move(std::make_pair(par.m_Hash, std::make_pair(par, dic))));
-    return it->second.second;
 }
 
 const std::vector<BigInteger> &Solver::DistCondQ(const DistCondQParameters &par)
@@ -1031,61 +828,6 @@ const std::vector<BigInteger> &Solver::DistCondQ(const DistCondQParameters &par)
     }
     auto it = m_DistCondQCache.insert(std::move(std::make_pair(par.m_Hash, std::make_pair(par, dic))));
     return it->second.second;
-}
-
-DistCondParameters::DistCondParameters(const std::vector<Block> &sets1, const std::vector<Block> &sets2, const std::vector<Block> &sets3, int minesCond, int length)
-    : Sets1(sets1),
-      Sets2(sets2),
-      Sets3(sets3),
-      MinesCond(minesCond),
-      Length(length)
-{
-    m_Hash = (Hash(Sets1) << 44) ^ (Hash(Sets2) << 24) ^ (Hash(Sets3) << 4) ^ MinesCond;
-}
-
-bool operator==(const DistCondParameters &lhs, const DistCondParameters &rhs)
-{
-    if (lhs.m_Hash != rhs.m_Hash)
-        return false;
-    if (lhs.MinesCond != rhs.MinesCond)
-        return false;
-    if (lhs.Sets1 != rhs.Sets1)
-        return false;
-    if (lhs.Sets2 != rhs.Sets2)
-        return false;
-    if (lhs.Sets3 != rhs.Sets3)
-        return false;
-    return true;
-}
-
-bool operator!=(const DistCondParameters &lhs, const DistCondParameters &rhs)
-{
-    return !(lhs == rhs);
-}
-
-bool operator<(const DistCondParameters &lhs, const DistCondParameters &rhs)
-{
-    if (lhs.m_Hash < rhs.m_Hash)
-        return true;
-    if (lhs.m_Hash > rhs.m_Hash)
-        return false;
-    if (lhs.MinesCond < rhs.MinesCond)
-        return true;
-    if (lhs.MinesCond > rhs.MinesCond)
-        return false;
-    if (lhs.Sets1 < rhs.Sets1)
-        return true;
-    if (lhs.Sets1 > rhs.Sets1)
-        return false;
-    if (lhs.Sets2 < rhs.Sets2)
-        return true;
-    if (lhs.Sets2 > rhs.Sets2)
-        return false;
-    if (lhs.Sets3 < rhs.Sets3)
-        return true;
-    if (lhs.Sets3 > rhs.Sets3)
-        return false;
-    return false;
 }
 
 DistCondQParameters::DistCondQParameters(const std::vector<int> &sets1, Block set2ID, int length)
