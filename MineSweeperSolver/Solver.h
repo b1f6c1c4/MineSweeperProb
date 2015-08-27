@@ -53,7 +53,7 @@ private:
     bool ReduceRestrains();
     bool SimpleOverlap();
     bool SimpleOverlap(int r1, int r2, bool &rowRemoved);
-    void EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<double> &augmentedMatrix);
+    void EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<int> &augmentedMatrix);
     void ProcessSolutions();
 
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1) const;

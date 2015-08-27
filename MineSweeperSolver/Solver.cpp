@@ -4,7 +4,7 @@
 #include <assert.h>
 
 static void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection);
-static std::vector<int> Gauss(OrthogonalList<double> &matrix);
+static std::vector<int> Gauss(OrthogonalList<int> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
 static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
 static unsigned __int64 Hash(const BlockSet &set);
@@ -148,17 +148,7 @@ void Solver::Solve(bool withProb)
         return;
     }
 
-    OrthogonalList<double> augmentedMatrix(m_Matrix.GetWidth(), m_Matrix.GetHeight());
-    for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
-    {
-        auto node = m_Matrix.GetRowHead(row).Right;
-        auto nr = &augmentedMatrix.GetRowHead(row);
-        while (node != nullptr)
-        {
-            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), node->Value);
-            node = node->Right;
-        }
-    }
+    OrthogonalList<int> augmentedMatrix(m_Matrix);
 
     auto minors = Gauss(augmentedMatrix);
 
@@ -568,7 +558,7 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
 
     //if (exceptA.empty() || exceptB.empty())
     //{
-    //    Node<double> *nr;
+    //    Node<int> *nr;
     //    if (exceptA.empty())
     //    {
     //        n2->Value -= n1->Value;
@@ -598,7 +588,7 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
     return flag;
 }
 
-std::vector<int> Gauss(OrthogonalList<double> &matrix)
+std::vector<int> Gauss(OrthogonalList<int> &matrix)
 {
     auto n = matrix.GetWidth();
     auto minorCol = std::vector<int>();
@@ -606,7 +596,7 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
     for (auto col = 0; col < n; ++col)
     {
         auto biasNode = matrix.SeekDown(major, col).Down;
-        while (biasNode != nullptr && abs(biasNode->Value) < 1E-14)
+        while (biasNode != nullptr && biasNode->Value == 0)
         {
             auto tmp = biasNode->Down;
             matrix.Remove(*biasNode);
@@ -618,8 +608,9 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
             continue;
         }
 
-        auto vec = std::vector<std::pair<int, double>>();
-        auto theBiasInv = 1 / biasNode->Value;
+        auto vec = std::vector<std::pair<int, int>>();
+        assert(abs(biasNode->Value) == 1);
+        auto theBiasInv = biasNode->Value;
         auto node = matrix.GetColHead(col).Down;
         while (node != nullptr)
         {
@@ -647,7 +638,7 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
                 while (nc->Down != nullptr && nc->Down->Row < it->first)
                     nc = nc->Down;
 
-                double oldV;
+                int oldV;
                 if (nc->Down == nullptr ||
                     nc->Down->Row > it->first)
                     oldV = 0;
@@ -710,7 +701,7 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
     return minorCol;
 }
 
-void Solver::EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<double> &augmentedMatrix)
+void Solver::EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<int> &augmentedMatrix)
 {
     auto n = m_BlockSets.size();
 
@@ -730,7 +721,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
     auto mR = n - minors.size();
     auto majors = std::vector<int>(mR);
     auto cnts = std::vector<int>(mR);
-    auto sums = std::vector<double>(mR);
+    auto sums = std::vector<int>(mR);
     {
         auto minorID = 0;
         auto mainRow = 0;
@@ -773,7 +764,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 auto flag = true;
                 for (auto mainRow = 0; mainRow < mR; mainRow++)
                 {
-                    auto val = static_cast<int>(round(sums[mainRow]));
+                    auto val = sums[mainRow];
                     if (val < 0 ||
                         val > cnts[mainRow])
                     {
