@@ -52,7 +52,7 @@ private:
     void MergeSets();
     bool ReduceRestrains();
     bool SimpleOverlap();
-    bool SimpleOverlap(int r1, int r2);
+    bool SimpleOverlap(int r1, int r2, bool &rowRemoved);
     void EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<double> &augmentedMatrix);
     void ProcessSolutions();
 

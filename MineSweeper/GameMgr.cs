@@ -287,10 +287,10 @@ namespace MineSweeper
         public void OpenBlock(int x, int y)
         {
             if (Solving)
-                throw new InvalidOperationException("上一次求解未完成");
+                return;
 
             if (!Started)
-                throw new InvalidOperationException("游戏已结束");
+                return;
 
             OpenBlock(m_NativeObject, x, y);
             FetchStatus();
@@ -303,7 +303,7 @@ namespace MineSweeper
         public void Solve()
         {
             if (Solving)
-                throw new InvalidOperationException("上一次求解未完成");
+                return;
 
             if (!Started)
                 return;
@@ -345,7 +345,7 @@ namespace MineSweeper
         public void SemiAutomaticStep()
         {
             if (Solving)
-                throw new InvalidOperationException("上一次求解未完成");
+                return;
 
             if (!Started)
                 return;
@@ -363,7 +363,7 @@ namespace MineSweeper
         public void SemiAutomatic()
         {
             if (Solving)
-                throw new InvalidOperationException("上一次求解未完成");
+                return;
 
             if (!Started)
                 return;
@@ -381,7 +381,7 @@ namespace MineSweeper
         public void AutomaticStep()
         {
             if (Solving)
-                throw new InvalidOperationException("上一次求解未完成");
+                return;
 
             if (!Started)
                 return;

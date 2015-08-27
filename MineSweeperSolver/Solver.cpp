@@ -445,16 +445,23 @@ bool Solver::SimpleOverlap()
         }
 
         for (auto i = 0; i < indexes.size() - 1; ++i)
+        {
             for (auto j = i + 1; j < indexes.size(); ++j)
-                flag |= SimpleOverlap(indexes[i], indexes[j]);
+            {
+                auto rowRemoved = false;
+                flag |= SimpleOverlap(indexes[i], indexes[j], rowRemoved);
+                if (rowRemoved)
+                    return true;
+            }
+        }
     }
-
+    
     return flag;
 }
 
-bool Solver::SimpleOverlap(int r1, int r2)
+bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
 {
-    if (!m_Pairs.insert(std::make_pair(r1, r2)).second)
+    if (!m_Pairs.emplace(r1, r2).second)
         return false;
 
     std::vector<int> exceptA, exceptB, intersection;
@@ -480,6 +487,18 @@ bool Solver::SimpleOverlap(int r1, int r2)
             n1 = n1->Right;
             n2 = n2->Right;
         }
+    }
+    if (n1 == nullptr || n2 == nullptr)
+        throw;
+
+    if (exceptA.empty() && exceptB.empty())
+    {
+        if (n1->Value != n2->Value)
+            throw;
+
+        m_Matrix.RemoveRow(r2);
+        rowRemoved = true;
+        return false;
     }
 
     typedef std::pair<int, int> Iv;
@@ -535,6 +554,35 @@ bool Solver::SimpleOverlap(int r1, int r2)
     proc(exceptA, ivA0, ivA);
     proc(exceptB, ivB0, ivB);
     proc(intersection, ivC0, ivC);
+
+    //if (exceptA.empty() || exceptB.empty())
+    //{
+    //    Node<double> *nr;
+    //    if (exceptA.empty())
+    //    {
+    //        n2->Value -= n1->Value;
+    //        nr = m_Matrix.GetRowHead(r2).Right;
+    //    }
+    //    else
+    //    {
+    //        n1->Value -= n2->Value;
+    //        nr = m_Matrix.GetRowHead(r1).Right;
+    //    }
+    //    auto it = intersection.begin();
+    //    while (nr->Col != m_BlockSets.size())
+    //    {
+    //        if (nr->Col != *it)
+    //        {
+    //            nr = nr->Right;
+    //            continue;
+    //        }
+    //        auto tmp = nr;
+    //        nr = nr->Right;
+    //        m_Matrix.Remove(*tmp);
+    //        if (++it == intersection.end())
+    //            break;
+    //    }
+    //}
 
     return flag;
 }

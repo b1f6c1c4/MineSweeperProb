@@ -217,8 +217,10 @@ void OrthogonalList<T>::Remove(Node<T> &nr, Node<T> &nc)
         return;
 
     auto node = left->Right;
-    if (node->Col != nc.Col)
+    if (node != up->Down)
         return;
+    if (node->Col != nc.Col)
+        throw;
 
     left->Right = node->Right;
     up->Down = node->Down;
@@ -235,70 +237,64 @@ void OrthogonalList<T>::Remove(const Node<T> &node)
 template <class T>
 void OrthogonalList<T>::RemoveRow(int row)
 {
-    auto nr = m_Rows[row];
-    while (nr.Right != nullptr)
-        Remove(nr, m_Cols[nr.Right->Col]);
-    std::for_each(m_Rows.begin() + row + 1, m_Rows.end(), [](Node<T> &node)
-                  {
-                      --node.Row;
-                      auto n = node.Right;
-                      while (n != nullptr)
-                      {
-                          --n->Row;
-                          n = n->Right;
-                      }
-                  });
+    while (m_Rows[row].Right != nullptr)
+        Remove(row, m_Rows[row].Right->Col);
     m_Rows.erase(m_Rows.begin() + row);
+    for (auto i = row; i < m_Rows.size(); ++i)
+    {
+        auto n = &m_Rows[i];
+        while (n != nullptr)
+        {
+            --n->Row;
+            n = n->Right;
+        }
+    }
 }
 
 template <class T>
 void OrthogonalList<T>::RemoveCol(int col)
 {
-    auto nc = m_Cols[col];
-    while (nc.Down != nullptr)
-        Remove(m_Rows[nc.Down->Row], nc);
-    std::for_each(m_Cols.begin() + col + 1, m_Cols.end(), [](Node<T> &node)
-                  {
-                      --node.Col;
-                      auto n = node.Down;
-                      while (n != nullptr)
-                      {
-                          --n->Col;
-                          n = n->Down;
-                      }
-                  });
+    while (m_Cols[col].Down != nullptr)
+        Remove(m_Cols[col].Down->Row, col);
     m_Cols.erase(m_Cols.begin() + col);
+    for (auto i = col; i < m_Cols.size(); ++i)
+    {
+        auto n = &m_Cols[i];
+        while (n != nullptr)
+        {
+            --n->Col;
+            n = n->Down;
+        }
+    }
 }
 
 template <class T>
 void OrthogonalList<T>::InsertRow(int row)
 {
-    std::for_each(m_Rows.begin() + row, m_Rows.end(), [](Node<T> &node)
-                  {
-                      ++node.Row;
-                      auto n = node.Right;
-                      while (n != nullptr)
-                      {
-                          ++n->Row;
-                          n = n->Right;
-                      }
-                  });
+    for (auto i = row; i < m_Rows.size(); ++i)
+    {
+        auto n = &m_Rows[i];
+        while (n != nullptr)
+        {
+            ++n->Row;
+            n = n->Right;
+        }
+    }
     m_Rows.insert(m_Rows.begin() + row, Node<T>(row, -1));
 }
 
 template <class T>
 void OrthogonalList<T>::InsertCol(int col)
 {
-    std::for_each(m_Cols.begin() + col, m_Cols.end(), [](Node<T> &node)
-                  {
-                      ++node.Col;
-                      auto n = node.Down;
-                      while (n != nullptr)
-                      {
-                          ++n->Col;
-                          n = n->Down;
-                      }
-                  });
+    for (auto i = col; i < m_Cols.size(); ++i)
+    {
+        auto n = &m_Cols[i];
+        while (n != nullptr)
+        {
+            ++n->Col;
+            n = n->Down;
+        }
+    }
     m_Cols.insert(m_Cols.begin() + col, Node<T>(-1, col));
 }
 
@@ -329,3 +325,28 @@ void OrthogonalList<T>::ExtendWidth(int cols)
     for (auto i = size; i < cols; ++i)
         m_Cols.emplace_back(-1, i);
 }
+
+//template <class T>
+//void Check(const OrthogonalList<T> &ol)
+//{
+//    for (auto i = 0; i < ol.GetHeight(); ++i)
+//    {
+//        auto n = &ol.GetRowHead(i);
+//        while (n != nullptr)
+//        {
+//            if (n->Row != i)
+//                throw;
+//            n = n->Right;
+//        }
+//    }
+//    for (auto i = 0; i < ol.GetWidth(); ++i)
+//    {
+//        auto n = &ol.GetColHead(i);
+//        while (n != nullptr)
+//        {
+//            if (n->Col != i)
+//                throw;
+//            n = n->Down;
+//        }
+//    }
+//}
