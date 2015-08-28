@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -20,8 +21,6 @@ namespace MineSweeper
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
-        private delegate void UpdateDelegate();
-
         public MineSweeper(int width, int height, int mines)
         {
             m_Width = width;
@@ -36,14 +35,16 @@ namespace MineSweeper
 
             InitializeComponent();
 
+            SuspendLayout();
             m_UIBlocks = new List<UIBlock>();
+            var font = new Font("Consolas", 11F * m_ScaleFactor);
             for (var i = 0; i < m_Width; i++)
                 for (var j = 0; j < m_Height; j++)
                 {
                     var ub = new UIBlock
                                  {
                                      Location = new Point(i * 25, j * 25),
-                                     Font = new Font("Consolas", 11F * m_ScaleFactor),
+                                     Font = font,
                                      X = i,
                                      Y = j
                                  };
@@ -54,15 +55,32 @@ namespace MineSweeper
                 }
 
             Scale(new SizeF(m_ScaleFactor, m_ScaleFactor));
+            ResumeLayout();
         }
 
         private void MineSweeper_Load(object sender, EventArgs e) { Reset(); }
 
+        private static void InvokeIfRequired(ISynchronizeInvoke control, MethodInvoker action)
+        {
+            if (control.InvokeRequired)
+                control.Invoke(action, new object[0]);
+            else
+                action();
+        }
+
         private void UpdateAll()
         {
             UpdateText();
-            foreach (var ub in m_UIBlocks)
-                ub.FetchState();
+            m_Mgr.EnterReadLock();
+            try
+            {
+                foreach (var ub in m_UIBlocks)
+                    ub.FetchState();
+            }
+            finally
+            {
+                m_Mgr.ExitReadLock();
+            }
         }
 
         private void UpdateText()
@@ -139,7 +157,7 @@ namespace MineSweeper
                 (int)(m_Width * 25 * m_ScaleFactor),
                 (int)(m_Height * 25 * m_ScaleFactor) + progressBar1.Height);
 
-            m_Mgr.StatusUpdated += () => Invoke(new UpdateDelegate(UpdateAll), new object[] { });
+            m_Mgr.StatusUpdated += () => InvokeIfRequired(this, UpdateAll);
             m_Mgr.FetchStatus();
 
             m_Mgr.Solve();

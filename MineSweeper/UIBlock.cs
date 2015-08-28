@@ -21,22 +21,11 @@ namespace MineSweeper
 
         public GameMgr TheMgr { get; set; }
 
-        public static void InvokeIfRequired(ISynchronizeInvoke control, MethodInvoker action)
-        {
-            if (control.InvokeRequired)
-                control.Invoke(action, new object[0]);
-            else
-                action();
-        }
-
         public void FetchState()
         {
-            TheMgr.EnterReadLock();
 
             var str = string.Empty;
             Color color, fColor = Color.Black;
-            try
-            {
                 if (TheMgr.Mode.HasFlag(SolvingMode.Half) &&
                     !TheMgr.Succeed &&
                     TheMgr.InferredStatuses != null)
@@ -122,20 +111,10 @@ namespace MineSweeper
                     color = TheMgr.Succeed ? Color.Green : Color.Red;
                 else
                     color = Color.DarkGray;
-            }
-            finally
-            {
-                TheMgr.ExitReadLock();
-            }
-
-            InvokeIfRequired(
-                             this,
-                             () =>
-                             {
-                                 Text = str;
-                                 BackColor = color;
-                                 ForeColor = fColor;
-                             });
+            
+            Text = str;
+            BackColor = color;
+            ForeColor = fColor;
         }
     }
 }
