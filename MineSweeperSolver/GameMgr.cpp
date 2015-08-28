@@ -195,6 +195,22 @@ void GameMgr::Solve(bool withProb, bool withPref)
     m_Solver.Solve(true, withProb);
 
     for (auto i = 0; i < m_Blocks.size(); ++i)
+        switch (m_Solver.GetBlockStatus(i))
+        {
+        case BlockStatus::Mine: 
+            if (!m_Blocks[i].IsMine)
+                throw;
+            break;
+        case BlockStatus::Blank:
+            if (m_Blocks[i].IsMine)
+                throw;
+            break;
+        case BlockStatus::Unknown:
+        default: 
+            break;
+        }
+
+    for (auto i = 0; i < m_Blocks.size(); ++i)
         if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
             m_Best.push_back(i);
 

@@ -1,5 +1,4 @@
 #include "BigInteger.h"
-#include <assert.h>
 
 BigInteger::BigInteger() : m_Data(1, 0), m_Bits(0) {}
 

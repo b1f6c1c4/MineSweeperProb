@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include <vector>
 #include <algorithm>
+#include <set>
 
 template <class T>
 struct Node
@@ -326,27 +327,39 @@ void OrthogonalList<T>::ExtendWidth(int cols)
         m_Cols.emplace_back(-1, i);
 }
 
-//template <class T>
-//void Check(const OrthogonalList<T> &ol)
-//{
-//    for (auto i = 0; i < ol.GetHeight(); ++i)
-//    {
-//        auto n = &ol.GetRowHead(i);
-//        while (n != nullptr)
-//        {
-//            if (n->Row != i)
-//                throw;
-//            n = n->Right;
-//        }
-//    }
-//    for (auto i = 0; i < ol.GetWidth(); ++i)
-//    {
-//        auto n = &ol.GetColHead(i);
-//        while (n != nullptr)
-//        {
-//            if (n->Col != i)
-//                throw;
-//            n = n->Down;
-//        }
-//    }
-//}
+template <class T>
+bool Check(const OrthogonalList<T> &ol)
+{
+    std::set<std::pair<int, int>> pairs;
+    for (auto i = 0; i < ol.GetHeight(); ++i)
+    {
+        auto n = &ol.GetRowHead(i);
+        while (n != nullptr)
+        {
+            if (n->Row != i)
+                return false;
+            if (n->Col >= 0)
+                if (pairs.emplace(n->Row, n->Col).second == false)
+                    return false;
+            n = n->Right;
+        }
+    }
+    for (auto i = 0; i < ol.GetWidth(); ++i)
+    {
+        auto n = &ol.GetColHead(i);
+        while (n != nullptr)
+        {
+            if (n->Col != i)
+                return false;
+            if (n->Row >= 0)
+            {
+                auto v = pairs.find(std::make_pair(n->Row, n->Col));
+                if (v == pairs.end())
+                    return false;
+                pairs.erase(v);
+            }
+            n = n->Down;
+        }
+    }
+    return pairs.empty();
+}
