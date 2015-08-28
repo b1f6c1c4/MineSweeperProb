@@ -2,7 +2,7 @@
 #include "BinomialHelper.h"
 #include <assert.h>
 
-static std::vector<int> Gauss(OrthogonalList<int> &matrix);
+static std::vector<int> Gauss(OrthogonalList<float> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
 static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
 static unsigned __int64 Hash(const BlockSet &set);
@@ -130,7 +130,17 @@ void Solver::Solve(bool withOverlap, bool withProb)
         return;
     }
 
-    auto augmentedMatrix(m_Matrix);
+    OrthogonalList<float> augmentedMatrix(m_Matrix.GetWidth(), m_Matrix.GetHeight());
+    for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
+    {
+        auto node = m_Matrix.GetRowHead(row).Right;
+        auto nr = &augmentedMatrix.GetRowHead(row);
+        while (node != nullptr)
+        {
+            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), node->Value);
+            node = node->Right;
+        }
+    }
     auto minors = Gauss(augmentedMatrix);
 
     if (!minors.empty() &&
@@ -320,13 +330,11 @@ bool Solver::ReduceRestrains()
                 if (node->Down == nullptr ||
                     node->Down->Row != nc->Row ||
                     (node->Down->Value -= dMines) < 0)
-                {
-                    m_TotalStates = BigInteger(0);
-                    return true;
-                }
+                    throw;
                 nc = nc->Down;
                 ncc = node->Down;
             }
+            flag = true;
         }
         if (m_BlockSets[col].empty())
         {
@@ -335,6 +343,7 @@ bool Solver::ReduceRestrains()
             for (auto &id : m_SetIDs)
                 if (id > col)
                     --id;
+            flag = true;
         }
     }
     return flag;
@@ -498,15 +507,16 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
     return flag;
 }
 
-std::vector<int> Gauss(OrthogonalList<int> &matrix)
+std::vector<int> Gauss(OrthogonalList<float> &matrix)
 {
+#define ZEROQ(val) (abs(val) < static_cast<float>(1E-4))
     auto n = matrix.GetWidth();
     auto minorCol = std::vector<int>();
     auto major = 0;
     for (auto col = 0; col < n; ++col)
     {
         auto biasNode = matrix.SeekDown(major, col).Down;
-        while (biasNode != nullptr && biasNode->Value == 0)
+        while (biasNode != nullptr && ZEROQ(biasNode->Value))
         {
             auto tmp = biasNode->Down;
             matrix.Remove(*biasNode);
@@ -518,9 +528,8 @@ std::vector<int> Gauss(OrthogonalList<int> &matrix)
             continue;
         }
 
-        auto vec = std::vector<std::pair<int, int>>();
-        assert(abs(biasNode->Value) == 1);
-        auto theBiasInv = biasNode->Value;
+        auto vec = std::vector<std::pair<int, float>>();
+        auto theBiasInv = 1 / biasNode->Value;
         auto node = matrix.GetColHead(col).Down;
         while (node != nullptr)
         {
@@ -560,14 +569,14 @@ std::vector<int> Gauss(OrthogonalList<int> &matrix)
                 if (nc->Down == nullptr ||
                     nc->Down->Row > it->first)
                 {
-                    if (abs(val) < 1E-14)
+                    if (ZEROQ(val))
                         continue;
 
                     auto nr = &matrix.SeekRight(it->first, bias->Col);
                     nc = &matrix.Add(*nr, *nc, val);
                 }
-                else if (abs(val) < 1E-14)
-                    matrix.Remove(*nc->Down);
+                else if (ZEROQ(val))
+                    matrix.Remove(*nc->Down); // probably bias ?
                 else
                 {
                     nc = nc->Down;
@@ -611,7 +620,7 @@ std::vector<int> Gauss(OrthogonalList<int> &matrix)
     return minorCol;
 }
 
-void Solver::EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<int> &augmentedMatrix)
+void Solver::EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<float> &augmentedMatrix)
 {
     auto n = m_BlockSets.size();
 
@@ -631,7 +640,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
     auto mR = n - minors.size();
     auto majors = std::vector<int>(mR);
     auto cnts = std::vector<int>(mR);
-    auto sums = std::vector<int>(mR);
+    auto sums = std::vector<float>(mR);
     {
         auto minorID = 0;
         auto mainRow = 0;
@@ -674,7 +683,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 auto flag = true;
                 for (auto mainRow = 0; mainRow < mR; mainRow++)
                 {
-                    auto val = sums[mainRow];
+                    auto val = static_cast<int>(round(sums[mainRow]));
                     if (val < 0 ||
                         val > cnts[mainRow])
                     {
