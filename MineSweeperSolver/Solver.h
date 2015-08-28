@@ -34,6 +34,7 @@ public:
     void AddRestrain(const BlockSet &set, int mines);
     void Solve(bool withOverlap, bool withProb);
 
+    const BigInteger &ZeroCondQ(const BlockSet &set, Block blk);
     const std::vector<BigInteger> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
 private:
     std::vector<BlockStatus> m_Manager;
@@ -44,7 +45,7 @@ private:
     std::vector<double> m_Probability;
     std::set<std::pair<int, int>> m_Pairs;
     BigInteger m_TotalStates;
-    std::multimap<unsigned __int64, std::pair<DistCondQParameters, std::vector<BigInteger>>> m_DistCondQCache;
+    std::multimap<unsigned __int64, DistCondQParameters *> m_DistCondQCache;
 
     void ReduceSet(BlockSet &set, int &outMines, int &outBlanks) const;
     void MergeSets();
@@ -56,7 +57,9 @@ private:
 
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines, int &blanks) const;
 
-    const std::vector<BigInteger> &DistCondQ(const DistCondQParameters &par);
+    const BigInteger &ZCondQ(DistCondQParameters &&par);
+    const std::vector<BigInteger> &DistCondQ(DistCondQParameters &&par);
+    void ClearDistCondQCache();
 };
 
 class DistCondQParameters
@@ -64,12 +67,17 @@ class DistCondQParameters
 public:
     friend class Solver;
 private:
-    DistCondQParameters(const std::vector<int> &sets1, Block set2ID, int length);
+    DistCondQParameters(DistCondQParameters &&other);
+    DistCondQParameters(Block set2ID, int length);
 
-    const std::vector<int> &Sets1;
+    std::vector<int> Sets1;
     int Set2ID;
     int Length;
     unsigned __int64 m_Hash;
+
+    unsigned __int64 Hash();
+
+    std::vector<BigInteger> m_Result;
 
     friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
     friend bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);

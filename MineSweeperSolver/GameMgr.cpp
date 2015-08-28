@@ -1,6 +1,12 @@
 #include "GameMgr.h"
 #include "random.h"
 #include "BinomialHelper.h"
+#include <functional>
+
+template <class T>
+static void Largest(std::vector<Block> &bests, std::function<T(Block)> fun);
+template <class T>
+static void Largest(std::vector<Block> &bests, std::function<const T &(Block)> fun);
 
 GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height)
 {
@@ -134,6 +140,50 @@ void GameMgr::OpenBlock(int x, int y)
     OpenBlock(GetIndex(x, y));
 }
 
+template <class T>
+void Largest(std::vector<Block> &bests, std::function<T(int)> fun)
+{
+    if (bests.size() <= 1)
+        return;
+    auto newBests = std::vector<Block>();
+    newBests.push_back(bests.front());
+    auto bestVal = fun(bests.front());
+    for (auto i = 1; i < bests.size(); ++i)
+    {
+        auto p = fun(bests[i]);
+        if (bestVal < p)
+        {
+            bestVal = p;
+            newBests.clear();
+        }
+        if (!(p < bestVal))
+            newBests.push_back(bests[i]);
+    }
+    newBests.swap(bests);
+}
+
+template <class T>
+void Largest(std::vector<Block> &bests, std::function<const T &(int)> fun)
+{
+    if (bests.size() <= 1)
+        return;
+    auto newBests = std::vector<Block>();
+    newBests.push_back(bests.front());
+    const T *bestVal = &fun(bests.front());
+    for (auto i = 1; i < bests.size(); ++i)
+    {
+        const T *p = &fun(bests[i]);
+        if (*bestVal < *p)
+        {
+            bestVal = p;
+            newBests.clear();
+        }
+        if (!(*p < *bestVal))
+            newBests.push_back(bests[i]);
+    }
+    newBests.swap(bests);
+}
+
 void GameMgr::Solve(bool withProb, bool withPref)
 {
     if (!m_Started)
@@ -153,40 +203,25 @@ void GameMgr::Solve(bool withProb, bool withPref)
 
     if (!withProb)
         return;
-
-    auto probs = std::vector<double>();
-    double bestProb = 1;
+    
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
         if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Unknown)
             continue;
         m_Preferred.push_back(i);
-        auto p = m_Solver.GetProbability(i);
-        probs.push_back(p);
-        if (p < bestProb)
-            bestProb = p;
-    }
-    {
-        auto bProbs = std::vector<int>();
-        for (auto i = 0; i < m_Preferred.size(); ++i)
-            if (probs[i] <= bestProb)
-                bProbs.push_back(m_Preferred[i]);
-        bProbs.swap(m_Preferred);
     }
 
-    if (m_Preferred.size() <= 1 || !withPref)
+    Largest(m_Preferred, std::function<double(Block)>([this](Block blk) { return -m_Solver.GetProbability(blk); }));
+
+    if (!withPref)
         return;
 
-    auto prozs = std::vector<BigInteger>();
-    auto quans = std::vector<double>();
-    BigInteger bestProz(0);
-    for (auto i = 0; i < m_Preferred.size(); ++i)
+    Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)->const BigInteger & { return m_Solver.ZeroCondQ(m_BlocksR[blk].Surrounding, blk); }));
+
+    Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
     {
         int m;
-        auto di = m_Solver.DistributionCondQ(m_BlocksR[m_Preferred[i]].Surrounding, m_Preferred[i], m);
-        prozs.push_back(di[0]);
-        if (di[0] > bestProz)
-            bestProz = di[0];
+        auto di = m_Solver.DistributionCondQ(m_BlocksR[blk].Surrounding, blk, m);
 
         BigInteger t(0);
         for (auto j = 0; j < di.size(); ++j)
@@ -200,31 +235,8 @@ void GameMgr::Solve(bool withProb, bool withPref)
                 q += -p * log2(p);
             }
 
-        quans.push_back(q);
-    }
-    {
-        auto bProzs = std::vector<int>();
-        auto quas = std::vector<double>();
-        for (auto i = 0; i < m_Preferred.size(); ++i)
-            if (prozs[i] >= bestProz)
-            {
-                bProzs.push_back(m_Preferred[i]);
-                quas.push_back(quans[i]);
-            }
-        bProzs.swap(m_Preferred);
-        quas.swap(quans);
-    }
-    {
-        double bestQuan = 0;
-        for (auto i = 0; i < m_Preferred.size(); ++i)
-            if (quans[i] > bestQuan)
-                bestQuan = quans[i];
-        auto bQuans = std::vector<int>();
-        for (auto i = 0; i < m_Preferred.size(); ++i)
-            if (quans[i] >= bestQuan)
-                bQuans.push_back(m_Preferred[i]);
-        bQuans.swap(m_Preferred);
-    }
+        return q;
+    }));
 }
 
 void GameMgr::OpenOptimalBlocks()

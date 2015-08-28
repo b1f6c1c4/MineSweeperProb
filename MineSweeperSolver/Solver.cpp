@@ -105,7 +105,7 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
 void Solver::Solve(bool withOverlap, bool withProb)
 {
     m_Solutions.clear();
-    m_DistCondQCache.clear();
+    ClearDistCondQCache();
 
     auto flag = true;
     while (flag)
@@ -162,17 +162,27 @@ void Solver::Solve(bool withOverlap, bool withProb)
     ProcessSolutions();
 }
 
+const BigInteger& Solver::ZeroCondQ(const BlockSet& set, Block blk)
+{
+    DistCondQParameters par(m_SetIDs[blk], 0);
+    int dMines, dBlanks;
+    GetIntersectionCounts(set, par.Sets1, dMines, dBlanks);
+    par.Hash();
+    for (auto b : par.Sets1)
+        par.Length += b;
+    return ZCondQ(std::move(par));
+}
+
 const std::vector<BigInteger> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
 {
+    DistCondQParameters par(m_SetIDs[blk], 0);
     int dMines, dBlanks;
-    BlockSet sets1;
-    GetIntersectionCounts(set, sets1, dMines, dBlanks);
-    auto length = 0;
-    for (auto b : sets1)
-        length += b;
-
+    GetIntersectionCounts(set, par.Sets1, dMines, dBlanks);
+    par.Hash();
+    for (auto b : par.Sets1)
+        par.Length += b;
     min = dMines;
-    return DistCondQ(DistCondQParameters(sets1, m_SetIDs[blk], length));
+    return DistCondQ(std::move(par));
 }
 
 void Overlap(const BlockSet &setA, const BlockSet &setB, BlockSet &exceptA, BlockSet &exceptB, BlockSet &intersection)
@@ -785,7 +795,7 @@ void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1
     auto lst1 = BlockSet(set1);
     sets1.clear();
     sets1.resize(m_BlockSets.size(), 0);
-
+    mines = 0, blanks = 0;
     for (auto blk : set1)
     {
         switch (m_Manager[blk])
@@ -805,22 +815,70 @@ void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1
     }
 }
 
-const std::vector<BigInteger> &Solver::DistCondQ(const DistCondQParameters &par)
+const BigInteger& Solver::ZCondQ(DistCondQParameters&& par)
 {
+    DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
     for (auto it = itp.first; it != itp.second; ++it)
     {
-        if (it->second.first == par)
-            return it->second.second;
+        if (*it->second != par)
+            continue;
+        if (!it->second->m_Result.empty())
+            return it->second->m_Result.front();
+        ptr = it->second;
+        break;
     }
-    std::vector<BigInteger> dic(par.Length + 1);
+    if (ptr == nullptr)
+    {
+        ptr = new DistCondQParameters(std::move(par));
+        m_DistCondQCache.insert(std::make_pair(ptr->m_Hash, ptr));
+    }
+    ptr->m_Result.emplace_back(0);
+    auto &val = ptr->m_Result.front();
+    for (auto &solution : m_Solutions)
+    {
+        BigInteger valT(1);
+        for (auto i = 0; i < m_BlockSets.size(); i++)
+        {
+            auto n = m_BlockSets[i].size();
+            auto a = ptr->Sets1[i], b = i == ptr->Set2ID ? 1 : 0;
+            auto m = solution.Dist[i];
+
+            valT *= Binomial(n - a - b, m);
+        }
+        val += valT;
+    }
+    return val;
+}
+
+const std::vector<BigInteger> &Solver::DistCondQ(DistCondQParameters &&par)
+{
+    DistCondQParameters *ptr = nullptr;
+    auto itp = m_DistCondQCache.equal_range(par.m_Hash);
+    for (auto it = itp.first; it != itp.second; ++it)
+    {
+        if (*it->second != par)
+            continue;
+        if (it->second->m_Result.size() == it->second->Length + 1)
+            return it->second->m_Result;
+        ptr = it->second;
+        break;
+    }
+    if (ptr == nullptr)
+    {
+        ptr = new DistCondQParameters(std::move(par));
+        m_DistCondQCache.insert(std::make_pair(ptr->m_Hash, ptr));
+    }
+    auto &dic = ptr->m_Result;
+    dic.clear();
+    dic.resize(ptr->Length + 1);
     for (auto &solution : m_Solutions)
     {
         auto dicT = std::vector<BigInteger>(1, BigInteger(1));
         for (auto i = 0; i < m_BlockSets.size(); i++)
         {
             auto n = m_BlockSets[i].size();
-            auto a = par.Sets1[i], b = i == par.Set2ID ? 1 : 0;
+            auto a = ptr->Sets1[i], b = i == ptr->Set2ID ? 1 : 0;
             auto m = solution.Dist[i];
 
             auto cases = std::vector<BigInteger>();
@@ -835,16 +893,30 @@ const std::vector<BigInteger> &Solver::DistCondQ(const DistCondQParameters &par)
         }
         Merge(dicT, dic);
     }
-    auto it = m_DistCondQCache.insert(std::move(std::make_pair(par.m_Hash, std::make_pair(par, dic))));
-    return it->second.second;
+    return ptr->m_Result;
 }
 
-DistCondQParameters::DistCondQParameters(const std::vector<int> &sets1, Block set2ID, int length)
-    : Sets1(sets1),
-      Set2ID(set2ID),
-      Length(length)
+void Solver::ClearDistCondQCache()
 {
-    m_Hash = (Hash(Sets1) << 8) ^ set2ID;
+    for (auto &cache : m_DistCondQCache)
+        delete cache.second;
+    m_DistCondQCache.clear();
+}
+
+DistCondQParameters::DistCondQParameters(DistCondQParameters&& other)
+{
+    Sets1.swap(other.Sets1);
+    Set2ID = other.Set2ID;
+    Length = other.Length;
+    m_Hash = other.m_Hash;
+    m_Result.swap(other.m_Result);
+}
+
+DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()) {}
+
+unsigned long long DistCondQParameters::Hash()
+{
+    return m_Hash = ::Hash(Sets1) << 5 ^ Set2ID;
 }
 
 bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
