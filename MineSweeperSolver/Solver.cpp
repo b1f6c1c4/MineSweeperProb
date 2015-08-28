@@ -66,14 +66,18 @@ const BigInteger &Solver::GetTotalStates() const
 
 void Solver::AddRestrain(Block blk, bool isMine)
 {
+    if (m_Manager[blk] == BlockStatus::Blank && isMine)
+        throw;
+    if (m_Manager[blk] == BlockStatus::Mine && !isMine)
+        throw;
     m_Manager[blk] = isMine ? BlockStatus::Mine : BlockStatus::Blank;
 }
 
 void Solver::AddRestrain(const BlockSet &set, int mines)
 {
-    auto dMines = 0, dBlanks = 0;
+    auto dMines = 0;
     std::vector<int> bin;
-    GetIntersectionCounts(set, bin, dMines, dBlanks);
+    GetIntersectionCounts(set, bin, dMines);
 
     m_Matrix.ExtendHeight(m_Matrix.GetHeight() + 1);
 
@@ -187,8 +191,8 @@ void Solver::Solve(bool withOverlap, bool withProb)
 const BigInteger& Solver::ZeroCondQ(const BlockSet& set, Block blk)
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
-    int dMines, dBlanks;
-    GetIntersectionCounts(set, par.Sets1, dMines, dBlanks);
+    int dMines;
+    GetIntersectionCounts(set, par.Sets1, dMines);
     par.Hash();
     for (auto b : par.Sets1)
         par.Length += b;
@@ -198,34 +202,13 @@ const BigInteger& Solver::ZeroCondQ(const BlockSet& set, Block blk)
 const std::vector<BigInteger> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
-    int dMines, dBlanks;
-    GetIntersectionCounts(set, par.Sets1, dMines, dBlanks);
+    int dMines;
+    GetIntersectionCounts(set, par.Sets1, dMines);
     par.Hash();
     for (auto b : par.Sets1)
         par.Length += b;
     min = dMines;
     return DistCondQ(std::move(par));
-}
-
-void Solver::ReduceSet(BlockSet &set, int &mines, int &blanks) const
-{
-    mines = 0;
-    blanks = 0;
-    for (auto i = 0; i < set.size(); ++i)
-        switch (m_Manager[set[i]])
-        {
-        case BlockStatus::Mine:
-            mines++;
-            set.erase(set.begin() + i--);
-            break;
-        case BlockStatus::Blank:
-            blanks++;
-            set.erase(set.begin() + i--);
-            break;
-        case BlockStatus::Unknown:
-        default:
-            break;
-        }
 }
 
 void Solver::MergeSets()
@@ -331,8 +314,27 @@ bool Solver::ReduceRestrains()
 
     for (auto col = 0; col < m_BlockSets.size(); ++col)
     {
-        int dMines, dBlanks;
-        ReduceSet(m_BlockSets[col], dMines, dBlanks);
+        auto dMines = 0;
+        auto &set = m_BlockSets[col];
+        for (auto it = set.begin(); it != set.end(); ++it)
+        {
+            switch (m_Manager[*it])
+            {
+            case BlockStatus::Mine:
+                ++dMines;
+                m_SetIDs[*it] = -1;
+                break;
+            case BlockStatus::Blank:
+                m_SetIDs[*it] = -2;
+                break;
+            case BlockStatus::Unknown:
+            default:
+                continue;
+            }
+            it = set.erase(it);
+            if (it == set.end())
+                break;
+        }
         if (dMines != 0)
         {
             auto nc = m_Matrix.GetColHead(col).Down;
@@ -349,7 +351,7 @@ bool Solver::ReduceRestrains()
             }
             flag = true;
         }
-        if (m_BlockSets[col].empty())
+        if (set.empty())
         {
             m_Matrix.RemoveCol(col);
             ASSERT_CHECK;
@@ -800,27 +802,23 @@ void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases)
     dicN.swap(from);
 }
 
-void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines, int &blanks) const
+void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const
 {
     sets1.clear();
     sets1.resize(m_BlockSets.size(), 0);
-    mines = 0, blanks = 0;
+    mines = 0;
     for (auto blk : set1)
-        switch (m_Manager[blk])
+    {
+        auto v = m_SetIDs[blk];
+        if (v == -1)
         {
-        case BlockStatus::Mine:
             ++mines;
-            break;
-        case BlockStatus::Blank:
-            ++blanks;
-            break;
-        case BlockStatus::Unknown:
-            ++sets1[m_SetIDs[blk]];
-            break;
-        default:
-            ASSERT(false);
-            break;
+            continue;
         }
+        if (v == -2)
+            continue;
+        ++sets1[m_SetIDs[blk]];
+    }
 }
 
 const BigInteger& Solver::ZCondQ(DistCondQParameters&& par)

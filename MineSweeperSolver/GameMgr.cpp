@@ -194,6 +194,8 @@ void GameMgr::Solve(bool withProb, bool withPref)
 
     m_Solver.Solve(true, withProb);
 
+#define DEBUG
+#ifdef DEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)
         switch (m_Solver.GetBlockStatus(i))
         {
@@ -209,6 +211,7 @@ void GameMgr::Solve(bool withProb, bool withPref)
         default: 
             break;
         }
+#endif
 
     for (auto i = 0; i < m_Blocks.size(); ++i)
         if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)

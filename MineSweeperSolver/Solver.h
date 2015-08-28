@@ -55,7 +55,7 @@ private:
     void EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<float> &augmentedMatrix);
     void ProcessSolutions();
 
-    void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines, int &blanks) const;
+    void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 
     const BigInteger &ZCondQ(DistCondQParameters &&par);
     const std::vector<BigInteger> &DistCondQ(DistCondQParameters &&par);
