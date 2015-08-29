@@ -120,6 +120,17 @@ BigInteger &BigInteger::operator*=(const BigInteger &other)
     return *this;
 }
 
+BigInteger::operator size_t() const
+{
+    size_t res = 0;
+    for (auto i = 0; i < sizeof(size_t) && i < m_Data.size(); ++i)
+    {
+        res <<= 8;
+        res |= m_Data[i];
+    }
+    return res;
+}
+
 double BigInteger::GetSignificand() const
 {
     if (*this == 0)

@@ -10,6 +10,7 @@ public:
     ~Solution();
 
     friend class Solver;
+    friend class Drainer;
 private:
     std::vector<int> Dist;
     BigInteger States;

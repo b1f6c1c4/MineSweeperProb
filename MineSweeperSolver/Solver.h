@@ -36,6 +36,8 @@ public:
 
     const BigInteger &ZeroCondQ(const BlockSet &set, Block blk);
     const std::vector<BigInteger> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
+
+    friend class Drainer;
 private:
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;
@@ -47,7 +49,6 @@ private:
     BigInteger m_TotalStates;
     std::multimap<unsigned __int64, DistCondQParameters *> m_DistCondQCache;
 
-    void ReduceSet(BlockSet &set, int &outMines, int &outBlanks) const;
     void MergeSets();
     bool ReduceRestrains();
     bool SimpleOverlapAll();

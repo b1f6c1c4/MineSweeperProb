@@ -2,13 +2,14 @@
 #include "random.h"
 #include "BinomialHelper.h"
 #include <functional>
+#include "Drainer.h"
 
 template <class T>
 static void Largest(std::vector<Block> &bests, std::function<T(Block)> fun);
 template <class T>
 static void Largest(std::vector<Block> &bests, std::function<const T &(Block)> fun);
 
-GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height)
+GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height), m_Drainer(nullptr)
 {
     m_Blocks.reserve(width * height);
 
@@ -26,14 +27,13 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
             blk.Y = j;
             blk.IsOpen = false;
             blk.IsMine = false;
-            blkR.Self.push_back(blk.Index);
-            blkR.Surrounding.reserve(8);
+            blkR.reserve(8);
             for (auto di = -1; di <= 1; di++)
                 if (i + di >= 0 && i + di < width)
                     for (auto dj = -1; dj <= 1; dj++)
                         if (j + dj >= 0 && j + dj < height)
                             if (di != 0 || dj != 0)
-                                blkR.Surrounding.push_back(GetIndex(i + di, j + dj));
+                                blkR.push_back(GetIndex(i + di, j + dj));
             lst.push_back(blk.Index);
         }
     m_Solver.AddRestrain(lst, totalMines);
@@ -221,7 +221,16 @@ void GameMgr::Solve(bool withProb, bool withPref)
 
     if (!withProb)
         return;
-    
+
+    if (m_Drainer == nullptr && m_Solver.GetTotalStates() < 50)
+        m_Drainer = new Drainer(*this);
+
+    if (m_Drainer != nullptr)
+    {
+        m_Drainer->Update();
+        m_Preferred = m_Drainer->GetBestBlocks();
+    }
+
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
         if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Unknown)
@@ -234,12 +243,12 @@ void GameMgr::Solve(bool withProb, bool withPref)
     if (!withPref)
         return;
 
-    Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)->const BigInteger & { return m_Solver.ZeroCondQ(m_BlocksR[blk].Surrounding, blk); }));
+    Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)->const BigInteger & { return m_Solver.ZeroCondQ(m_BlocksR[blk], blk); }));
 
     Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
     {
         int m;
-        auto di = m_Solver.DistributionCondQ(m_BlocksR[blk].Surrounding, blk, m);
+        auto di = m_Solver.DistributionCondQ(m_BlocksR[blk], blk, m);
 
         BigInteger t(0);
         for (auto j = 0; j < di.size(); ++j)
@@ -354,7 +363,7 @@ void GameMgr::SettleMines(int initID)
         if (m_Blocks[i].IsMine)
             continue;
         m_Blocks[i].Degree = 0;
-        for (auto &id : m_BlocksR[i].Surrounding)
+        for (auto &id : m_BlocksR[i])
             if (m_Blocks[id].IsMine)
                 ++m_Blocks[i].Degree;
     }
@@ -380,10 +389,10 @@ void GameMgr::OpenBlock(int id)
     m_Solver.AddRestrain(id, false);
     if (m_Blocks[id].Degree == 0)
     {
-        for (auto &blk : m_BlocksR[id].Surrounding)
+        for (auto &blk : m_BlocksR[id])
             OpenBlock(blk);
     }
-    m_Solver.AddRestrain(m_BlocksR[id].Surrounding, m_Blocks[id].Degree);
+    m_Solver.AddRestrain(m_BlocksR[id], m_Blocks[id].Degree);
 
     if (--m_ToOpen == 0)
     {

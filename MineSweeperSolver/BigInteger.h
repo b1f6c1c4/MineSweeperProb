@@ -24,6 +24,8 @@ public:
     friend DLL_API bool operator==(const BigInteger &lhs, const BigInteger &rhs);
     friend DLL_API bool operator!=(const BigInteger &lhs, const BigInteger &rhs);
 
+    explicit operator size_t() const;
+
     double GetSignificand() const;
     int GetExponent() const;
     double Log2() const;

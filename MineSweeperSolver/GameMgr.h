@@ -13,12 +13,6 @@ struct
     bool IsMine;
 };
 
-struct BlockRelationship
-{
-    BlockSet Self;
-    BlockSet Surrounding;
-};
-
 struct GameStatus;
 
 class
@@ -59,15 +53,18 @@ public:
     bool SemiAutomatic(bool withProb);
     void AutomaticStep();
     void Automatic();
+
+    friend class Drainer;
 private:
     int m_TotalWidth, m_TotalHeight, m_TotalMines;
     bool m_Settled, m_Started, m_Succeed;
     std::vector<BlockProperty> m_Blocks;
-    std::vector<BlockRelationship> m_BlocksR;
+    std::vector<BlockSet> m_BlocksR;
     int m_ToOpen;
     Solver m_Solver;
     double m_AllBits;
     std::vector<Block> m_Best, m_Preferred;
+    Drainer *m_Drainer;
 
     int GetIndex(int x, int y) const;
 

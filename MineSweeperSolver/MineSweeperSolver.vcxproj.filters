@@ -42,6 +42,9 @@
     <ClInclude Include="random.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Drainer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -66,6 +69,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="random.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Drainer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
