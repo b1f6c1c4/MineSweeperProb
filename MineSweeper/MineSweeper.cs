@@ -105,7 +105,7 @@ namespace MineSweeper
                         m_Mgr.Probabilities != null)
                         sb.Append($" M{m_Mgr.Probabilities[m_CurrentBlock.Index]:P2}");
 
-                        //if (m_Mgr.Mode.HasFlag(SolvingMode.Extended) &&
+                        //if (m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb) &&
                         //    (m_Mgr.DegreeDist != null &&
                         //     m_Mgr.Quantity != null))
                         //{
@@ -144,7 +144,7 @@ namespace MineSweeper
         {
             if (mgr == null)
             {
-                var mode = m_Mgr?.Mode ?? SolvingMode.Automatic;
+                var mode = m_Mgr?.Mode ?? SolvingMode.ZeroProb;
                 m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
             }
             else
@@ -238,7 +238,7 @@ namespace MineSweeper
                     break;
                 case Keys.A:
                     if (m_Mgr.Started &&
-                        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
+                        m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb))
                         if (m_Mgr.BestBlocks.Any())
                             m_Mgr.SemiAutomaticStep();
                         else
@@ -246,7 +246,7 @@ namespace MineSweeper
                     break;
                 case Keys.Z:
                     if (m_Mgr.Started &&
-                        m_Mgr.Mode.HasFlag(SolvingMode.Automatic))
+                        m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb))
                         if (m_Mgr.BestBlocks.Any())
                             m_Mgr.SemiAutomatic();
                         else
@@ -260,33 +260,27 @@ namespace MineSweeper
                     m_Mgr.Solve();
                     break;
                 case Keys.D1:
-                    m_Mgr.Mode = SolvingMode.Half;
+                    m_Mgr.Mode = SolvingMode.Reduce;
                     m_Mgr.Solve();
                     break;
                 case Keys.D2:
-                    m_Mgr.Mode = SolvingMode.Probability;
+                    m_Mgr.Mode = SolvingMode.Overlap;
                     m_Mgr.Solve();
                     break;
                 case Keys.D3:
-                    m_Mgr.Mode = SolvingMode.Automatic;
+                    m_Mgr.Mode = SolvingMode.Probability;
                     m_Mgr.Solve();
                     break;
                 case Keys.D4:
-                    m_Mgr.Mode = SolvingMode.Extended;
+                    m_Mgr.Mode = SolvingMode.ZeroProb;
                     m_Mgr.Solve();
+                    break;
+                case Keys.D5:
+                    m_Mgr.Mode = SolvingMode.Drained;
                     break;
                 case Keys.C:
                     m_Mgr.Cancel();
                     break;
-                    //case Keys.D:
-                    //    Task.Run(
-                    //             () =>
-                    //             {
-                    //                 var dr = new Drainer();
-                    //                 m_Mgr.PreferredBlocks = dr.Drain(m_Mgr).ToList();
-                    //                 m_Mgr.DrainProbability = dr.Prob;
-                    //             });
-                    //    break;
             }
             UpdateText();
         }

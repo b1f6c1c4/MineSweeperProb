@@ -151,6 +151,10 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
         macro->m_Degrees.resize(m_Blocks.size(), -1);
         macro->m_ToOpen = m_Mgr.m_ToOpen;
         macro->m_Solver = new Solver(m_Blocks.size());
+#ifdef _DEBUG
+        macro->m_Solver->m_SetIDs.clear();
+        macro->m_Solver->m_SetIDs.resize(m_Blocks.size(), -1);
+#endif
         macro->m_Solver->m_BlockSets.clear();
         macro->m_Solver->m_BlockSets.reserve(m_Mgr.m_Solver.m_BlockSets.size());
         for (auto &set : m_Mgr.m_Solver.m_BlockSets)
@@ -161,8 +165,14 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
             for (auto blk : set)
             {
                 auto blkC = m_BlocksLookup[blk];
+#ifdef _DEBUG
+                if (blkC == 0)
+                    ASSERT(m_Blocks[0] == blk);
+#endif
                 setC.push_back(blkC);
+                ASSERT(macro->m_Solver->m_SetIDs[blkC] == -1);
                 macro->m_Solver->m_SetIDs[blkC] = macro->m_Solver->m_BlockSets.size() - 1;
+                ASSERT(&setC == &macro->m_Solver->m_BlockSets[macro->m_Solver->m_SetIDs[blkC]])
             }
         }
         macro->m_Solver->m_Matrix = m_Mgr.m_Solver.m_Matrix;
@@ -290,7 +300,7 @@ void Drainer::Update()
     macro->m_Degrees = m_RootMacro->m_Degrees;
     for (auto i = 0; i < m_Blocks.size();++i)
         if (m_Mgr.m_Blocks[m_Blocks[i]].IsOpen)
-            macro->m_Degrees[i] = m_Mgr.m_Blocks[m_Blocks[i]].Degree;
+            macro->m_Degrees[i] = m_Mgr.m_Blocks[m_Blocks[i]].Degree - m_DMines[i];
     macro->Hash();
     auto newRoot = GetOrAddMacroSituation(macro);
     ASSERT(macro == nullptr);
@@ -433,11 +443,11 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
         return m_SucceedMacro;
     }
 
-    auto step = [&micro, &macro, this](bool withOverlap, bool withProb)
+    auto step = [&micro, &macro, this]()
     {
         if (macro == nullptr)
             return false;
-        macro->m_Solver->Solve(withOverlap, withProb);
+        macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, true);
         auto flag = false;
         for (auto i = 0; i < macro->m_Degrees.size(); ++i)
         {
@@ -455,16 +465,25 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
         return flag;
     };
 
-    while (true)
+    auto flag = true;
+    while (flag)
     {
-        while (step(false, false)) {}
-        if (step(true, false))
-            continue;
-        if (!step(false, true))
-            break;
+        flag = false;
+        macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, true);
+        for (auto i = 0; i < macro->m_Degrees.size(); ++i)
+        {
+            if (macro->m_Degrees[i] >= 0 || macro->m_Solver->m_Manager[i] != BlockStatus::Blank)
+                continue;
+            OpenBlock(micro, macro, i);
+            flag = true;
+            if (macro->m_ToOpen == 0)
+            {
+                delete macro;
+                macro = nullptr;
+                return m_SucceedMacro;
+            }
+        }
     }
-    if (macro == nullptr)
-        return m_SucceedMacro;
 
     return macro;
 }

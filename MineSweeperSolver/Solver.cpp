@@ -1,6 +1,7 @@
 #include "Solver.h"
 #include "BinomialHelper.h"
 
+#define _DEBUG
 #ifdef _DEBUG
 #define ASSERT(val) if (!(val)) throw;
 #define ASSERT_CHECK CheckOL(m_Matrix);
@@ -28,7 +29,7 @@ static unsigned __int64 Hash(const BlockSet &set);
 template <class T>
 static unsigned __int64 HashCol(const Node<T> *ptr);
 
-Solver::Solver(int count) : m_Manager(count, BlockStatus::Unknown), m_Probability(count)
+Solver::Solver(int count) : m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
@@ -36,6 +37,11 @@ Solver::Solver(int count) : m_Manager(count, BlockStatus::Unknown), m_Probabilit
         lst[i] = i;
     m_SetIDs.resize(count, 0);
     m_Matrix.ExtendWidth(2);
+}
+
+SolvingState Solver::GetSolvingState() const
+{
+    return m_State;
 }
 
 BlockStatus Solver::GetBlockStatus(Block block) const
@@ -65,11 +71,17 @@ const BigInteger &Solver::GetTotalStates() const
 
 void Solver::AddRestrain(Block blk, bool isMine)
 {
+    if (m_Manager[blk] == BlockStatus::Unknown)
+    {
+        m_Manager[blk] = isMine ? BlockStatus::Mine : BlockStatus::Blank;
+        m_State = SolvingState::Stale;
+        return;
+    }
+    m_State &= SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
     if (m_Manager[blk] == BlockStatus::Blank && isMine)
         throw;
     if (m_Manager[blk] == BlockStatus::Mine && !isMine)
         throw;
-    m_Manager[blk] = isMine ? BlockStatus::Mine : BlockStatus::Blank;
 }
 
 void Solver::AddRestrain(const BlockSet &set, int mines)
@@ -125,26 +137,39 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
 
     m_Matrix.Add(*nr, m_Matrix.GetColHead(m_BlockSets.size()), mines - dMines);
     ASSERT_CHECK;
+    m_State = SolvingState::Stale;
 }
 
-void Solver::Solve(bool withOverlap, bool withProb)
+void Solver::Solve(SolvingState maxDepth, bool shortcut)
 {
+    if ((m_State & maxDepth) == maxDepth)
+        return;
+
     m_Solutions.clear();
     ClearDistCondQCache();
 
-    auto flag = true;
-    while (flag)
+    while (true)
     {
-        while (ReduceRestrains()) {}
-        if (withOverlap)
-            flag = SimpleOverlapAll();
-        else
-            flag = false;
+        while ((m_State & SolvingState::Reduce) == SolvingState::Stale)
+        {
+            ReduceRestrains();
+            if (shortcut && (m_State & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
+                return;
+        }
+        if ((maxDepth & SolvingState::Overlap) == SolvingState::Stale)
+            break;
+        SimpleOverlapAll();
+        if (shortcut && (m_State & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
+            return;
+        if ((m_State & SolvingState::Overlap) == SolvingState::Overlap)
+            break;
     }
     MergeSets();
 
-    if (!withProb)
+    if ((maxDepth & SolvingState::Probability) == SolvingState::Stale)
         return;
+
+    m_State |= SolvingState::Probability;
 
     if (m_BlockSets.empty())
     {
@@ -252,9 +277,9 @@ void Solver::MergeSets()
     }
 }
 
-bool Solver::ReduceRestrains()
+void Solver::ReduceRestrains()
 {
-    auto flag = false;
+    m_State |= SolvingState::Reduce;
     auto row = 0;
     auto n = m_Matrix.GetColHead(m_BlockSets.size()).Down;
     while (row < m_Matrix.GetHeight())
@@ -266,9 +291,13 @@ bool Solver::ReduceRestrains()
             {
                 auto col = nr->Col;
                 for (auto &blk : m_BlockSets[col])
+                {
+                    if (m_Manager[blk] == BlockStatus::Blank)
+                        continue;
                     m_Manager[blk] = BlockStatus::Blank;
+                    m_State = SolvingState::CanOpenForSure;
+                }
                 nr = nr->Right;
-                flag = true;
             }
             if (n != nullptr && n->Row == row)
                 n = n->Down;
@@ -294,9 +323,11 @@ bool Solver::ReduceRestrains()
             {
                 auto col = nr->Col;
                 for (auto &blk : m_BlockSets[col])
+                {
                     m_Manager[blk] = BlockStatus::Mine;
+                    m_State &= SolvingState::CanOpenForSure;
+                }
                 nr = nr->Right;
-                flag = true;
             }
             ASSERT_CHECK;
             ASSERT(n != nullptr && n->Row == row);
@@ -351,7 +382,7 @@ bool Solver::ReduceRestrains()
                 nc = nc->Down;
                 ncc = node->Down;
             }
-            flag = true;
+            m_State &= SolvingState::CanOpenForSure;
         }
         if (set.empty())
         {
@@ -361,16 +392,15 @@ bool Solver::ReduceRestrains()
             for (auto &id : m_SetIDs)
                 if (id > col)
                     --id;
-            flag = true;
+            m_State &= SolvingState::CanOpenForSure;
         }
     }
     ASSERT_CHECK;
-    return flag;
 }
 
-bool Solver::SimpleOverlapAll()
+void Solver::SimpleOverlapAll()
 {
-    auto flag = false;
+    m_State |= SolvingState::Overlap;
     m_Pairs.clear();
 
     for (auto col = 0; col < m_BlockSets.size(); ++col)
@@ -384,21 +414,16 @@ bool Solver::SimpleOverlapAll()
         }
 
         for (auto i = 0; i < indexes.size() - 1; ++i)
-        {
             for (auto j = i + 1; j < indexes.size(); ++j)
-            {
-                auto rowRemoved = false;
-                flag |= SimpleOverlap(indexes[i], indexes[j], rowRemoved);
-                if (rowRemoved)
-                    return true;
-            }
-        }
+                if (SimpleOverlap(indexes[i], indexes[j]))
+                {
+                    m_State &= SolvingState::CanOpenForSure;
+                    return;
+                }
     }
-    
-    return flag;
 }
 
-bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
+bool Solver::SimpleOverlap(int r1, int r2)
 {
     if (!m_Pairs.emplace(r1, r2).second)
         return false;
@@ -437,8 +462,7 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
 
         m_Matrix.RemoveRow(r2);
         ASSERT_CHECK;
-        rowRemoved = true;
-        return false;
+        return true;
     }
 
     typedef std::pair<int, int> Iv;
@@ -470,8 +494,7 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
     ivB = ints(ivB, subs(ivBC, ivC));
     ivC = ints(ivC, ints(subs(ivAC, ivA), subs(ivBC, ivB)));
 
-    auto flag = false;
-    auto proc = [&flag, this](const std::vector<int> &lst, const Iv &iv0,const Iv &iv)
+    auto proc = [this](const std::vector<int> &lst, const Iv &iv0,const Iv &iv)
         {
             if (lst.empty())
                 return;
@@ -479,15 +502,21 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
             {
                 for (const auto &id : lst)
                     for (const auto &blk : m_BlockSets[id])
+                    {
                         m_Manager[blk] = BlockStatus::Mine;
-                flag = true;
+                        m_State &= SolvingState::CanOpenForSure;
+                    }
             }
             else if (iv0.first == iv.second)
             {
                 for (const auto &id : lst)
                     for (const auto &blk : m_BlockSets[id])
+                    {
+                        if (m_Manager[blk] == BlockStatus::Blank)
+                            continue;
                         m_Manager[blk] = BlockStatus::Blank;
-                flag = true;
+                        m_State = SolvingState::CanOpenForSure;
+                    }
             }
         };
 
@@ -496,7 +525,7 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
     proc(intersection, ivC0, ivC);
 
     ASSERT_CHECK;
-    return flag;
+    return false;
 }
 
 template <class T>
@@ -743,8 +772,15 @@ void Solver::ProcessSolutions()
         auto prod = m_TotalStates * m_BlockSets[i].size();
         ASSERT(exp[i] <= prod);
         if (exp[i] == 0)
+        {
             for (auto &blk : m_BlockSets[i])
+            {
+                if (m_Manager[blk] == BlockStatus::Blank)
+                    continue;
                 m_Manager[blk] = BlockStatus::Blank;
+                m_State |= SolvingState::CanOpenForSure;
+            }
+        }
         else if (exp[i] == prod)
             for (auto &blk : m_BlockSets[i])
                 m_Manager[blk] = BlockStatus::Mine;

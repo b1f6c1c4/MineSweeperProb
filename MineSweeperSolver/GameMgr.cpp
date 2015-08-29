@@ -4,12 +4,19 @@
 #include <functional>
 #include "Drainer.h"
 
+#define _DEBUG
+#ifdef _DEBUG
+#define ASSERT(val) if (!(val)) throw;
+#else
+#define ASSERT(val)
+#endif
+
 template <class T>
 static void Largest(std::vector<Block> &bests, std::function<T(Block)> fun);
 template <class T>
 static void Largest(std::vector<Block> &bests, std::function<const T &(Block)> fun);
 
-GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height), m_Drainer(nullptr)
 {
     m_Blocks.reserve(width * height);
 
@@ -39,6 +46,14 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
     m_Solver.AddRestrain(lst, totalMines);
 
     m_AllBits = Binomial(width * height, totalMines).Log2();
+}
+
+GameMgr::~GameMgr()
+{
+    if (m_Drainer == nullptr)
+        return;
+    delete m_Drainer;
+    m_Drainer = nullptr;
 }
 
 Solver &GameMgr::GetSolver()
@@ -184,7 +199,7 @@ void Largest(std::vector<Block> &bests, std::function<const T &(int)> fun)
     newBests.swap(bests);
 }
 
-void GameMgr::Solve(bool withProb, bool withPref)
+void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 {
     if (!m_Started)
         return;
@@ -192,7 +207,8 @@ void GameMgr::Solve(bool withProb, bool withPref)
     m_Best.clear();
     m_Preferred.clear();
 
-    m_Solver.Solve(true, withProb);
+    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+    m_Solver.Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
 
 #ifdef _DEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)
@@ -212,35 +228,51 @@ void GameMgr::Solve(bool withProb, bool withPref)
         }
 #endif
 
+    if ((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
+    {
+        for (auto i = 0; i < m_Blocks.size(); ++i)
+            if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
+                m_Best.push_back(i);
+        ASSERT(!m_Best.empty());
+        return;
+    }
+#ifdef _DEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)
         if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
-            m_Best.push_back(i);
+            throw;
+#endif
 
-    if (!m_Best.empty())
+    if ((maxDepth & SolvingState::Probability) == SolvingState::Stale &&
+        (maxDepth & SolvingState::ZeroProb) == SolvingState::Stale &&
+        (maxDepth & SolvingState::Drained) == SolvingState::Stale)
         return;
 
-    if (!withProb)
-        return;
+#ifdef _DEBUG
+#endif
 
-    if (m_Drainer == nullptr && m_Solver.GetTotalStates() < 50)
-        m_Drainer = new Drainer(*this);
+    if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
+        if (m_Drainer == nullptr && m_Solver.GetTotalStates() <= DrainCriterion &&
+            (m_Solver.GetTotalStates() > 2 || m_ToOpen > 1))
+            EnableDrainer();
 
     if (m_Drainer != nullptr)
     {
         m_Drainer->Update();
-        m_Preferred = m_Drainer->GetBestBlocks();
+        if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
+            m_Preferred = m_Drainer->GetBestBlocks();
     }
 
-    for (auto i = 0; i < m_Blocks.size(); ++i)
-    {
-        if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Unknown)
-            continue;
-        m_Preferred.push_back(i);
-    }
+    if (m_Preferred.empty())
+        for (auto i = 0; i < m_Blocks.size(); ++i)
+        {
+            if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Unknown)
+                continue;
+            m_Preferred.push_back(i);
+        }
 
     Largest(m_Preferred, std::function<double(Block)>([this](Block blk) { return -m_Solver.GetProbability(blk); }));
 
-    if (!withPref)
+    if ((maxDepth & SolvingState::ZeroProb) == SolvingState::Stale)
         return;
 
     Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)->const BigInteger & { return m_Solver.ZeroCondQ(m_BlocksR[blk], blk); }));
@@ -286,56 +318,69 @@ void GameMgr::OpenOptimalBlocks()
     auto blk = m_Preferred.size() == 1 ? m_Preferred[0] : m_Preferred[RandomInteger(m_Preferred.size())];
     m_Preferred.clear();
     OpenBlock(blk);
+    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 }
 
-bool GameMgr::SemiAutomaticStep(bool withOverlap, bool withProb)
+bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
 {
     if (!m_Started)
         return false;
-    m_Solver.Solve(withOverlap, withProb);
+    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+    m_Solver.Solve(maxDepth, true);
+    if ((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
+#ifdef _DEBUG
+    {
+        for (auto i = 0; i < m_Blocks.size(); ++i)
+            if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
+                throw;
+        return false;
+    }
+#else
+        return false;
+#endif
     auto flag = false;
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
         if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Blank)
             continue;
         OpenBlock(i);
+        ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
         flag = true;
         if (m_Started)
             continue;
         break;
     }
-    return flag && m_Started;
-}
-
-bool GameMgr::SemiAutomatic(bool withProb)
-{
-    if (!m_Started)
-        return false;
-    while (true)
-    {
-        while (SemiAutomaticStep(false, false)) {}
-        if (SemiAutomaticStep(true, false))
-            continue;
-        if (!withProb || !SemiAutomaticStep(false, true))
-            break;
-    }
+    ASSERT(flag);
     return m_Started;
 }
 
-void GameMgr::AutomaticStep()
+bool GameMgr::SemiAutomatic(SolvingState maxDepth)
+{
+    if (!m_Started)
+        return false;
+    while (SemiAutomaticStep(maxDepth)) { }
+    return m_Started;
+}
+
+void GameMgr::AutomaticStep(SolvingState maxDepth)
 {
     if (!m_Started)
         return;
 
-    Solve(true, true);
+    Solve(maxDepth, true);
     OpenOptimalBlocks();
 }
 
 void GameMgr::Automatic()
 {
     while (m_Started)
-        if (SemiAutomatic(true))
-            AutomaticStep();
+        if (SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability))
+            AutomaticStep(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::ZeroProb | SolvingState::Drained);
+}
+
+void GameMgr::EnableDrainer()
+{
+    m_Drainer = new Drainer(*this);
 }
 
 int GameMgr::GetIndex(int x, int y) const
@@ -399,4 +444,6 @@ void GameMgr::OpenBlock(int id)
         m_Started = false;
         m_Succeed = true;
     }
+
+    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 }

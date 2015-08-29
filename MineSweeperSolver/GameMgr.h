@@ -15,11 +15,13 @@ struct
 
 struct GameStatus;
 
-class
-    DLL_API GameMgr
+class DLL_API GameMgr
 {
 public:
     GameMgr(int width, int height, int totalMines);
+    ~GameMgr();
+
+    size_t DrainCriterion;
 
     Solver &GetSolver();
     const Solver &GetSolver() const;
@@ -45,14 +47,16 @@ public:
 
     void OpenBlock(int x, int y);
 
-    void Solve(bool withProb, bool withPref);
+    void Solve(SolvingState maxDepth, bool shortcut);
 
     void OpenOptimalBlocks();
 
-    bool SemiAutomaticStep(bool withOverlap, bool withProb);
-    bool SemiAutomatic(bool withProb);
-    void AutomaticStep();
+    bool SemiAutomaticStep(SolvingState maxDepth);
+    bool SemiAutomatic(SolvingState maxDepth);
+    void AutomaticStep(SolvingState maxDepth);
     void Automatic();
+
+    void EnableDrainer();
 
     friend class Drainer;
 private:

@@ -18,24 +18,29 @@ namespace MineSweeper
         None = 0x0,
 
         /// <summary>
+        ///     自动简易求解
+        /// </summary>
+        Reduce = 0x1,
+
+        /// <summary>
         ///     自动半程求解
         /// </summary>
-        Half = 0x1,
+        Overlap = 0x2 | Reduce,
 
         /// <summary>
         ///     自动概率求解
         /// </summary>
-        Probability = 0x2 | Half,
+        Probability = 0x4 | Overlap,
 
         /// <summary>
         ///     自动决策求解
         /// </summary>
-        Automatic = 0x4 | Probability,
+        ZeroProb = 0x8 | Probability,
 
         /// <summary>
-        ///     自动扩展求解
+        ///     完美求解
         /// </summary>
-        Extended = 0x8 | Automatic
+        Drained = 0x8000
     }
 
     public sealed class Block : IComparable<Block>
@@ -74,11 +79,6 @@ namespace MineSweeper
             }
             internal set { m_IsMine = value; }
         }
-
-        /// <summary>
-        ///     是否有雷
-        /// </summary>
-        internal bool IsMineInternal() => m_IsMine;
 
         /// <summary>
         ///     周围的格中雷数
@@ -151,19 +151,30 @@ namespace MineSweeper
                     return;
 
                 Cancel();
+                if (value.HasFlag(SolvingMode.Drained))
+                {
+                    if (!m_Mode.HasFlag(SolvingMode.Drained))
+                    {
+                        m_Backgrounding = new Thread(ProcessDrain);
+                        Solving = true;
+                        m_Backgrounding.Start();
+                    }
+                    m_Mode = SolvingMode.Drained;
+                    return;
+                }
                 m_Mode = value;
-                if (!m_Mode.HasFlag(SolvingMode.Extended))
+                if (!m_Mode.HasFlag(SolvingMode.ZeroProb))
                 {
                     //DegreeDist = null;
                     //Quantity = null;
                 }
-                if (!m_Mode.HasFlag(SolvingMode.Automatic)) { }
-                if (!m_Mode.HasFlag(SolvingMode.Probability))
+                if (!m_Mode.HasFlag(SolvingMode.Probability)) { }
+                if (!m_Mode.HasFlag(SolvingMode.Overlap))
                 {
                     Probabilities = null;
                     Bits = double.NaN;
                 }
-                if (!m_Mode.HasFlag(SolvingMode.Half))
+                if (!m_Mode.HasFlag(SolvingMode.Reduce))
                 {
                     PreferredBlocks = null;
                     InferredStatuses = null;
@@ -307,7 +318,7 @@ namespace MineSweeper
             if (!Started)
                 return;
 
-            if (!Mode.HasFlag(SolvingMode.Half))
+            if (!Mode.HasFlag(SolvingMode.Reduce))
                 return;
 
             m_Backgrounding = new Thread(ProcessSolve);
@@ -343,7 +354,7 @@ namespace MineSweeper
             if (!Started)
                 return;
 
-            if (!Mode.HasFlag(SolvingMode.Half))
+            if (!Mode.HasFlag(SolvingMode.Reduce))
                 return;
 
             m_Backgrounding = new Thread(ProcessSemiAutomaticStep);
@@ -362,7 +373,7 @@ namespace MineSweeper
             if (!Started)
                 return;
 
-            if (!Mode.HasFlag(SolvingMode.Half))
+            if (!Mode.HasFlag(SolvingMode.Reduce))
                 return;
 
             m_Backgrounding = new Thread(ProcessSemiAutomatic);
@@ -381,7 +392,7 @@ namespace MineSweeper
             if (!Started)
                 return;
 
-            if (!Mode.HasFlag(SolvingMode.Automatic))
+            if (!Mode.HasFlag(SolvingMode.Probability))
                 return;
 
             m_Backgrounding = new Thread(ProcessAutomaticStep);
@@ -404,7 +415,7 @@ namespace MineSweeper
         private static extern void OpenBlock(IntPtr mgr, int x, int y);
 
         [DllImport("MineSweeperSolver.dll")]
-        private static extern void Solve(IntPtr mgr, bool withProb);
+        private static extern void Solve(IntPtr mgr, SolvingMode maxDepth);
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern IntPtr GetGameStatus(IntPtr mgr);
@@ -425,6 +436,9 @@ namespace MineSweeper
         private static extern bool Automatic(IntPtr mgr);
 
         [DllImport("MineSweeperSolver.dll")]
+        private static extern bool EnableDrainer(IntPtr mgr); 
+
+         [DllImport("MineSweeperSolver.dll")]
         private static extern bool OpenOptimalBlocks(IntPtr mgr);
 
         #endregion PInvokes
@@ -539,7 +553,7 @@ namespace MineSweeper
 
         private void ProcessSolve()
         {
-            Solve(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
+            Solve(m_NativeObject, Mode);
             FetchStatus();
         }
 
@@ -578,6 +592,12 @@ namespace MineSweeper
                 AutomaticStep(m_NativeObject);
                 FetchStatus();
             }
+        }
+
+        private void ProcessDrain()
+        {
+            EnableDrainer(m_NativeObject);
+            FetchStatus();
         }
 
         public void Dispose() => Dispose(true);

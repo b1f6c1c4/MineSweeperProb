@@ -13,6 +13,37 @@ enum class BlockStatus
     Blank = -2
 };
 
+enum class SolvingState
+{
+    Stale = 0x0,
+    Reduce = 0x1,
+    Overlap = 0x2,
+    Probability = 0x4,
+    ZeroProb = 0x8,
+    Drained = 0x8000,
+    CanOpenForSure = 0x10000
+};
+
+inline SolvingState operator&(SolvingState lhs, SolvingState rhs)
+{
+    return static_cast<SolvingState>(static_cast<int>(lhs) & static_cast<int>(rhs));
+}
+
+inline SolvingState operator|(SolvingState lhs, SolvingState rhs)
+{
+    return static_cast<SolvingState>(static_cast<int>(lhs) | static_cast<int>(rhs));
+}
+
+inline SolvingState operator&=(SolvingState &lhs, SolvingState rhs)
+{
+    return lhs = (lhs & rhs);
+}
+
+inline SolvingState operator|=(SolvingState &lhs, SolvingState rhs)
+{
+    return lhs = (lhs | rhs);
+}
+
 typedef int Block;
 typedef std::vector<Block> BlockSet;
 
@@ -24,6 +55,7 @@ class DLL_API Solver
 public:
     explicit Solver(int count);
 
+    SolvingState GetSolvingState() const;
     BlockStatus GetBlockStatus(Block block) const;
     const BlockStatus *GetBlockStatuses() const;
     double GetProbability(Block block) const;
@@ -32,13 +64,14 @@ public:
 
     void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
-    void Solve(bool withOverlap, bool withProb);
+    void Solve(SolvingState maxDepth, bool shortcut);
 
     const BigInteger &ZeroCondQ(const BlockSet &set, Block blk);
     const std::vector<BigInteger> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
 
     friend class Drainer;
 private:
+    SolvingState m_State;
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;
     std::vector<int> m_SetIDs;
@@ -50,9 +83,9 @@ private:
     std::multimap<unsigned __int64, DistCondQParameters *> m_DistCondQCache;
 
     void MergeSets();
-    bool ReduceRestrains();
-    bool SimpleOverlapAll();
-    bool SimpleOverlap(int r1, int r2, bool &rowRemoved);
+    void ReduceRestrains();
+    void SimpleOverlapAll();
+    bool SimpleOverlap(int r1, int r2);
     void EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<float> &augmentedMatrix);
     void ProcessSolutions();
 

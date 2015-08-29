@@ -53,9 +53,9 @@ extern "C" DLL_API void OpenBlock(GameMgr *mgr, int x, int y)
     mgr->OpenBlock(x, y);
 }
 
-extern "C" DLL_API void Solve(GameMgr *mgr, bool withProb, bool withPref)
+extern "C" DLL_API void Solve(GameMgr *mgr, SolvingState maxDepth)
 {
-    mgr->Solve(withProb, withPref);
+    mgr->Solve(maxDepth, false);
 }
 
 extern "C" DLL_API GameStatus *GetGameStatus(GameMgr *mgr)
@@ -92,22 +92,27 @@ extern "C" DLL_API void ReleaseGameStatus(GameStatus *status)
 
 extern "C" DLL_API bool SemiAutomaticStep(GameMgr *mgr, bool withProb)
 {
-    return mgr->SemiAutomaticStep(true, withProb);
+    return mgr->SemiAutomaticStep(SolvingState::Reduce | SolvingState::Overlap | (withProb ? SolvingState::Probability : SolvingState::Stale));
 }
 
 extern "C" DLL_API bool SemiAutomatic(GameMgr *mgr, bool withProb)
 {
-    return mgr->SemiAutomatic(withProb);
+    return mgr->SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | (withProb ? SolvingState::Probability : SolvingState::Stale));
 }
 
 extern "C" DLL_API void AutomaticStep(GameMgr *mgr)
 {
-    mgr->AutomaticStep();
+    mgr->AutomaticStep(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::ZeroProb);
 }
 
 extern "C" DLL_API void Automatic(GameMgr *mgr)
 {
     mgr->Automatic();
+}
+
+extern "C" DLL_API void EnableDrainer(GameMgr *mgr)
+{
+    mgr->EnableDrainer();
 }
 
 extern "C" DLL_API void OpenOptimalBlocks(GameMgr *mgr)

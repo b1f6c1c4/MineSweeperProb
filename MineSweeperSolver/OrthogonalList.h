@@ -3,8 +3,16 @@
 #include <vector>
 #include <set>
 
+#define _DEBUG
 #ifdef _DEBUG
 #include <sstream>
+#define ASSERT(val) if (!(val)) throw;
+template <class T>
+class OrthogonalList;
+template <class T>
+bool Check(const OrthogonalList<T> &ol);
+#else
+#define ASSERT(val)
 #endif
 
 template <class T>
@@ -27,6 +35,8 @@ public:
     OrthogonalList(int width, int height);
     OrthogonalList(const OrthogonalList<T> &other);
     ~OrthogonalList();
+
+    OrthogonalList<T> &operator=(const OrthogonalList<T> &other);
 
     int GetHeight() const;
     int GetWidth() const;
@@ -100,9 +110,37 @@ OrthogonalList<T>::OrthogonalList(const OrthogonalList<T> &other)
 template <class T>
 OrthogonalList<T>::~OrthogonalList()
 {
+    ASSERT(Check(*this));
     for (auto &node : m_Rows)
         while (node.Right != nullptr)
             Remove(*node.Right);
+}
+
+template <class T>
+OrthogonalList<T>& OrthogonalList<T>::operator=(const OrthogonalList<T>& other) 
+{
+    for (auto &node : m_Rows)
+        while (node.Right != nullptr)
+            Remove(*node.Right);
+
+    m_Rows.clear();
+    m_Cols.clear();
+
+    ExtendHeight(other.GetHeight());
+    ExtendWidth(other.GetWidth());
+
+    for (auto i = 0; i < m_Rows.size(); i++)
+    {
+        const Node<T> *n = other.GetRowHead(i).Right;
+        auto nr = &m_Rows[i];
+        while (n != nullptr)
+        {
+            nr = &Add(*nr, m_Cols[n->Col], n->Value);
+            n = n->Right;
+        }
+    }
+
+    return *this;
 }
 
 template <class T>
@@ -223,8 +261,8 @@ void OrthogonalList<T>::Remove(Node<T> &nr, Node<T> &nc)
     auto node = left->Right;
     if (node != up->Down)
         return;
-    if (node->Col != nc.Col)
-        throw;
+    ASSERT(node->Col == nc.Col);
+    ASSERT(node->Row == nr.Row);
 
     left->Right = node->Right;
     up->Down = node->Down;
@@ -241,8 +279,9 @@ void OrthogonalList<T>::Remove(const Node<T> &node)
 template <class T>
 void OrthogonalList<T>::RemoveRow(int row)
 {
+    ASSERT(Check(*this));
     while (m_Rows[row].Right != nullptr)
-        Remove(row, m_Rows[row].Right->Col);
+        Remove(*m_Rows[row].Right);
     for (auto i = row; i < m_Rows.size() - 1; ++i)
     {
         auto n = m_Rows[i].Right = m_Rows[i + 1].Right;
@@ -258,8 +297,9 @@ void OrthogonalList<T>::RemoveRow(int row)
 template <class T>
 void OrthogonalList<T>::RemoveCol(int col)
 {
+    ASSERT(Check(*this));
     while (m_Cols[col].Down != nullptr)
-        Remove(m_Cols[col].Down->Row, col);
+        Remove(*m_Cols[col].Down);
     for (auto i = col; i < m_Cols.size() - 1; ++i)
     {
         auto n = m_Cols[i].Down = m_Cols[i + 1].Down;
