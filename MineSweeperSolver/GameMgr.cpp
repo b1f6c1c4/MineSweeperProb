@@ -194,8 +194,7 @@ void GameMgr::Solve(bool withProb, bool withPref)
 
     m_Solver.Solve(true, withProb);
 
-#define DEBUG
-#ifdef DEBUG
+#ifdef _DEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)
         switch (m_Solver.GetBlockStatus(i))
         {

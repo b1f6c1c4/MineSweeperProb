@@ -1,8 +1,11 @@
 #pragma once
 #include "stdafx.h"
 #include <vector>
-#include <algorithm>
 #include <set>
+
+#ifdef _DEBUG
+#include <sstream>
+#endif
 
 template <class T>
 struct Node
@@ -240,16 +243,16 @@ void OrthogonalList<T>::RemoveRow(int row)
 {
     while (m_Rows[row].Right != nullptr)
         Remove(row, m_Rows[row].Right->Col);
-    m_Rows.erase(m_Rows.begin() + row);
-    for (auto i = row; i < m_Rows.size(); ++i)
+    for (auto i = row; i < m_Rows.size() - 1; ++i)
     {
-        auto n = &m_Rows[i];
+        auto n = m_Rows[i].Right = m_Rows[i + 1].Right;
         while (n != nullptr)
         {
             --n->Row;
             n = n->Right;
         }
     }
+    m_Rows.pop_back();
 }
 
 template <class T>
@@ -257,46 +260,48 @@ void OrthogonalList<T>::RemoveCol(int col)
 {
     while (m_Cols[col].Down != nullptr)
         Remove(m_Cols[col].Down->Row, col);
-    m_Cols.erase(m_Cols.begin() + col);
-    for (auto i = col; i < m_Cols.size(); ++i)
+    for (auto i = col; i < m_Cols.size() - 1; ++i)
     {
-        auto n = &m_Cols[i];
+        auto n = m_Cols[i].Down = m_Cols[i + 1].Down;
         while (n != nullptr)
         {
             --n->Col;
             n = n->Down;
         }
     }
+    m_Cols.pop_back();
 }
 
 template <class T>
 void OrthogonalList<T>::InsertRow(int row)
 {
-    for (auto i = row; i < m_Rows.size(); ++i)
+    m_Rows.emplace_back(m_Rows.size(), -1);
+    for (auto i = m_Rows.size() - 1; i > row; --i)
     {
-        auto n = &m_Rows[i];
+        auto n = m_Rows[i].Right = m_Rows[i - 1].Right;
         while (n != nullptr)
         {
             ++n->Row;
             n = n->Right;
         }
     }
-    m_Rows.insert(m_Rows.begin() + row, Node<T>(row, -1));
+    m_Rows[row].Right = nullptr;
 }
 
 template <class T>
 void OrthogonalList<T>::InsertCol(int col)
 {
-    for (auto i = col; i < m_Cols.size(); ++i)
+    m_Cols.emplace_back(-1, m_Cols.size());
+    for (auto i = m_Cols.size() - 1; i > col; --i)
     {
-        auto n = &m_Cols[i];
+        auto n = m_Cols[i].Down = m_Cols[i - 1].Down;
         while (n != nullptr)
         {
             ++n->Col;
             n = n->Down;
         }
     }
-    m_Cols.insert(m_Cols.begin() + col, Node<T>(-1, col));
+    m_Cols[col].Down = nullptr;
 }
 
 template <class T>
@@ -327,6 +332,7 @@ void OrthogonalList<T>::ExtendWidth(int cols)
         m_Cols.emplace_back(-1, i);
 }
 
+#ifdef _DEBUG
 template <class T>
 bool Check(const OrthogonalList<T> &ol)
 {
@@ -363,3 +369,26 @@ bool Check(const OrthogonalList<T> &ol)
     }
     return pairs.empty();
 }
+
+template <class T>
+std::string ToString(OrthogonalList<T> ol)
+{
+    auto sw = std::stringstream();
+    auto flag = false;
+    sw << "{";
+    for (auto i = 0; i < ol.GetHeight(); ++i)
+    {
+        auto node = ol.GetRowHead(i).Right;
+        while (node != nullptr)
+        {
+            if (flag)
+                sw << ",";
+            sw << "{" << node->Row + 1 << "," << node->Col + 1<< "}->" << node->Value;
+            flag = true;
+            node = node->Right;
+        }
+    }
+    sw << "}";
+    return sw.str();
+}
+#endif

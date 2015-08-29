@@ -1,15 +1,10 @@
 #include "Solver.h"
 #include "BinomialHelper.h"
 
-#ifdef DEBUG
+#ifdef _DEBUG
 #define ASSERT(val) if (!(val)) throw;
-#define ASSERT_CHECK fuck(m_Matrix);
-#else
-#define ASSERT(val)
-#define ASSERT_CHECK
-#endif
-
-void fuck(OrthogonalList<int> &m)
+#define ASSERT_CHECK CheckOL(m_Matrix);
+void CheckOL(OrthogonalList<int> &m)
 {
     ASSERT(Check(m));
     for (auto row = 0; row < m.GetHeight(); ++row)
@@ -20,9 +15,13 @@ void fuck(OrthogonalList<int> &m)
         ASSERT(n.Down->Value >= 0);
     }
 }
+#else
+#define ASSERT(val)
+#define ASSERT_CHECK
+#endif
 
-
-static std::vector<int> Gauss(OrthogonalList<float> &matrix);
+template <class T>
+static std::vector<int> Gauss(OrthogonalList<T> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
 static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
 static unsigned __int64 Hash(const BlockSet &set);
@@ -316,8 +315,11 @@ bool Solver::ReduceRestrains()
     {
         auto dMines = 0;
         auto &set = m_BlockSets[col];
+        BlockSet setN;
+        setN.reserve(set.size());
         for (auto it = set.begin(); it != set.end(); ++it)
         {
+            ASSERT(m_SetIDs[*it] == col);
             switch (m_Manager[*it])
             {
             case BlockStatus::Mine:
@@ -328,13 +330,13 @@ bool Solver::ReduceRestrains()
                 m_SetIDs[*it] = -2;
                 break;
             case BlockStatus::Unknown:
-            default:
+                setN.push_back(*it);
                 continue;
+            default:
+                ASSERT(false);
             }
-            it = set.erase(it);
-            if (it == set.end())
-                break;
         }
+        setN.swap(set);
         if (dMines != 0)
         {
             auto nc = m_Matrix.GetColHead(col).Down;
@@ -493,47 +495,14 @@ bool Solver::SimpleOverlap(int r1, int r2, bool &rowRemoved)
     proc(exceptB, ivB0, ivB);
     proc(intersection, ivC0, ivC);
 
-    if (exceptA.empty() || exceptB.empty())
-    {
-        ASSERT(!intersection.empty());
-        Node<int> *nr;
-        if (exceptA.empty())
-        {
-            n2->Value -= n1->Value;
-            ASSERT(n2->Value >= 0);
-            nr = m_Matrix.GetRowHead(r2).Right;
-        }
-        else
-        {
-            n1->Value -= n2->Value;
-            ASSERT(n1->Value >= 0);
-            nr = m_Matrix.GetRowHead(r1).Right;
-        }
-        auto it = intersection.begin();
-        while (nr->Col != m_BlockSets.size())
-        {
-            if (nr->Col != *it)
-            {
-                nr = nr->Right;
-                continue;
-            }
-            auto tmp = nr;
-            nr = nr->Right;
-            m_Matrix.Remove(*tmp);
-            ASSERT_CHECK;
-            if (++it == intersection.end())
-                break;
-        }
-        ASSERT(it == intersection.end());
-    }
-
     ASSERT_CHECK;
     return flag;
 }
 
-std::vector<int> Gauss(OrthogonalList<float> &matrix)
+template <class T>
+std::vector<int> Gauss(OrthogonalList<T> &matrix)
 {
-#define ZEROQ(val) (abs(val) < static_cast<float>(1E-4))
+#define ZEROQ(val) (abs(val) < static_cast<T>(1E-4))
     auto n = matrix.GetWidth();
     auto minorCol = std::vector<int>();
     auto major = 0;
@@ -552,7 +521,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
             continue;
         }
 
-        auto vec = std::vector<std::pair<int, float>>();
+        auto vec = std::vector<std::pair<int, T>>();
         auto theBiasInv = 1 / biasNode->Value;
         auto node = matrix.GetColHead(col).Down;
         while (node != nullptr)
@@ -581,7 +550,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
                 while (nc->Down != nullptr && nc->Down->Row < it->first)
                     nc = nc->Down;
 
-                int oldV;
+                T oldV;
                 if (nc->Down == nullptr ||
                     nc->Down->Row > it->first)
                     oldV = 0;
