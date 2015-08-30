@@ -281,6 +281,10 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Preferred.clear();
 
     m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
+#ifdef _DEBUG
+    if (m_Solver->GetTotalStates() == 0)
+        throw;
+#endif
 
 #ifdef _DEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)

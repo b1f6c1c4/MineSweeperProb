@@ -20,9 +20,9 @@ void CheckOL(OrthogonalList<int> &m)
 #define ASSERT_CHECK
 #endif
 
-#define ZEROQ(val) (abs(val) < static_cast<float>(1E-4))
+#define ZEROQ(val) (abs(val) < static_cast<double>(1E-3))
 
-static std::vector<int> Gauss(OrthogonalList<float> &matrix);
+static std::vector<int> Gauss(OrthogonalList<double> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
 static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
 static unsigned __int64 Hash(const BlockSet &set);
@@ -184,12 +184,12 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         return;
     }
 
-    OrthogonalList<float> augmentedMatrix(m_Matrix.GetWidth(), m_Matrix.GetHeight());
+    OrthogonalList<double> augmentedMatrix(m_Matrix.GetWidth(), m_Matrix.GetHeight());
     for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
     {
         auto nr = &augmentedMatrix.GetRowHead(row);
         for (auto node = m_Matrix.GetRowHead(row).Right; node != nullptr; node = node->Right)
-            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), static_cast<float>(node->Value));
+            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), static_cast<double>(node->Value));
     }
     auto minors = Gauss(augmentedMatrix);
 
@@ -526,7 +526,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
     return false;
 }
 
-std::vector<int> Gauss(OrthogonalList<float> &matrix)
+std::vector<int> Gauss(OrthogonalList<double> &matrix)
 {
     auto n = matrix.GetWidth();
     auto minorCol = std::vector<int>();
@@ -546,7 +546,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
             continue;
         }
 
-        auto vec = std::vector<std::pair<int, float>>();
+        auto vec = std::vector<std::pair<int, double>>();
         auto theBiasInv = 1 / biasNode->Value;
         for (auto node = matrix.GetColHead(col).Down; node != nullptr;)
         {
@@ -573,7 +573,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
                 while (nc->Down != nullptr && nc->Down->Row < it->first)
                     nc = nc->Down;
 
-                float oldV;
+                double oldV;
                 if (nc->Down == nullptr ||
                     nc->Down->Row > it->first)
                     oldV = 0;
@@ -635,7 +635,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
     return minorCol;
 }
 
-void Solver::EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<float> &augmentedMatrix)
+void Solver::EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<double> &augmentedMatrix)
 {
     auto n = m_BlockSets.size();
 
@@ -651,7 +651,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
     auto mR = n - minors.size();
     auto majors = std::vector<int>(mR);
     auto cnts = std::vector<int>(mR);
-    auto sums = std::vector<float>(mR);
+    auto sums = std::vector<double>(mR);
     {
         auto minorID = 0;
         auto mainRow = 0;
@@ -677,7 +677,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
     auto aggr = [&sums,&minors,&augmentedMatrix](int minor, int val)
         {
             for (auto nc = augmentedMatrix.GetColHead(minors[minor]).Down; nc != nullptr; nc = nc->Down)
-                sums[nc->Row] -= nc->Value * static_cast<float>(val);
+                sums[nc->Row] -= nc->Value * static_cast<double>(val);
         };
     auto stack = std::vector<int>();
     stack.reserve(minors.size());
