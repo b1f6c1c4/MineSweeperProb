@@ -7,13 +7,11 @@ BigInteger::BigInteger(int val)
     m_Data.reserve(sizeof(val));
 
     auto b = false;
-    unsigned int v = abs(val);
-    while (v != 0)
+    for (unsigned int v = abs(val); v != 0; v /= 0x100)
     {
         if (v & 0x80)
             b = true;
         m_Data.push_back(v % 0x100);
-        v /= 0x100;
     }
     if (b || m_Data.empty())
         m_Data.push_back(0);
@@ -30,13 +28,11 @@ BigInteger &BigInteger::operator+=(const BigInteger &other)
 
     BYTE c = 0;
     auto it = m_Data.begin();
-    auto itO = other.m_Data.begin();
-    while (itO != other.m_Data.end())
+    for (auto itO = other.m_Data.begin(); itO != other.m_Data.end(); ++it , ++itO)
     {
         unsigned short val = *it + *itO + c;
         *it = static_cast<BYTE>(val);
         c = static_cast<BYTE>(val >> 8);
-        ++it , ++itO;
     }
     while (c != 0)
     {
@@ -158,12 +154,8 @@ double BigInteger::GetSignificand() const
         lst[id++] = 0x00;
 
     auto shift = 0;
-    auto b = lst[0];
-    while (!(b & 0x80))
-    {
-        b <<= 1;
-        shift++;
-    }
+    for (auto b = lst[0]; !(b & 0x80); b <<= 1)
+        ++shift;
 
     if (shift <= 3)
     {
@@ -204,12 +196,9 @@ void BigInteger::UpdateBits()
         m_Data.push_back(0);
 
     m_Bits = 8 * (m_Data.size() - 1);
-    auto v = m_Data.back();
-    while (v != 0)
-    {
+
+    for (auto v = m_Data.back(); v != 0; v /= 2)
         ++m_Bits;
-        v /= 2;
-    }
 }
 
 DLL_API BigInteger operator+(const BigInteger &one, const BigInteger &another)

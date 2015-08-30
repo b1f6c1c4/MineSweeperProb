@@ -65,9 +65,9 @@ const Solver &GameMgr::GetSolver() const
     return m_Solver;
 }
 
-const Drainer* GameMgr::GetDrainer() const
+const Drainer *GameMgr::GetDrainer() const
 {
-	return m_Drainer;
+    return m_Drainer;
 }
 
 int GameMgr::GetTotalWidth() const
@@ -274,32 +274,39 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             m_Preferred.push_back(i);
         }
 
-    Largest(m_Preferred, std::function<double(Block)>([this](Block blk) { return -m_Solver.GetProbability(blk); }));
+    Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
+                                                      {
+                                                          return -m_Solver.GetProbability(blk);
+                                                      }));
 
     if ((maxDepth & SolvingState::ZeroProb) == SolvingState::Stale)
         return;
 
-    Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)->const BigInteger & { return m_Solver.ZeroCondQ(m_BlocksR[blk], blk); }));
+    Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)-> const BigInteger&
+                                                                  
+                                                                  {
+                                                                      return m_Solver.ZeroCondQ(m_BlocksR[blk], blk);
+                                                                  }));
 
     Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
-    {
-        int m;
-        auto di = m_Solver.DistributionCondQ(m_BlocksR[blk], blk, m);
+                                                      {
+                                                          int m;
+                                                          auto di = m_Solver.DistributionCondQ(m_BlocksR[blk], blk, m);
 
-        BigInteger t(0);
-        for (auto j = 0; j < di.size(); ++j)
-            t += di[j];
+                                                          BigInteger t(0);
+                                                          for (auto j = 0; j < di.size(); ++j)
+                                                              t += di[j];
 
-        double q = 0;
-        for (auto j = 0; j < di.size(); ++j)
-            if (di[j] != 0)
-            {
-                auto p = di[j] / t;
-                q += -p * log2(p);
-            }
+                                                          double q = 0;
+                                                          for (auto j = 0; j < di.size(); ++j)
+                                                              if (di[j] != 0)
+                                                              {
+                                                                  auto p = di[j] / t;
+                                                                  q += -p * log2(p);
+                                                              }
 
-        return q;
-    }));
+                                                          return q;
+                                                      }));
 }
 
 void GameMgr::OpenOptimalBlocks()
@@ -388,10 +395,10 @@ void GameMgr::Automatic()
 
 void GameMgr::EnableDrainer()
 {
-	if (m_Drainer != nullptr)
-		return;
-	m_Drainer = new Drainer(*this);
-	Solve(SolvingState::Probability | SolvingState::Drained, false);
+    if (m_Drainer != nullptr)
+        return;
+    m_Drainer = new Drainer(*this);
+    Solve(SolvingState::Probability | SolvingState::Drained, false);
 }
 
 int GameMgr::GetIndex(int x, int y) const
@@ -401,8 +408,7 @@ int GameMgr::GetIndex(int x, int y) const
 
 void GameMgr::SettleMines(int initID)
 {
-    auto totalMines = m_TotalMines;
-    while (totalMines > 0)
+    for (auto totalMines = m_TotalMines; totalMines > 0;)
     {
         auto id = RandomInteger(m_TotalWidth * m_TotalHeight);
         if (id == initID)
@@ -410,7 +416,7 @@ void GameMgr::SettleMines(int initID)
         if (m_Blocks[id].IsMine)
             continue;
         m_Blocks[id].IsMine = true;
-        totalMines--;
+        --totalMines;
     }
     m_Settled = true;
 

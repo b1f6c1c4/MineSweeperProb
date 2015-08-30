@@ -261,7 +261,7 @@ namespace MineSweeper
                     break;
                 case Keys.D0:
                     m_Mgr.Mode = SolvingMode.None;
-                    m_Mgr.Solve();
+                    UpdateAll();
                     break;
                 case Keys.D1:
                     m_Mgr.Mode = SolvingMode.Reduce;

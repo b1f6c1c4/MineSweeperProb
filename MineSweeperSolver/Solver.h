@@ -2,9 +2,9 @@
 #include "stdafx.h"
 #include <vector>
 #include "OrthogonalList.h"
-#include "Solution.h"
 #include <set>
 #include <map>
+#include "BigInteger.h"
 
 enum class BlockStatus
 {
@@ -47,10 +47,11 @@ inline SolvingState operator|=(SolvingState &lhs, SolvingState rhs)
 typedef int Block;
 typedef std::vector<Block> BlockSet;
 
-class DistCondParameters;
+class Solution;
 class DistCondQParameters;
 
-class DLL_API Solver
+class
+    DLL_API Solver
 {
 public:
     explicit Solver(int count);
@@ -121,3 +122,17 @@ private:
 bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+
+class Solution
+{
+public:
+    explicit Solution(std::vector<int> &&dist);
+    ~Solution();
+
+    friend class Solver;
+    friend class Drainer;
+private:
+    std::vector<int> Dist;
+    BigInteger States;
+    double Ratio;
+};

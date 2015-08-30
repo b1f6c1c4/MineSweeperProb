@@ -157,7 +157,6 @@
     <ClInclude Include="Drainer.h" />
     <ClInclude Include="GameMgr.h" />
     <ClInclude Include="random.h" />
-    <ClInclude Include="Solution.h" />
     <ClInclude Include="Solver.h" />
     <ClInclude Include="OrthogonalList.h" />
     <ClInclude Include="stdafx.h" />
@@ -183,7 +182,6 @@
     <ClCompile Include="Drainer.cpp" />
     <ClCompile Include="GameMgr.cpp" />
     <ClCompile Include="random.cpp" />
-    <ClCompile Include="Solution.cpp" />
     <ClCompile Include="Solver.cpp" />
     <ClCompile Include="stdafx.cpp" />
   </ItemGroup>

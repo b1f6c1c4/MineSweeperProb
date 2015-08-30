@@ -13,8 +13,8 @@ class MacroSituation
 public:
     ~MacroSituation();
 
-    friend bool operator==(const MacroSituation& lhs, const MacroSituation& rhs);
-    friend bool operator!=(const MacroSituation& lhs, const MacroSituation& rhs);
+    friend bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
+    friend bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 
     friend class Drainer;
 private:
@@ -25,10 +25,10 @@ private:
     std::set<MicroSituation *> m_Micros;
     std::set<MacroSituation *> m_Incomings;
     std::map<Block, std::map<MicroSituation *, MacroSituation *>> m_Transfer;
-    
+
     double m_BestProb;
     BlockSet m_BestBlocks;
-	std::vector<double> m_Probs;
+    std::vector<double> m_Probs;
 
     unsigned __int64 m_Hash;
 
@@ -38,8 +38,8 @@ private:
     unsigned __int64 Hash();
 };
 
-bool operator==(const MacroSituation& lhs, const MacroSituation& rhs);
-bool operator!=(const MacroSituation& lhs, const MacroSituation& rhs);
+bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
+bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 
 class Drainer
 {
@@ -48,8 +48,8 @@ public:
     ~Drainer();
 
     double GetBestProb() const;
-	BlockSet GetBestBlocks() const;
-	const double *GetBestProbabilities() const;
+    BlockSet GetBestBlocks() const;
+    const double *GetBestProbabilities() const;
 
     void Update();
 private:
@@ -72,4 +72,3 @@ private:
     MacroSituation *SolveMicro(MicroSituation &micro, MacroSituation *macroOld, Block blk);
     void OpenBlock(MicroSituation &micro, MacroSituation *macro, Block blk);
 };
-

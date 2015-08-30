@@ -30,8 +30,8 @@ struct
 
     const BlockProperty *BlockProperties;
     const BlockStatus *InferredStatus;
-	const double *Probabilities;
-	const double *DrainProbabilities;
+    const double *Probabilities;
+    const double *DrainProbabilities;
 
     int BestBlockCount;
     const Block *BestBlocks;
@@ -81,11 +81,11 @@ extern "C" DLL_API GameStatus *GetGameStatus(GameMgr *mgr)
 
     st->TotalBlocks = st->TotalWidth * st->TotalHeight;
     st->InferredStatus = mgr->GetSolver().GetBlockStatuses();
-	st->Probabilities = mgr->GetSolver().GetProbabilities();
-	if (mgr->GetDrainer() != nullptr)
-		st->DrainProbabilities = mgr->GetDrainer()->GetBestProbabilities();
-	else
-		st->DrainProbabilities = nullptr;
+    st->Probabilities = mgr->GetSolver().GetProbabilities();
+    if (mgr->GetDrainer() != nullptr)
+        st->DrainProbabilities = mgr->GetDrainer()->GetBestProbabilities();
+    else
+        st->DrainProbabilities = nullptr;
 
     return st;
 }

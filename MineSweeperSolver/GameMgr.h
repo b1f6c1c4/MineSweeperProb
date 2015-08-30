@@ -15,7 +15,8 @@ struct
 
 struct GameStatus;
 
-class DLL_API GameMgr
+class
+    DLL_API GameMgr
 {
 public:
     GameMgr(int width, int height, int totalMines);
@@ -23,9 +24,9 @@ public:
 
     size_t DrainCriterion;
 
-	Solver &GetSolver();
-	const Solver &GetSolver() const;
-	const Drainer *GetDrainer() const;
+    Solver &GetSolver();
+    const Solver &GetSolver() const;
+    const Drainer *GetDrainer() const;
 
     int GetTotalWidth() const;
     int GetTotalHeight() const;

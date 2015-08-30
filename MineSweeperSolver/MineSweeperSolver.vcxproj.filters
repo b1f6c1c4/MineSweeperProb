@@ -27,9 +27,6 @@
     <ClInclude Include="Solver.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Solution.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="BigInteger.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -54,9 +51,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Solver.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Solution.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="BigInteger.cpp">

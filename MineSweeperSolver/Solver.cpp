@@ -103,15 +103,11 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
             nr = &m_Matrix.Add(*nr, m_Matrix.GetColHead(col), 1);
             continue;
         }
-        
+
         m_Matrix.InsertCol(m_Matrix.GetWidth() - 1);
-        auto node = m_Matrix.GetColHead(col).Down;
         auto nodeX = &m_Matrix.GetColHead(m_Matrix.GetWidth() - 2);
-        while (node != nullptr)
-        {
+        for (auto node = m_Matrix.GetColHead(col).Down; node != nullptr; node = node->Down)
             nodeX = &m_Matrix.Add(*node, *nodeX, node->Value);
-            node = node->Down;
-        }
         m_Matrix.Add(*nr, *nodeX, 1);
         ASSERT(Check(m_Matrix));
 
@@ -186,13 +182,9 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
     OrthogonalList<float> augmentedMatrix(m_Matrix.GetWidth(), m_Matrix.GetHeight());
     for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
     {
-        auto node = m_Matrix.GetRowHead(row).Right;
         auto nr = &augmentedMatrix.GetRowHead(row);
-        while (node != nullptr)
-        {
+        for (auto node = m_Matrix.GetRowHead(row).Right; node != nullptr; node = node->Right)
             nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), static_cast<float>(node->Value));
-            node = node->Right;
-        }
     }
     auto minors = Gauss(augmentedMatrix);
 
@@ -215,7 +207,7 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
     ProcessSolutions();
 }
 
-const BigInteger& Solver::ZeroCondQ(const BlockSet& set, Block blk)
+const BigInteger &Solver::ZeroCondQ(const BlockSet &set, Block blk)
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
     int dMines;
@@ -248,15 +240,10 @@ void Solver::MergeSets()
         auto flag = false;
         for (auto it = itp.first; it != itp.second; ++it)
         {
-            auto nc1 = m_Matrix.GetColHead(it->second).Down;
-            auto nc2 = m_Matrix.GetColHead(i).Down;
-            while (nc1 != nullptr && nc2 != nullptr)
-            {
+            auto nc1 = m_Matrix.GetColHead(it->second).Down, nc2 = m_Matrix.GetColHead(i).Down;
+            for (; nc1 != nullptr && nc2 != nullptr; nc1 = nc1->Down , nc2 = nc2->Down)
                 if (nc1->Row != nc2->Row)
                     break;
-                nc1 = nc1->Down;
-                nc2 = nc2->Down;
-            }
             if (nc1 == nullptr && nc2 == nullptr)
             {
                 flag = true;
@@ -289,8 +276,7 @@ void Solver::ReduceRestrains()
     {
         if (n == nullptr || n->Row > row || n->Value == 0)
         {
-            auto nr = m_Matrix.GetRowHead(row).Right;
-            while (nr->Col != n->Col)
+            for (auto nr = m_Matrix.GetRowHead(row).Right; nr->Col != n->Col;)
             {
                 auto col = nr->Col;
                 nr = nr->Right;
@@ -311,7 +297,7 @@ void Solver::ReduceRestrains()
                     if (id > col)
                         --id;
                     else if (id == col)
-                        ASSERT(false);
+                    ASSERT(false);
                 m_State &= SolvingState::CanOpenForSure;
             }
             if (n != nullptr && n->Row == row)
@@ -322,24 +308,15 @@ void Solver::ReduceRestrains()
             continue;
         }
         auto count = 0;
-        {
-            auto nr = m_Matrix.GetRowHead(row).Right;
-            while (nr != n)
-            {
-                count += m_BlockSets[nr->Col].size();
-                nr = nr->Right;
-            }
-        }
+        for (auto nr = m_Matrix.GetRowHead(row).Right; nr != n; nr = nr->Right)
+            count += m_BlockSets[nr->Col].size();
         ASSERT(n->Value <= count);
         if (n->Value == count)
         {
-            auto nr = m_Matrix.GetRowHead(row).Right;
-            while (nr != n)
-            {
-                auto col = nr->Col;
-                for (auto &blk : m_BlockSets[col])
+            for (auto nr = m_Matrix.GetRowHead(row).Right; nr != n; nr = nr->Right)
+                for (auto &blk : m_BlockSets[nr->Col])
                 {
-                    ASSERT(m_Manager[blk] == BlockStatus::Mine || m_SetIDs[blk] == col);
+                    ASSERT(m_Manager[blk] == BlockStatus::Mine || m_SetIDs[blk] == nr->Col);
                     m_SetIDs[blk] = -1;
                     if (m_Manager[blk] == BlockStatus::Mine)
                         continue;
@@ -347,8 +324,6 @@ void Solver::ReduceRestrains()
                     m_Manager[blk] = BlockStatus::Mine;
                     m_State &= SolvingState::CanOpenForSure;
                 }
-                nr = nr->Right;
-            }
             ASSERT_CHECK;
             ASSERT(n != nullptr && n->Row == row);
             n = n->Down;
@@ -359,7 +334,7 @@ void Solver::ReduceRestrains()
         }
         ASSERT(n != nullptr && n->Row == row);
         n = n->Down;
-        row++;
+        ++row;
     }
 
     for (auto col = 0; col < m_BlockSets.size(); ++col)
@@ -390,16 +365,14 @@ void Solver::ReduceRestrains()
         setN.swap(set);
         if (dMines != 0)
         {
-            auto nc = m_Matrix.GetColHead(col).Down;
             auto ncc = &m_Matrix.GetColHead(m_BlockSets.size());
-            while (nc != nullptr)
+            for (auto nc = m_Matrix.GetColHead(col).Down; nc != nullptr; nc = nc->Down)
             {
                 auto node = &m_Matrix.SeekDown(nc->Row, *ncc);
                 ASSERT(node->Down != nullptr);
                 ASSERT(node->Down->Row == nc->Row);
                 node->Down->Value -= dMines;
                 ASSERT(node->Down->Value >= 0);
-                nc = nc->Down;
                 ncc = node->Down;
             }
             m_State &= SolvingState::CanOpenForSure;
@@ -426,12 +399,8 @@ void Solver::SimpleOverlapAll()
     for (auto col = 0; col < m_BlockSets.size(); ++col)
     {
         std::vector<int> indexes;
-        auto node = m_Matrix.GetColHead(col).Down;
-        while (node != nullptr)
-        {
+        for (auto node = m_Matrix.GetColHead(col).Down; node != nullptr; node = node->Down)
             indexes.push_back(node->Row);
-            node = node->Down;
-        }
 
         for (auto i = 0; i < indexes.size() - 1; ++i)
             for (auto j = i + 1; j < indexes.size(); ++j)
@@ -574,8 +543,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
 
         auto vec = std::vector<std::pair<int, float>>();
         auto theBiasInv = 1 / biasNode->Value;
-        auto node = matrix.GetColHead(col).Down;
-        while (node != nullptr)
+        for (auto node = matrix.GetColHead(col).Down; node != nullptr;)
         {
             auto tmp = node->Down;
             if (node->Row != biasNode->Row)
@@ -591,8 +559,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
             node = tmp;
         }
 
-        auto bias = biasNode->Right;
-        while (bias != nullptr)
+        for (auto bias = biasNode->Right; bias != nullptr; bias = bias->Right)
         {
             auto biasVal = bias->Value;
             auto nc = &matrix.GetColHead(bias->Col);
@@ -627,7 +594,6 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
                     nc->Value = val;
                 }
             }
-            bias = bias->Right;
         }
 
         if (major != biasNode->Row)
@@ -659,7 +625,7 @@ std::vector<int> Gauss(OrthogonalList<float> &matrix)
                     break;
             }
         }
-        major++;
+        ++major;
     }
     return minorCol;
 }
@@ -671,12 +637,8 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
     if (minors.empty())
     {
         auto lst = std::vector<int>(n);
-        auto nc = augmentedMatrix.GetColHead(n).Down;
-        while (nc != nullptr)
-        {
+        for (auto nc = augmentedMatrix.GetColHead(n).Down; nc != nullptr; nc = nc->Down)
             lst[nc->Row] = static_cast<int>(round(nc->Value));
-            nc = nc->Down;
-        }
         m_Solutions.emplace_back(move(lst));
         return;
     }
@@ -692,7 +654,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
         for (auto col = 0; col < n; col++)
             if (minorID < minors.size() &&
                 col == minors[minorID])
-                minorID++;
+                ++minorID;
             else // major
             {
                 majors[mainRow] = col;
@@ -704,17 +666,13 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                     sums[mainRow] = nc->Value;
                     nc = nc->Down;
                 }
-                mainRow++;
+                ++mainRow;
             }
     }
     auto aggr = [&sums,&minors,&augmentedMatrix](int minor, int val)
         {
-            auto nc = augmentedMatrix.GetColHead(minors[minor]).Down;
-            while (nc != nullptr)
-            {
+            for (auto nc = augmentedMatrix.GetColHead(minors[minor]).Down; nc != nullptr; nc = nc->Down)
                 sums[nc->Row] -= nc->Value * static_cast<float>(val);
-                nc = nc->Down;
-            }
         };
     auto stack = std::vector<int>();
     stack.reserve(minors.size());
@@ -727,11 +685,11 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 auto flag = true;
                 for (auto mainRow = 0; mainRow < mR; mainRow++)
                 {
-					if (!ZEROQ(round(sums[mainRow]) - sums[mainRow]))
-					{
-						flag = false;
-						break;
-					}
+                    if (!ZEROQ(round(sums[mainRow]) - sums[mainRow]))
+                    {
+                        flag = false;
+                        break;
+                    }
                     auto val = static_cast<int>(round(sums[mainRow]));
                     if (val < 0 ||
                         val > cnts[mainRow])
@@ -749,7 +707,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 }
 
                 aggr(stack.size() - 1, 1);
-                stack.back()++;
+                ++stack.back();
             }
             else
             {
@@ -758,7 +716,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 if (stack.empty())
                     break;
                 aggr(stack.size() - 1, 1);
-                stack.back()++;
+                ++stack.back();
             }
         else if (stack.back() <= m_BlockSets[minors[stack.size() - 1]].size())
             stack.push_back(0); // aggr(stack.size() - 1, 0);
@@ -769,7 +727,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
             if (stack.empty())
                 break;
             aggr(stack.size() - 1, 1);
-            stack.back()++;
+            ++stack.back();
         }
 }
 
@@ -876,7 +834,7 @@ void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1
     }
 }
 
-const BigInteger& Solver::ZCondQ(DistCondQParameters&& par)
+const BigInteger &Solver::ZCondQ(DistCondQParameters &&par)
 {
     DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
@@ -964,7 +922,7 @@ void Solver::ClearDistCondQCache()
     m_DistCondQCache.clear();
 }
 
-DistCondQParameters::DistCondQParameters(DistCondQParameters&& other)
+DistCondQParameters::DistCondQParameters(DistCondQParameters &&other)
 {
     Sets1.swap(other.Sets1);
     Set2ID = other.Set2ID;
@@ -1012,9 +970,8 @@ bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
 unsigned __int64 Hash(const BlockSet &set)
 {
     unsigned __int64 hash = 5381;
-    auto it = set.begin();
-    while (it != set.end())
-        hash = (hash << 5) + hash + *it++ + 30;
+    for (auto v : set)
+        hash = (hash << 5) + hash + v + 30;
     return hash;
 }
 
@@ -1022,10 +979,11 @@ template <class T>
 unsigned __int64 HashCol(const Node<T> *ptr)
 {
     unsigned __int64 hash = 5381;
-    while (ptr != nullptr)
-    {
+    for (; ptr != nullptr; ptr = ptr->Down)
         hash = (hash << 5) + hash + ptr->Row;
-        ptr = ptr->Down;
-    }
     return hash;
 }
+
+Solution::Solution(std::vector<int> &&dist):Dist(dist), Ratio(NAN) {}
+
+Solution::~Solution() {}

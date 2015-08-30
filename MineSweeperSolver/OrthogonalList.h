@@ -94,15 +94,11 @@ OrthogonalList<T>::OrthogonalList(const OrthogonalList<T> &other)
     ExtendHeight(other.GetHeight());
     ExtendWidth(other.GetWidth());
 
-    for (auto i = 0; i < m_Rows.size(); i++)
+    for (auto i = 0; i < m_Rows.size(); ++i)
     {
-        const Node<T> *n = other.GetRowHead(i).Right;
         auto nr = &m_Rows[i];
-        while (n != nullptr)
-        {
+        for (const auto *n = other.GetRowHead(i).Right; n != nullptr; n = n->Right)
             nr = &Add(*nr, m_Cols[n->Col], n->Value);
-            n = n->Right;
-        }
     }
 }
 
@@ -116,7 +112,7 @@ OrthogonalList<T>::~OrthogonalList()
 }
 
 template <class T>
-OrthogonalList<T>& OrthogonalList<T>::operator=(const OrthogonalList<T>& other) 
+OrthogonalList<T> &OrthogonalList<T>::operator=(const OrthogonalList<T> &other)
 {
     for (auto &node : m_Rows)
         while (node.Right != nullptr)
@@ -128,15 +124,11 @@ OrthogonalList<T>& OrthogonalList<T>::operator=(const OrthogonalList<T>& other)
     ExtendHeight(other.GetHeight());
     ExtendWidth(other.GetWidth());
 
-    for (auto i = 0; i < m_Rows.size(); i++)
+    for (auto i = 0; i < m_Rows.size(); ++i)
     {
-        const Node<T> *n = other.GetRowHead(i).Right;
         auto nr = &m_Rows[i];
-        while (n != nullptr)
-        {
+        for (const auto *n = other.GetRowHead(i).Right; n != nullptr; n = n->Right)
             nr = &Add(*nr, m_Cols[n->Col], n->Value);
-            n = n->Right;
-        }
     }
 
     return *this;
@@ -282,14 +274,8 @@ void OrthogonalList<T>::RemoveRow(int row)
     while (m_Rows[row].Right != nullptr)
         Remove(*m_Rows[row].Right);
     for (auto i = row; i < m_Rows.size() - 1; ++i)
-    {
-        auto n = m_Rows[i].Right = m_Rows[i + 1].Right;
-        while (n != nullptr)
-        {
+        for (auto n = m_Rows[i].Right = m_Rows[i + 1].Right; n != nullptr; n = n->Right)
             --n->Row;
-            n = n->Right;
-        }
-    }
     m_Rows.pop_back();
 }
 
@@ -300,14 +286,8 @@ void OrthogonalList<T>::RemoveCol(int col)
     while (m_Cols[col].Down != nullptr)
         Remove(*m_Cols[col].Down);
     for (auto i = col; i < m_Cols.size() - 1; ++i)
-    {
-        auto n = m_Cols[i].Down = m_Cols[i + 1].Down;
-        while (n != nullptr)
-        {
+        for (auto n = m_Cols[i].Down = m_Cols[i + 1].Down; n != nullptr; n = n->Down)
             --n->Col;
-            n = n->Down;
-        }
-    }
     m_Cols.pop_back();
 }
 
@@ -316,14 +296,8 @@ void OrthogonalList<T>::InsertRow(int row)
 {
     m_Rows.emplace_back(m_Rows.size(), -1);
     for (auto i = m_Rows.size() - 1; i > row; --i)
-    {
-        auto n = m_Rows[i].Right = m_Rows[i - 1].Right;
-        while (n != nullptr)
-        {
+        for (auto n = m_Rows[i].Right = m_Rows[i - 1].Right; n != nullptr; n = n->Right)
             ++n->Row;
-            n = n->Right;
-        }
-    }
     m_Rows[row].Right = nullptr;
 }
 
@@ -332,14 +306,8 @@ void OrthogonalList<T>::InsertCol(int col)
 {
     m_Cols.emplace_back(-1, m_Cols.size());
     for (auto i = m_Cols.size() - 1; i > col; --i)
-    {
-        auto n = m_Cols[i].Down = m_Cols[i - 1].Down;
-        while (n != nullptr)
-        {
+        for (auto n = m_Cols[i].Down = m_Cols[i - 1].Down; n != nullptr; n = n->Down)
             ++n->Col;
-            n = n->Down;
-        }
-    }
     m_Cols[col].Down = nullptr;
 }
 
@@ -377,22 +345,16 @@ bool Check(const OrthogonalList<T> &ol)
 {
     std::set<std::pair<int, int>> pairs;
     for (auto i = 0; i < ol.GetHeight(); ++i)
-    {
-        auto n = &ol.GetRowHead(i);
-        while (n != nullptr)
+        for (auto n = &ol.GetRowHead(i); n != nullptr; n = n->Right)
         {
             if (n->Row != i)
                 return false;
             if (n->Col >= 0)
                 if (pairs.emplace(n->Row, n->Col).second == false)
                     return false;
-            n = n->Right;
         }
-    }
     for (auto i = 0; i < ol.GetWidth(); ++i)
-    {
-        auto n = &ol.GetColHead(i);
-        while (n != nullptr)
+        for (auto n = &ol.GetColHead(i); n != nullptr; n = n->Down)
         {
             if (n->Col != i)
                 return false;
@@ -403,9 +365,7 @@ bool Check(const OrthogonalList<T> &ol)
                     return false;
                 pairs.erase(v);
             }
-            n = n->Down;
         }
-    }
     return pairs.empty();
 }
 
@@ -416,17 +376,13 @@ std::string ToString(OrthogonalList<T> ol)
     auto flag = false;
     sw << "{";
     for (auto i = 0; i < ol.GetHeight(); ++i)
-    {
-        auto node = ol.GetRowHead(i).Right;
-        while (node != nullptr)
+        for (auto node = ol.GetRowHead(i).Right; node != nullptr; node = node->Right)
         {
             if (flag)
                 sw << ",";
             sw << "{" << node->Row + 1 << "," << node->Col + 1<< "}->" << node->Value;
             flag = true;
-            node = node->Right;
         }
-    }
     sw << "}";
     return sw.str();
 }

@@ -12,20 +12,39 @@ static void Combinations(int n, int m, std::vector<std::vector<BlockStatus>> &di
     std::vector<BlockStatus> stack;
     stack.reserve(n);
     auto add = [&count, &stack, n, m]()
-    {
-        if (count < m)
         {
-            if (stack.size() < n - 1)
+            if (count < m)
             {
-                auto b = m - count >= n - stack.size();
-                stack.push_back(b ? BlockStatus::Mine : BlockStatus::Blank);
-                if (b)
-                    ++count;
+                if (stack.size() < n - 1)
+                {
+                    auto b = m - count >= n - stack.size();
+                    stack.push_back(b ? BlockStatus::Mine : BlockStatus::Blank);
+                    if (b)
+                        ++count;
+                    return false;
+                }
+                if (stack.empty())
+                    return true;
+                if (stack.back() == BlockStatus::Mine)
+                {
+                    while (!stack.empty() && stack.back() == BlockStatus::Mine)
+                    {
+                        stack.pop_back();
+                        --count;
+                    }
+                    if (stack.empty())
+                        return true;
+                }
+                stack.back() = BlockStatus::Mine;
+                ++count;
                 return false;
             }
-            if (stack.empty())
-                return true;
-            if (stack.back() == BlockStatus::Mine)
+            if (stack.size() < n - 1)
+            {
+                stack.push_back(BlockStatus::Blank);
+                return false;
+            }
+            while (true)
             {
                 while (!stack.empty() && stack.back() == BlockStatus::Mine)
                 {
@@ -34,37 +53,18 @@ static void Combinations(int n, int m, std::vector<std::vector<BlockStatus>> &di
                 }
                 if (stack.empty())
                     return true;
+                if (count < m)
+                {
+                    stack.back() = BlockStatus::Mine;
+                    ++count;
+                    return false;
+                }
+                while (!stack.empty() && stack.back() == BlockStatus::Blank)
+                    stack.pop_back();
+                if (stack.empty())
+                    return true;
             }
-            stack.back() = BlockStatus::Mine;
-            ++count;
-            return false;
-        }
-        if (stack.size() < n - 1)
-        {
-            stack.push_back(BlockStatus::Blank);
-            return false;
-        }
-        while (true)
-        {
-            while (!stack.empty() && stack.back() == BlockStatus::Mine)
-            {
-                stack.pop_back();
-                --count;
-            }
-            if (stack.empty())
-                return true;
-            if (count < m)
-            {
-                stack.back() = BlockStatus::Mine;
-                ++count;
-                return false;
-            }
-            while (!stack.empty() && stack.back() == BlockStatus::Blank)
-                stack.pop_back();
-            if (stack.empty())
-                return true;
-        }
-    };
+        };
     while (true)
     {
         if (stack.size() < n - 1)
@@ -85,7 +85,7 @@ static void Combinations(int n, int m, std::vector<std::vector<BlockStatus>> &di
 
 MacroSituation::MacroSituation() : m_ToOpen(0), m_Solver(nullptr), m_BestProb(NAN), m_Hash(Hash()) {}
 
-MacroSituation::MacroSituation(const MacroSituation& other) : m_Degrees(other.m_Degrees), m_ToOpen(other.m_ToOpen), m_Solver(nullptr), m_BestProb(NAN), m_Hash(other.m_Hash)
+MacroSituation::MacroSituation(const MacroSituation &other) : m_Degrees(other.m_Degrees), m_ToOpen(other.m_ToOpen), m_Solver(nullptr), m_BestProb(NAN), m_Hash(other.m_Hash)
 {
     if (other.m_Solver != nullptr)
         m_Solver = new Solver(*other.m_Solver);
@@ -133,7 +133,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
             case BlockStatus::Mine:
                 ++m_DMines[i];
                 break;
-            case BlockStatus::Blank: 
+            case BlockStatus::Blank:
                 break;
             default:
                 ASSERT(false);
@@ -230,8 +230,8 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
             continue;
 
         ma->m_BestProb = 0;
-		auto &probs = ma->m_Probs;
-		probs.resize(m_Blocks.size(), -1);
+        auto &probs = ma->m_Probs;
+        probs.resize(m_Blocks.size(), -1);
         for (auto i = 0; i < m_Blocks.size(); ++i)
         {
             if (ma->m_Degrees[i] >= 0 || ma->m_Solver->m_Manager[i] != BlockStatus::Unknown)
@@ -251,7 +251,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     }
 }
 
-bool operator==(const MacroSituation& lhs, const MacroSituation& rhs)
+bool operator==(const MacroSituation &lhs, const MacroSituation &rhs)
 {
     if (lhs.m_Hash != rhs.m_Hash)
         return false;
@@ -262,14 +262,14 @@ bool operator==(const MacroSituation& lhs, const MacroSituation& rhs)
     return true;
 }
 
-bool operator!=(const MacroSituation& lhs, const MacroSituation& rhs)
+bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs)
 {
     return !(lhs == rhs);
 }
 
 Drainer::~Drainer()
 {
-    for(auto &kvp : m_Macros)
+    for (auto &kvp : m_Macros)
     {
         if (kvp.second == nullptr)
             continue;
@@ -294,14 +294,14 @@ BlockSet Drainer::GetBestBlocks() const
 
 const double *Drainer::GetBestProbabilities() const
 {
-	return &*m_Prob.begin();
+    return &*m_Prob.begin();
 }
 
 void Drainer::Update()
 {
     auto macro = new MacroSituation();
     macro->m_Degrees = m_RootMacro->m_Degrees;
-    for (auto i = 0; i < m_Blocks.size();++i)
+    for (auto i = 0; i < m_Blocks.size(); ++i)
         if (m_Mgr.m_Blocks[m_Blocks[i]].IsOpen)
             macro->m_Degrees[i] = m_Mgr.m_Blocks[m_Blocks[i]].Degree - m_DMines[i];
     macro->Hash();
@@ -311,30 +311,30 @@ void Drainer::Update()
     ASSERT(newRoot != m_FailMacro);
     m_RootMacro = newRoot;
 
-	m_Prob.clear();
-	m_Prob.resize(m_Mgr.m_Blocks.size(), -1);
-	for (auto i = 0; i < m_Blocks.size(); ++i)
-		m_Prob[m_Blocks[i]] = m_RootMacro->m_Probs[i];
-	for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
-		switch (m_Mgr.m_Solver.m_Manager[i])
-		{
-		case BlockStatus::Unknown:
-			ASSERT(m_Prob[i] >= 0 && m_Prob[i] <= 1);
-			break;
-		case BlockStatus::Mine:
-			ASSERT(m_Prob[i] == -1);
-			m_Prob[i] = 0;
-			break;
-		case BlockStatus::Blank:
-			ASSERT(m_Prob[i] == -1);
-			m_Prob[i] = 1;
-			break;
-		default:
-			ASSERT(false);
-		}
+    m_Prob.clear();
+    m_Prob.resize(m_Mgr.m_Blocks.size(), -1);
+    for (auto i = 0; i < m_Blocks.size(); ++i)
+        m_Prob[m_Blocks[i]] = m_RootMacro->m_Probs[i];
+    for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
+        switch (m_Mgr.m_Solver.m_Manager[i])
+        {
+        case BlockStatus::Unknown:
+            ASSERT(m_Prob[i] >= 0 && m_Prob[i] <= 1);
+            break;
+        case BlockStatus::Mine:
+            ASSERT(m_Prob[i] == -1);
+            m_Prob[i] = 0;
+            break;
+        case BlockStatus::Blank:
+            ASSERT(m_Prob[i] == -1);
+            m_Prob[i] = 1;
+            break;
+        default:
+            ASSERT(false);
+        }
 }
 
-MacroSituation* Drainer::GetOrAddMacroSituation(MacroSituation *&macro)
+MacroSituation *Drainer::GetOrAddMacroSituation(MacroSituation *&macro)
 {
     auto hash = macro->m_Hash;
     auto itp = m_Macros.equal_range(hash);
@@ -369,7 +369,7 @@ void Drainer::GenerateMicros()
             lst.push_back(m_BlocksLookup[blk]);
     }
     std::vector<std::map<int, std::vector<std::map<int, BlockStatus>>>> dicc(sets.size());
-    for(auto solution : m_Mgr.m_Solver.m_Solutions)
+    for (auto solution : m_Mgr.m_Solver.m_Solutions)
     {
         std::vector<std::vector<std::map<int, BlockStatus>>*> ddic;
         for (auto i = 0; i < sets.size(); i++)
@@ -380,7 +380,7 @@ void Drainer::GenerateMicros()
             {
                 std::vector<std::vector<BlockStatus>> dists;
                 Combinations(sets[i].size(), m, dists);
-                for(auto l : dists)
+                for (auto l : dists)
                 {
                     lst.emplace_back();
                     auto &d = lst.back();
@@ -398,8 +398,8 @@ void Drainer::GenerateMicros()
             if (stack.size() == sets.size())
                 if (stack.back() < ddic[stack.size() - 1]->size())
                 {
-					m_Micros.emplace_back();
-					auto &lst = m_Micros.back();
+                    m_Micros.emplace_back();
+                    auto &lst = m_Micros.back();
                     lst.resize(m_Blocks.size(), BlockStatus::Blank);
                     for (auto i = 0; i < stack.size(); ++i)
                         for (auto kvp : ddic[i]->at(stack[i]))
@@ -443,7 +443,7 @@ void Drainer::GenerateMicros()
     }
 }
 
-void Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro)
+void Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)
 {
     macro->m_Micros.insert(&micro);
 
@@ -473,7 +473,7 @@ void Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro)
     }
 }
 
-MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macroOld, Block blk)
+MacroSituation *Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macroOld, Block blk)
 {
     if (micro[blk] == BlockStatus::Mine)
         return m_FailMacro;
@@ -488,9 +488,9 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
 
     while (true)
     {
-		ASSERT((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+        ASSERT((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
         macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, true);
-		if ((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
+        if ((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
 #ifdef _DEBUG
 		{
 			for (auto i = 0; i < macro->m_Degrees.size(); ++i)
@@ -499,7 +499,7 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
 			return macro;
 		}
 #else
-			return macro;
+            return macro;
 #endif
 
 #ifdef _DEBUG
@@ -519,11 +519,11 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
                 return m_SucceedMacro;
             }
         }
-		ASSERT(flag);
+        ASSERT(flag);
     }
 }
 
-void Drainer::OpenBlock(MicroSituation& micro, MacroSituation* macro, Block blk)
+void Drainer::OpenBlock(MicroSituation &micro, MacroSituation *macro, Block blk)
 {
     if (macro->m_Degrees[blk] >= 0)
         return;

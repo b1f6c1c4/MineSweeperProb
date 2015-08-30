@@ -29,12 +29,8 @@ BYTE *Random(int length)
 int RandomInteger(int maxExclusive)
 {
     auto bits = 0;
-    auto v = maxExclusive - 1;
-    while (v != 0)
-    {
+    for (auto v = maxExclusive - 1; v != 0; v >>= 1)
         ++bits;
-        v >>= 1;
-    }
     auto lng = (bits + 7) / 8;
     auto res = maxExclusive;
     while (res >= maxExclusive)
