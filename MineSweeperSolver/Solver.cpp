@@ -20,8 +20,9 @@ void CheckOL(OrthogonalList<int> &m)
 #define ASSERT_CHECK
 #endif
 
-template <class T>
-static std::vector<int> Gauss(OrthogonalList<T> &matrix);
+#define ZEROQ(val) (abs(val) < static_cast<float>(1E-4))
+
+static std::vector<int> Gauss(OrthogonalList<float> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
 static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
 static unsigned __int64 Hash(const BlockSet &set);
@@ -189,7 +190,7 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         auto nr = &augmentedMatrix.GetRowHead(row);
         while (node != nullptr)
         {
-            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), node->Value);
+            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), static_cast<float>(node->Value));
             node = node->Right;
         }
     }
@@ -551,10 +552,8 @@ bool Solver::SimpleOverlap(int r1, int r2)
     return false;
 }
 
-template <class T>
-std::vector<int> Gauss(OrthogonalList<T> &matrix)
+std::vector<int> Gauss(OrthogonalList<float> &matrix)
 {
-#define ZEROQ(val) (abs(val) < static_cast<T>(1E-4))
     auto n = matrix.GetWidth();
     auto minorCol = std::vector<int>();
     auto major = 0;
@@ -573,7 +572,7 @@ std::vector<int> Gauss(OrthogonalList<T> &matrix)
             continue;
         }
 
-        auto vec = std::vector<std::pair<int, T>>();
+        auto vec = std::vector<std::pair<int, float>>();
         auto theBiasInv = 1 / biasNode->Value;
         auto node = matrix.GetColHead(col).Down;
         while (node != nullptr)
@@ -602,7 +601,7 @@ std::vector<int> Gauss(OrthogonalList<T> &matrix)
                 while (nc->Down != nullptr && nc->Down->Row < it->first)
                     nc = nc->Down;
 
-                T oldV;
+                float oldV;
                 if (nc->Down == nullptr ||
                     nc->Down->Row > it->first)
                     oldV = 0;
@@ -713,7 +712,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
             auto nc = augmentedMatrix.GetColHead(minors[minor]).Down;
             while (nc != nullptr)
             {
-                sums[nc->Row] -= val * nc->Value;
+                sums[nc->Row] -= nc->Value * static_cast<float>(val);
                 nc = nc->Down;
             }
         };
@@ -728,6 +727,11 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 auto flag = true;
                 for (auto mainRow = 0; mainRow < mR; mainRow++)
                 {
+					if (!ZEROQ(round(sums[mainRow]) - sums[mainRow]))
+					{
+						flag = false;
+						break;
+					}
                     auto val = static_cast<int>(round(sums[mainRow]));
                     if (val < 0 ||
                         val > cnts[mainRow])

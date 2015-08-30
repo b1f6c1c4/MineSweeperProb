@@ -5,7 +5,6 @@
 #include "Drainer.h"
 
 #ifdef _DEBUG
-#include <fstream>
 #define ASSERT(val) if (!(val)) throw;
 #else
 #define ASSERT(val)
@@ -46,34 +45,6 @@ GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_
     m_Solver.AddRestrain(lst, totalMines);
 
     m_AllBits = Binomial(width * height, totalMines).Log2();
-
-#ifdef __DEBUG
-	std::ifstream fin("C:\\Users\\b1f6c1c4\\Documents\\ffff.txt");
-	std::vector<int> ff;
-	m_Settled = true;
-	for (auto i = 0; i < 480; ++i)
-	{
-		int f, g;
-		fin >> f >> g;
-		ff.push_back(f);
-		m_Blocks[i].IsMine = g;
-	}
-	for (auto i = 0; i < m_Blocks.size(); ++i)
-	{
-		if (m_Blocks[i].IsMine)
-			continue;
-		m_Blocks[i].Degree = 0;
-		for (auto &id : m_BlocksR[i])
-			if (m_Blocks[id].IsMine)
-				++m_Blocks[i].Degree;
-	}
-	for (auto i = 0; i < 480; ++i)
-		if (ff[i] == 1)
-		{
-			OpenBlock(i);
-			m_Solver.Solve(SolvingState::Reduce, false);
-		}
-#endif
 }
 
 GameMgr::~GameMgr()
@@ -92,6 +63,11 @@ Solver &GameMgr::GetSolver()
 const Solver &GameMgr::GetSolver() const
 {
     return m_Solver;
+}
+
+const Drainer* GameMgr::GetDrainer() const
+{
+	return m_Drainer;
 }
 
 int GameMgr::GetTotalWidth() const
@@ -366,14 +342,18 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
 #else
         return false;
 #endif
+#ifdef _DEBUG
     auto flag = false;
+#endif
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
         if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Blank)
             continue;
         OpenBlock(i);
         ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+#ifdef _DEBUG
         flag = true;
+#endif
         if (m_Started)
             continue;
         break;

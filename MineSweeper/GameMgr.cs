@@ -221,12 +221,17 @@ namespace MineSweeper
         /// <summary>
         ///     推测的状态
         /// </summary>
-        public List<BlockStatus> InferredStatuses;
+        public List<BlockStatus> InferredStatuses { get; private set; }
 
         /// <summary>
         ///     概率
         /// </summary>
-        public List<double> Probabilities;
+        public List<double> Probabilities { get; private set; }
+
+        /// <summary>
+        ///     完美概率
+        /// </summary>
+        public List<double> DrainProbabilities { get; private set; }
 
         /// <summary>
         ///     总信息量
@@ -246,7 +251,6 @@ namespace MineSweeper
         /// <summary>
         ///     最佳格
         /// </summary>
-        /// l
         public List<Block> PreferredBlocks { get; set; }
 
         /// <summary>
@@ -483,6 +487,7 @@ namespace MineSweeper
             [MarshalAs(UnmanagedType.U8)] public IntPtr Blocks;
             [MarshalAs(UnmanagedType.U8)] public IntPtr InferredStatus;
             [MarshalAs(UnmanagedType.U8)] public IntPtr Probabilities;
+            [MarshalAs(UnmanagedType.U8)] public IntPtr DrainProbabilities;
 
 
             [MarshalAs(UnmanagedType.U4)] public int BestBlockCount;
@@ -521,11 +526,14 @@ namespace MineSweeper
                     ToOpen = st.ToOpen;
                     AllBits = st.AllBits;
                     Bits = st.Bits;
-                    InferredStatuses = new List<BlockStatus>(st.TotalBlocks);
-                    Probabilities = new List<double>(st.TotalBlocks);
                     var pProp = (BlockProperty*)st.Blocks.ToPointer();
                     var pInf = (BlockStatus*)st.InferredStatus.ToPointer();
                     var pProb = (double*)st.Probabilities.ToPointer();
+                    var pDProb = (double*)st.DrainProbabilities.ToPointer();
+                    InferredStatuses = new List<BlockStatus>(st.TotalBlocks);
+                    Probabilities = new List<double>(st.TotalBlocks);
+                    if (pDProb != null)
+                        DrainProbabilities = new List<double>(st.TotalBlocks);
                     for (var i = 0; i < st.TotalBlocks; i++)
                     {
                         var property = *pProp++;
@@ -534,6 +542,8 @@ namespace MineSweeper
                         m_Blocks[i].Degree = property.Degree;
                         InferredStatuses.Add(*pInf++);
                         Probabilities.Add(*pProb++);
+                        if (pDProb != null)
+                            DrainProbabilities.Add(*pDProb++);
                     }
                     BestBlocks = new List<Block>(st.BestBlockCount);
                     var pBest = (int*)st.BestBlocks.ToPointer();

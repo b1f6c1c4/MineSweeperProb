@@ -83,8 +83,6 @@ static void Combinations(int n, int m, std::vector<std::vector<BlockStatus>> &di
     }
 }
 
-MicroSituation::MicroSituation(std::vector<BlockStatus>&& dist):Dist(dist) {}
-
 MacroSituation::MacroSituation() : m_ToOpen(0), m_Solver(nullptr), m_BestProb(NAN), m_Hash(Hash()) {}
 
 MacroSituation::MacroSituation(const MacroSituation& other) : m_Degrees(other.m_Degrees), m_ToOpen(other.m_ToOpen), m_Solver(nullptr), m_BestProb(NAN), m_Hash(other.m_Hash)
@@ -232,7 +230,8 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
             continue;
 
         ma->m_BestProb = 0;
-        std::vector<double> probs(m_Blocks.size(), 0);
+		auto &probs = ma->m_Probs;
+		probs.resize(m_Blocks.size(), -1);
         for (auto i = 0; i < m_Blocks.size(); ++i)
         {
             if (ma->m_Degrees[i] >= 0 || ma->m_Solver->m_Manager[i] != BlockStatus::Unknown)
@@ -293,6 +292,11 @@ BlockSet Drainer::GetBestBlocks() const
     return set;
 }
 
+const double *Drainer::GetBestProbabilities() const
+{
+	return &*m_Prob.begin();
+}
+
 void Drainer::Update()
 {
     auto macro = new MacroSituation();
@@ -306,6 +310,28 @@ void Drainer::Update()
     ASSERT(newRoot != m_SucceedMacro);
     ASSERT(newRoot != m_FailMacro);
     m_RootMacro = newRoot;
+
+	m_Prob.clear();
+	m_Prob.resize(m_Mgr.m_Blocks.size(), -1);
+	for (auto i = 0; i < m_Blocks.size(); ++i)
+		m_Prob[m_Blocks[i]] = m_RootMacro->m_Probs[i];
+	for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
+		switch (m_Mgr.m_Solver.m_Manager[i])
+		{
+		case BlockStatus::Unknown:
+			ASSERT(m_Prob[i] >= 0 && m_Prob[i] <= 1);
+			break;
+		case BlockStatus::Mine:
+			ASSERT(m_Prob[i] == -1);
+			m_Prob[i] = 0;
+			break;
+		case BlockStatus::Blank:
+			ASSERT(m_Prob[i] == -1);
+			m_Prob[i] = 1;
+			break;
+		default:
+			ASSERT(false);
+		}
 }
 
 MacroSituation* Drainer::GetOrAddMacroSituation(MacroSituation *&macro)
@@ -358,8 +384,8 @@ void Drainer::GenerateMicros()
                 {
                     lst.emplace_back();
                     auto &d = lst.back();
-                    for (auto j = 0; j < sets[i].size(); j++)
-                        d[indexes[i][j]] = l[j];
+                    for (auto j = 0; j < sets[i].size(); ++j)
+                        d.insert(std::make_pair(indexes[i][j], l[j]));
                 }
             }
             ddic.push_back(&lst);
@@ -372,11 +398,29 @@ void Drainer::GenerateMicros()
             if (stack.size() == sets.size())
                 if (stack.back() < ddic[stack.size() - 1]->size())
                 {
-                    std::vector<BlockStatus> lst(m_Blocks.size(), BlockStatus::Blank);
-                    for (auto i = 0; i < stack.size(); i++)
+					m_Micros.emplace_back();
+					auto &lst = m_Micros.back();
+                    lst.resize(m_Blocks.size(), BlockStatus::Blank);
+                    for (auto i = 0; i < stack.size(); ++i)
                         for (auto kvp : ddic[i]->at(stack[i]))
                             lst[kvp.first] = kvp.second;
-                    m_Micros.emplace_back(move(lst));
+#ifdef _DEBUG
+					for (auto row = 0; row < m_Mgr.m_Solver.m_Matrix.GetHeight(); ++row)
+					{
+						auto v = 0;
+						auto nr = m_Mgr.m_Solver.m_Matrix.GetRowHead(row).Right;
+						ASSERT(nr != nullptr);
+						while (nr->Col != m_Mgr.m_Solver.m_BlockSets.size())
+						{
+							for (auto blk : m_Mgr.m_Solver.m_BlockSets[nr->Col])
+								if (lst[m_BlocksLookup[blk]] == BlockStatus::Mine)
+									++v;
+							nr = nr->Right;
+							ASSERT(nr != nullptr);
+						}
+						ASSERT(nr->Value == v);
+					}
+#endif
 
                     ++stack.back();
                 }
@@ -431,7 +475,7 @@ void Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro)
 
 MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macroOld, Block blk)
 {
-    if (micro.Dist[blk] == BlockStatus::Mine)
+    if (micro[blk] == BlockStatus::Mine)
         return m_FailMacro;
 
     auto macro = new MacroSituation(*macroOld);
@@ -458,13 +502,17 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
 			return macro;
 #endif
 
+#ifdef _DEBUG
 		auto flag = false;
+#endif
         for (auto i = 0; i < macro->m_Degrees.size(); ++i)
         {
             if (macro->m_Degrees[i] >= 0 || macro->m_Solver->m_Manager[i] != BlockStatus::Blank)
                 continue;
             OpenBlock(micro, macro, i);
+#ifdef _DEBUG
             flag = true;
+#endif
             if (macro->m_ToOpen == 0)
             {
                 delete macro;
@@ -479,11 +527,11 @@ void Drainer::OpenBlock(MicroSituation& micro, MacroSituation* macro, Block blk)
 {
     if (macro->m_Degrees[blk] >= 0)
         return;
-    ASSERT(micro.Dist[blk] == BlockStatus::Blank);
+    ASSERT(micro[blk] == BlockStatus::Blank);
     macro->m_Solver->AddRestrain(blk, false);
     auto degree = 0;
     for (auto b : m_BlocksR[blk])
-        if (micro.Dist[b] == BlockStatus::Mine)
+        if (micro[b] == BlockStatus::Mine)
             ++degree;
     macro->m_Degrees[blk] = degree;
     if (degree == 0)

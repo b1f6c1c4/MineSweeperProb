@@ -23,8 +23,9 @@ public:
 
     size_t DrainCriterion;
 
-    Solver &GetSolver();
-    const Solver &GetSolver() const;
+	Solver &GetSolver();
+	const Solver &GetSolver() const;
+	const Drainer *GetDrainer() const;
 
     int GetTotalWidth() const;
     int GetTotalHeight() const;

@@ -6,15 +6,7 @@
 class GameMgr;
 class Drainer;
 
-class MicroSituation
-{
-public:
-    explicit MicroSituation(std::vector<BlockStatus> &&dist);
-
-    friend class Drainer;
-private:
-    std::vector<BlockStatus> Dist;
-};
+typedef std::vector<BlockStatus> MicroSituation;
 
 class MacroSituation
 {
@@ -36,6 +28,7 @@ private:
     
     double m_BestProb;
     BlockSet m_BestBlocks;
+	std::vector<double> m_Probs;
 
     unsigned __int64 m_Hash;
 
@@ -55,7 +48,8 @@ public:
     ~Drainer();
 
     double GetBestProb() const;
-    BlockSet GetBestBlocks() const;
+	BlockSet GetBestBlocks() const;
+	const double *GetBestProbabilities() const;
 
     void Update();
 private:
@@ -70,7 +64,6 @@ private:
 
     MacroSituation *m_RootMacro;
     MacroSituation *m_SucceedMacro, *m_FailMacro;
-
 
     MacroSituation *GetOrAddMacroSituation(MacroSituation *&macro);
 

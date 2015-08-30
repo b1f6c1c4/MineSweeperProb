@@ -101,30 +101,32 @@ namespace MineSweeper
                     sb.Append($" {m_Mgr.AllBits:F2}b");
 
                 if (m_CurrentBlock != null)
+                {
                     if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
                         m_Mgr.Probabilities != null)
                         sb.Append($" M{m_Mgr.Probabilities[m_CurrentBlock.Index]:P2}");
-
-                        //if (m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb) &&
-                        //    (m_Mgr.DegreeDist != null &&
-                        //     m_Mgr.Quantity != null))
-                        //{
-                        //    sb.Append($"Q{m_Mgr.Quantity[m_CurrentBlock]:F2}b: ");
-
-                        //    var dist = m_Mgr.DegreeDist[m_CurrentBlock];
-                        //    if (dist != null)
-                        //    {
-                        //        foreach (var kvp in dist.OrderBy(kvp => kvp.Key))
-                        //            sb.Append($"{kvp.Value:P1}[{kvp.Key}],");
-                        //        if (dist.Count > 0)
-                        //            sb.Remove(sb.Length - 1, 1);
-                        //    }
-                        //}
-                    //if (m_Mgr.DrainProbability != null)
+                    //if (m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb) &&
+                    //    (m_Mgr.DegreeDist != null &&
+                    //     m_Mgr.Quantity != null))
                     //{
-                    //    if (m_Mgr.DrainProbability.ContainsKey(m_CurrentBlock))
-                    //        sb.Append($" D{m_Mgr.DrainProbability[m_CurrentBlock]:P2}");
+                    //    sb.Append($"Q{m_Mgr.Quantity[m_CurrentBlock]:F2}b: ");
+
+                    //    var dist = m_Mgr.DegreeDist[m_CurrentBlock];
+                    //    if (dist != null)
+                    //    {
+                    //        foreach (var kvp in dist.OrderBy(kvp => kvp.Key))
+                    //            sb.Append($"{kvp.Value:P1}[{kvp.Key}],");
+                    //        if (dist.Count > 0)
+                    //            sb.Remove(sb.Length - 1, 1);
+                    //    }
                     //}
+                    if (m_Mgr.Mode.HasFlag(SolvingMode.Drained) &&
+                        m_Mgr.DrainProbabilities != null)
+                    {
+                        sb.Append($" D{m_Mgr.DrainProbabilities[m_CurrentBlock.Index]:P2}");
+                    }
+                }
+
 
                 if (!m_Mgr.Started)
                     sb.Append(m_Mgr.Succeed ? " Succeed" : " Failed");
@@ -238,7 +240,8 @@ namespace MineSweeper
                     break;
                 case Keys.A:
                     if (m_Mgr.Started &&
-                        m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb))
+                        (m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb) ||
+                         m_Mgr.Mode.HasFlag(SolvingMode.Drained)))
                         if (m_Mgr.BestBlocks.Any())
                             m_Mgr.SemiAutomaticStep();
                         else
@@ -246,7 +249,8 @@ namespace MineSweeper
                     break;
                 case Keys.Z:
                     if (m_Mgr.Started &&
-                        m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb))
+                        (m_Mgr.Mode.HasFlag(SolvingMode.ZeroProb) ||
+                         m_Mgr.Mode.HasFlag(SolvingMode.Drained)))
                         if (m_Mgr.BestBlocks.Any())
                             m_Mgr.SemiAutomatic();
                         else
