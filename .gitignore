@@ -12,10 +12,6 @@ $RECYCLE.BIN/
 *.user
 MineSweeper/bin/
 MineSweeper/obj/
-MineSweeperAnalyzer/bin/
-MineSweeperAnalyzer/obj/
-MineSweeperCalc/bin/
-MineSweeperCalc/obj/
 MineSweeperSolver/x64/
 MineSweeperSimulator/x64/
 /x64/
