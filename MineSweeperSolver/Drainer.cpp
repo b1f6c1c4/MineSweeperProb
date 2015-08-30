@@ -93,7 +93,7 @@ MacroSituation::MacroSituation(const MacroSituation &other) : m_Degrees(other.m_
 
 MacroSituation::~MacroSituation()
 {
-    if (m_Degrees.empty())
+    if (m_Solver == nullptr)
         return;
     delete m_Solver;
     m_Solver = nullptr;

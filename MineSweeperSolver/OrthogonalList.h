@@ -225,7 +225,7 @@ Node<T> &OrthogonalList<T>::Add(Node<T> &nr, Node<T> &nc, T val)
     }
     auto ptrC = &SeekDown(ptrR->Row, nc);
 
-    Node<T> *node = new Node<T>(ptrR->Row, ptrC->Col, val);
+    auto node = new Node<T>(ptrR->Row, ptrC->Col, val);
     node->Right = ptrR->Right;
     node->Down = ptrC->Down;
     ptrR->Right = node;

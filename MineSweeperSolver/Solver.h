@@ -55,6 +55,7 @@ class
 {
 public:
     explicit Solver(int count);
+    ~Solver();
 
     SolvingState GetSolvingState() const;
     BlockStatus GetBlockStatus(Block block) const;

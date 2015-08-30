@@ -39,6 +39,11 @@ Solver::Solver(int count) : m_State(SolvingState::Stale), m_Manager(count, Block
     m_Matrix.ExtendWidth(2);
 }
 
+Solver::~Solver()
+{
+    ClearDistCondQCache();
+}
+
 SolvingState Solver::GetSolvingState() const
 {
     return m_State;
@@ -918,7 +923,12 @@ const std::vector<BigInteger> &Solver::DistCondQ(DistCondQParameters &&par)
 void Solver::ClearDistCondQCache()
 {
     for (auto &cache : m_DistCondQCache)
+    {
+        if (cache.second == nullptr)
+            continue;
         delete cache.second;
+        cache.second = nullptr;
+    }
     m_DistCondQCache.clear();
 }
 
