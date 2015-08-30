@@ -1,6 +1,5 @@
 #include "Drainer.h"
 
-#define _DEBUG
 #ifdef _DEBUG
 #define ASSERT(val) if (!(val)) throw;
 #else
@@ -443,33 +442,23 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
         return m_SucceedMacro;
     }
 
-    auto step = [&micro, &macro, this]()
+    while (true)
     {
-        if (macro == nullptr)
-            return false;
+		ASSERT((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
         macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, true);
-        auto flag = false;
-        for (auto i = 0; i < macro->m_Degrees.size(); ++i)
-        {
-            if (macro->m_Degrees[i] >= 0 || macro->m_Solver->m_Manager[i] != BlockStatus::Blank)
-                continue;
-            OpenBlock(micro, macro, i);
-            flag = true;
-            if (macro->m_ToOpen == 0)
-            {
-                delete macro;
-                macro = nullptr;
-                break;
-            }
-        }
-        return flag;
-    };
+		if ((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
+#ifdef _DEBUG
+		{
+			for (auto i = 0; i < macro->m_Degrees.size(); ++i)
+				if (macro->m_Degrees[i] < 0 && macro->m_Solver->m_Manager[i] == BlockStatus::Blank)
+					throw;
+			return macro;
+		}
+#else
+			return macro;
+#endif
 
-    auto flag = true;
-    while (flag)
-    {
-        flag = false;
-        macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, true);
+		auto flag = false;
         for (auto i = 0; i < macro->m_Degrees.size(); ++i)
         {
             if (macro->m_Degrees[i] >= 0 || macro->m_Solver->m_Manager[i] != BlockStatus::Blank)
@@ -479,13 +468,11 @@ MacroSituation* Drainer::SolveMicro(MicroSituation& micro, MacroSituation* macro
             if (macro->m_ToOpen == 0)
             {
                 delete macro;
-                macro = nullptr;
                 return m_SucceedMacro;
             }
         }
+		ASSERT(flag);
     }
-
-    return macro;
 }
 
 void Drainer::OpenBlock(MicroSituation& micro, MacroSituation* macro, Block blk)

@@ -4,8 +4,8 @@
 #include <functional>
 #include "Drainer.h"
 
-#define _DEBUG
 #ifdef _DEBUG
+#include <fstream>
 #define ASSERT(val) if (!(val)) throw;
 #else
 #define ASSERT(val)
@@ -46,6 +46,34 @@ GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_
     m_Solver.AddRestrain(lst, totalMines);
 
     m_AllBits = Binomial(width * height, totalMines).Log2();
+
+#ifdef __DEBUG
+	std::ifstream fin("C:\\Users\\b1f6c1c4\\Documents\\ffff.txt");
+	std::vector<int> ff;
+	m_Settled = true;
+	for (auto i = 0; i < 480; ++i)
+	{
+		int f, g;
+		fin >> f >> g;
+		ff.push_back(f);
+		m_Blocks[i].IsMine = g;
+	}
+	for (auto i = 0; i < m_Blocks.size(); ++i)
+	{
+		if (m_Blocks[i].IsMine)
+			continue;
+		m_Blocks[i].Degree = 0;
+		for (auto &id : m_BlocksR[i])
+			if (m_Blocks[id].IsMine)
+				++m_Blocks[i].Degree;
+	}
+	for (auto i = 0; i < 480; ++i)
+		if (ff[i] == 1)
+		{
+			OpenBlock(i);
+			m_Solver.Solve(SolvingState::Reduce, false);
+		}
+#endif
 }
 
 GameMgr::~GameMgr()
@@ -207,7 +235,6 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Best.clear();
     m_Preferred.clear();
 
-    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
     m_Solver.Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
 
 #ifdef _DEBUG
@@ -237,9 +264,10 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         return;
     }
 #ifdef _DEBUG
-    for (auto i = 0; i < m_Blocks.size(); ++i)
-        if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
-            throw;
+	if (shortcut)
+		for (auto i = 0; i < m_Blocks.size(); ++i)
+			if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
+				throw;
 #endif
 
     if ((maxDepth & SolvingState::Probability) == SolvingState::Stale &&
@@ -380,7 +408,10 @@ void GameMgr::Automatic()
 
 void GameMgr::EnableDrainer()
 {
-    m_Drainer = new Drainer(*this);
+	if (m_Drainer != nullptr)
+		return;
+	m_Drainer = new Drainer(*this);
+	Solve(SolvingState::Probability | SolvingState::Drained, false);
 }
 
 int GameMgr::GetIndex(int x, int y) const

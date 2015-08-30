@@ -144,7 +144,7 @@ namespace MineSweeper
         {
             if (mgr == null)
             {
-                var mode = m_Mgr?.Mode ?? SolvingMode.ZeroProb;
+                var mode = (m_Mgr?.Mode ?? SolvingMode.ZeroProb) & SolvingMode.ZeroProb;
                 m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
             }
             else

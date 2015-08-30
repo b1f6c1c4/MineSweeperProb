@@ -1,7 +1,6 @@
 #include "Solver.h"
 #include "BinomialHelper.h"
 
-#define _DEBUG
 #ifdef _DEBUG
 #define ASSERT(val) if (!(val)) throw;
 #define ASSERT_CHECK CheckOL(m_Matrix);
@@ -169,6 +168,9 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
     if ((maxDepth & SolvingState::Probability) == SolvingState::Stale)
         return;
 
+    if ((m_State & SolvingState::Probability) == SolvingState::Probability)
+        return;
+
     m_State |= SolvingState::Probability;
 
     if (m_BlockSets.empty())
@@ -290,14 +292,26 @@ void Solver::ReduceRestrains()
             while (nr->Col != n->Col)
             {
                 auto col = nr->Col;
+                nr = nr->Right;
                 for (auto &blk : m_BlockSets[col])
                 {
+                    ASSERT(m_Manager[blk] == BlockStatus::Blank || m_SetIDs[blk] == col);
+                    m_SetIDs[blk] = -2;
                     if (m_Manager[blk] == BlockStatus::Blank)
                         continue;
+                    ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                     m_Manager[blk] = BlockStatus::Blank;
                     m_State = SolvingState::CanOpenForSure;
                 }
-                nr = nr->Right;
+                m_Matrix.RemoveCol(col);
+                ASSERT_CHECK;
+                m_BlockSets.erase(m_BlockSets.begin() + col);
+                for (auto &id : m_SetIDs)
+                    if (id > col)
+                        --id;
+                    else if (id == col)
+                        ASSERT(false);
+                m_State &= SolvingState::CanOpenForSure;
             }
             if (n != nullptr && n->Row == row)
                 n = n->Down;
@@ -324,6 +338,11 @@ void Solver::ReduceRestrains()
                 auto col = nr->Col;
                 for (auto &blk : m_BlockSets[col])
                 {
+                    ASSERT(m_Manager[blk] == BlockStatus::Mine || m_SetIDs[blk] == col);
+                    m_SetIDs[blk] = -1;
+                    if (m_Manager[blk] == BlockStatus::Mine)
+                        continue;
+                    ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                     m_Manager[blk] = BlockStatus::Mine;
                     m_State &= SolvingState::CanOpenForSure;
                 }
@@ -350,7 +369,6 @@ void Solver::ReduceRestrains()
         setN.reserve(set.size());
         for (auto it = set.begin(); it != set.end(); ++it)
         {
-            ASSERT(m_SetIDs[*it] == col);
             switch (m_Manager[*it])
             {
             case BlockStatus::Mine:
@@ -361,6 +379,7 @@ void Solver::ReduceRestrains()
                 m_SetIDs[*it] = -2;
                 break;
             case BlockStatus::Unknown:
+                ASSERT(m_SetIDs[*it] == col);
                 setN.push_back(*it);
                 continue;
             default:
@@ -503,6 +522,9 @@ bool Solver::SimpleOverlap(int r1, int r2)
                 for (const auto &id : lst)
                     for (const auto &blk : m_BlockSets[id])
                     {
+                        if (m_Manager[blk] == BlockStatus::Mine)
+                            continue;
+                        ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                         m_Manager[blk] = BlockStatus::Mine;
                         m_State &= SolvingState::CanOpenForSure;
                     }
@@ -514,6 +536,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
                     {
                         if (m_Manager[blk] == BlockStatus::Blank)
                             continue;
+                        ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                         m_Manager[blk] = BlockStatus::Blank;
                         m_State = SolvingState::CanOpenForSure;
                     }
@@ -752,6 +775,21 @@ void Solver::ProcessSolutions()
     m_TotalStates = BigInteger(0);
     for (auto &so : m_Solutions)
     {
+#ifdef _DEBUG
+		for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
+		{
+			auto v = 0;
+			auto nr = m_Matrix.GetRowHead(row).Right;
+			ASSERT(nr != nullptr);
+			while (nr->Col != m_BlockSets.size())
+			{
+				v += so.Dist[nr->Col];
+				nr = nr->Right;
+				ASSERT(nr != nullptr);
+			}
+			ASSERT(nr->Value == v);
+		}
+#endif
         so.States = BigInteger(1);
         for (auto i = 0; i < m_BlockSets.size(); ++i)
             so.States *= Binomial(m_BlockSets[i].size(), so.Dist[i]);
@@ -777,13 +815,21 @@ void Solver::ProcessSolutions()
             {
                 if (m_Manager[blk] == BlockStatus::Blank)
                     continue;
+                ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                 m_Manager[blk] = BlockStatus::Blank;
+                m_State &= SolvingState::Overlap | SolvingState::Probability | SolvingState::CanOpenForSure;
                 m_State |= SolvingState::CanOpenForSure;
             }
         }
         else if (exp[i] == prod)
             for (auto &blk : m_BlockSets[i])
+            {
+                if (m_Manager[blk] == BlockStatus::Mine)
+                    continue;
+                ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                 m_Manager[blk] = BlockStatus::Mine;
+                m_State &= SolvingState::Overlap | SolvingState::Probability | SolvingState::CanOpenForSure;
+            }
 
         auto p = exp[i] / prod;
         for (auto &blk : m_BlockSets[i])

@@ -40,7 +40,7 @@ namespace MineSweeper
         /// <summary>
         ///     完美求解
         /// </summary>
-        Drained = 0x8000
+        Drained = 0x8000 | Probability
     }
 
     public sealed class Block : IComparable<Block>
@@ -424,10 +424,10 @@ namespace MineSweeper
         private static extern void ReleaseGameStatus(IntPtr status);
 
         [DllImport("MineSweeperSolver.dll")]
-        private static extern bool SemiAutomaticStep(IntPtr mgr, bool withProb);
+        private static extern bool SemiAutomaticStep(IntPtr mgr, SolvingMode maxDepth);
 
         [DllImport("MineSweeperSolver.dll")]
-        private static extern bool SemiAutomatic(IntPtr mgr, bool withProb);
+        private static extern bool SemiAutomatic(IntPtr mgr, SolvingMode maxDepth);
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern bool AutomaticStep(IntPtr mgr);
@@ -566,7 +566,7 @@ namespace MineSweeper
             }
             else
             {
-                SemiAutomaticStep(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
+                SemiAutomaticStep(m_NativeObject, Mode);
                 FetchStatus();
             }
         }
@@ -575,7 +575,7 @@ namespace MineSweeper
         {
             if (BestBlocks.Any())
                 OpenOptimalBlocks(m_NativeObject);
-            SemiAutomatic(m_NativeObject, Mode.HasFlag(SolvingMode.Probability));
+            SemiAutomatic(m_NativeObject, Mode);
             ProcessSolve();
         }
 

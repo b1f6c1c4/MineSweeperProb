@@ -3,7 +3,6 @@
 #include <vector>
 #include <set>
 
-#define _DEBUG
 #ifdef _DEBUG
 #include <sstream>
 #define ASSERT(val) if (!(val)) throw;

@@ -90,14 +90,14 @@ extern "C" DLL_API void ReleaseGameStatus(GameStatus *status)
         delete status;
 }
 
-extern "C" DLL_API bool SemiAutomaticStep(GameMgr *mgr, bool withProb)
+extern "C" DLL_API bool SemiAutomaticStep(GameMgr *mgr, SolvingState maxDepth)
 {
-    return mgr->SemiAutomaticStep(SolvingState::Reduce | SolvingState::Overlap | (withProb ? SolvingState::Probability : SolvingState::Stale));
+    return mgr->SemiAutomaticStep(maxDepth);
 }
 
-extern "C" DLL_API bool SemiAutomatic(GameMgr *mgr, bool withProb)
+extern "C" DLL_API bool SemiAutomatic(GameMgr *mgr, SolvingState maxDepth)
 {
-    return mgr->SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | (withProb ? SolvingState::Probability : SolvingState::Stale));
+    return mgr->SemiAutomatic(maxDepth);
 }
 
 extern "C" DLL_API void AutomaticStep(GameMgr *mgr)
