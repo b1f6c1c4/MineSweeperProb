@@ -115,7 +115,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
 {
     for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
     {
-        if (m_Mgr.m_Blocks[i].IsOpen || m_Mgr.m_Solver.GetBlockStatus(i) != BlockStatus::Unknown)
+        if (m_Mgr.m_Blocks[i].IsOpen || m_Mgr.m_Solver->GetBlockStatus(i) != BlockStatus::Unknown)
             continue;
         m_BlocksLookup.insert(std::make_pair(i, m_Blocks.size()));
         m_Blocks.push_back(i);
@@ -125,7 +125,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
         for (auto blk : m_Mgr.m_BlocksR[m_Blocks[i]])
-            switch (m_Mgr.m_Solver.m_Manager[blk])
+            switch (m_Mgr.m_Solver->m_Manager[blk])
             {
             case BlockStatus::Unknown:
                 m_BlocksR[i].push_back(m_BlocksLookup[blk]);
@@ -153,8 +153,8 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
         macro->m_Solver->m_SetIDs.resize(m_Blocks.size(), -1);
 #endif
         macro->m_Solver->m_BlockSets.clear();
-        macro->m_Solver->m_BlockSets.reserve(m_Mgr.m_Solver.m_BlockSets.size());
-        for (auto &set : m_Mgr.m_Solver.m_BlockSets)
+        macro->m_Solver->m_BlockSets.reserve(m_Mgr.m_Solver->m_BlockSets.size());
+        for (auto &set : m_Mgr.m_Solver->m_BlockSets)
         {
             macro->m_Solver->m_BlockSets.emplace_back();
             auto &setC = macro->m_Solver->m_BlockSets.back();
@@ -172,7 +172,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
                 ASSERT(&setC == &macro->m_Solver->m_BlockSets[macro->m_Solver->m_SetIDs[blkC]])
             }
         }
-        macro->m_Solver->m_Matrix = m_Mgr.m_Solver.m_Matrix;
+        macro->m_Solver->m_Matrix = m_Mgr.m_Solver->m_Matrix;
         macro->Hash();
         m_RootMacro = GetOrAddMacroSituation(macro);
     }
@@ -316,7 +316,7 @@ void Drainer::Update()
     for (auto i = 0; i < m_Blocks.size(); ++i)
         m_Prob[m_Blocks[i]] = m_RootMacro->m_Probs[i];
     for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
-        switch (m_Mgr.m_Solver.m_Manager[i])
+        switch (m_Mgr.m_Solver->m_Manager[i])
         {
         case BlockStatus::Unknown:
             ASSERT(m_Prob[i] >= 0 && m_Prob[i] <= 1);
@@ -356,9 +356,9 @@ MacroSituation *Drainer::GetOrAddMacroSituation(MacroSituation *&macro)
 
 void Drainer::GenerateMicros()
 {
-    m_Micros.reserve(static_cast<size_t>(m_Mgr.m_Solver.m_TotalStates));
+    m_Micros.reserve(static_cast<size_t>(m_Mgr.m_Solver->m_TotalStates));
 
-    auto &sets = m_Mgr.m_Solver.m_BlockSets;
+    auto &sets = m_Mgr.m_Solver->m_BlockSets;
     std::vector<BlockSet> indexes;
     indexes.reserve(sets.size());
     for (auto &set : sets)
@@ -369,7 +369,7 @@ void Drainer::GenerateMicros()
             lst.push_back(m_BlocksLookup[blk]);
     }
     std::vector<std::map<int, std::vector<std::map<int, BlockStatus>>>> dicc(sets.size());
-    for (auto solution : m_Mgr.m_Solver.m_Solutions)
+    for (auto solution : m_Mgr.m_Solver->m_Solutions)
     {
         std::vector<std::vector<std::map<int, BlockStatus>>*> ddic;
         for (auto i = 0; i < sets.size(); i++)
@@ -405,14 +405,14 @@ void Drainer::GenerateMicros()
                         for (auto kvp : ddic[i]->at(stack[i]))
                             lst[kvp.first] = kvp.second;
 #ifdef _DEBUG
-					for (auto row = 0; row < m_Mgr.m_Solver.m_Matrix.GetHeight(); ++row)
+					for (auto row = 0; row < m_Mgr.m_Solver->m_Matrix.GetHeight(); ++row)
 					{
 						auto v = 0;
-						auto nr = m_Mgr.m_Solver.m_Matrix.GetRowHead(row).Right;
+						auto nr = m_Mgr.m_Solver->m_Matrix.GetRowHead(row).Right;
 						ASSERT(nr != nullptr);
-						while (nr->Col != m_Mgr.m_Solver.m_BlockSets.size())
+						while (nr->Col != m_Mgr.m_Solver->m_BlockSets.size())
 						{
-							for (auto blk : m_Mgr.m_Solver.m_BlockSets[nr->Col])
+							for (auto blk : m_Mgr.m_Solver->m_BlockSets[nr->Col])
 								if (lst[m_BlocksLookup[blk]] == BlockStatus::Mine)
 									++v;
 							nr = nr->Right;

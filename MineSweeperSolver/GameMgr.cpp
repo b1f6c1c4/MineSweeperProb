@@ -3,6 +3,7 @@
 #include "BinomialHelper.h"
 #include <functional>
 #include "Drainer.h"
+#include <iostream>
 
 #ifdef _DEBUG
 #define ASSERT(val) if (!(val)) throw;
@@ -15,8 +16,10 @@ static void Largest(std::vector<Block> &bests, std::function<T(Block)> fun);
 template <class T>
 static void Largest(std::vector<Block> &bests, std::function<const T &(Block)> fun);
 
-GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(width * height), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
 {
+    m_Solver = new Solver(width * height);
+
     m_Blocks.reserve(width * height);
 
     auto lst = BlockSet();
@@ -42,27 +45,93 @@ GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_
                                 blkR.push_back(GetIndex(i + di, j + dj));
             lst.push_back(blk.Index);
         }
-    m_Solver.AddRestrain(lst, totalMines);
+    m_Solver->AddRestrain(lst, totalMines);
 
     m_AllBits = Binomial(width * height, totalMines).Log2();
 }
 
+GameMgr::GameMgr(std::istream& sr) : DrainCriterion(64), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_Solver(nullptr), m_Drainer(nullptr)
+{
+#define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val));
+    READ(m_TotalWidth);
+    READ(m_TotalHeight);
+    READ(m_TotalMines);
+    READ(m_Settled);
+    READ(m_Started);
+    READ(m_ToOpen);
+
+    m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+
+    m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
+
+    auto lst = BlockSet();
+    lst.reserve(m_TotalWidth * m_TotalHeight);
+    for (auto i = 0; i < m_TotalWidth; ++i)
+        for (auto j = 0; j < m_TotalHeight; ++j)
+        {
+            m_Blocks.emplace_back();
+            m_BlocksR.emplace_back();
+            auto &blk = m_Blocks.back();
+            auto &blkR = m_BlocksR.back();
+            blk.Index = GetIndex(i, j);
+            blk.X = i;
+            blk.Y = j;
+            blk.IsOpen = false;
+            blk.IsMine = false;
+            blkR.reserve(8);
+            for (auto di = -1; di <= 1; di++)
+                if (i + di >= 0 && i + di < m_TotalWidth)
+                    for (auto dj = -1; dj <= 1; dj++)
+                        if (j + dj >= 0 && j + dj < m_TotalHeight)
+                            if (di != 0 || dj != 0)
+                                blkR.push_back(GetIndex(i + di, j + dj));
+            lst.push_back(blk.Index);
+        }
+    m_Solver->AddRestrain(lst, m_TotalMines);
+
+    if (m_Settled)
+    {
+        for (auto &blk : m_Blocks)
+        {
+            READ(blk.Degree);
+            READ(blk.IsOpen);
+            READ(blk.IsMine);
+            if (blk.IsOpen && !blk.IsMine)
+                m_Solver->AddRestrain(blk.Index, false);
+        }
+        m_Solver->Solve(SolvingState::Reduce, false);
+
+        for (auto &blk : m_Blocks)
+            if (blk.IsOpen && !blk.IsMine && blk.Degree != 0)
+                m_Solver->AddRestrain(m_BlocksR[blk.Index],blk.Degree);
+    }
+
+    CacheBinomials(m_TotalWidth * m_TotalHeight, m_TotalMines);
+    m_AllBits = Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines).Log2();
+}
+
 GameMgr::~GameMgr()
 {
-    if (m_Drainer == nullptr)
-        return;
-    delete m_Drainer;
-    m_Drainer = nullptr;
+    if (m_Solver != nullptr)
+    {
+        delete m_Solver;
+        m_Solver = nullptr;
+    }
+    if (m_Drainer != nullptr)
+    {
+        delete m_Drainer;
+        m_Drainer = nullptr;
+    }
 }
 
 Solver &GameMgr::GetSolver()
 {
-    return m_Solver;
+    return *m_Solver;
 }
 
 const Solver &GameMgr::GetSolver() const
 {
-    return m_Solver;
+    return *m_Solver;
 }
 
 const Drainer *GameMgr::GetDrainer() const
@@ -102,7 +171,7 @@ bool GameMgr::GetSucceed() const
 
 double GameMgr::GetBits() const
 {
-    return m_Solver.GetTotalStates().Log2();
+    return m_Solver->GetTotalStates().Log2();
 }
 
 double GameMgr::GetAllBits() const
@@ -122,12 +191,12 @@ const BlockProperty *GameMgr::GetBlockProperties() const
 
 double GameMgr::GetBlockProbability(int x, int y) const
 {
-    return m_Solver.GetProbability(GetIndex(x, y));
+    return m_Solver->GetProbability(GetIndex(x, y));
 }
 
 BlockStatus GameMgr::GetInferredStatus(int x, int y) const
 {
-    return m_Solver.GetBlockStatus(GetIndex(x, y));
+    return m_Solver->GetBlockStatus(GetIndex(x, y));
 }
 
 const Block *GameMgr::GetBestBlocks() const
@@ -211,11 +280,11 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Best.clear();
     m_Preferred.clear();
 
-    m_Solver.Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
+    m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
 
 #ifdef _DEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)
-        switch (m_Solver.GetBlockStatus(i))
+        switch (m_Solver->GetBlockStatus(i))
         {
         case BlockStatus::Mine: 
             if (!m_Blocks[i].IsMine)
@@ -231,10 +300,10 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         }
 #endif
 
-    if ((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
+    if ((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
     {
         for (auto i = 0; i < m_Blocks.size(); ++i)
-            if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
+            if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
                 m_Best.push_back(i);
         ASSERT(!m_Best.empty());
         return;
@@ -242,7 +311,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 #ifdef _DEBUG
 	if (shortcut)
 		for (auto i = 0; i < m_Blocks.size(); ++i)
-			if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
+			if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
 				throw;
 #endif
 
@@ -255,8 +324,8 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 #endif
 
     if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
-        if (m_Drainer == nullptr && m_Solver.GetTotalStates() <= DrainCriterion &&
-            (m_Solver.GetTotalStates() > 2 || m_ToOpen > 1))
+        if (m_Drainer == nullptr && m_Solver->GetTotalStates() <= DrainCriterion &&
+            (m_Solver->GetTotalStates() > 2 || m_ToOpen > 1))
             EnableDrainer();
 
     if (m_Drainer != nullptr)
@@ -269,14 +338,14 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     if (m_Preferred.empty())
         for (auto i = 0; i < m_Blocks.size(); ++i)
         {
-            if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Unknown)
+            if (m_Blocks[i].IsOpen || m_Solver->GetBlockStatus(i) != BlockStatus::Unknown)
                 continue;
             m_Preferred.push_back(i);
         }
 
     Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
                                                       {
-                                                          return -m_Solver.GetProbability(blk);
+                                                          return -m_Solver->GetProbability(blk);
                                                       }));
 
     if ((maxDepth & SolvingState::ZeroProb) == SolvingState::Stale)
@@ -285,13 +354,13 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)-> const BigInteger&
                                                                   
                                                                   {
-                                                                      return m_Solver.ZeroCondQ(m_BlocksR[blk], blk);
+                                                                      return m_Solver->ZeroCondQ(m_BlocksR[blk], blk);
                                                                   }));
 
     Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
                                                       {
                                                           int m;
-                                                          auto di = m_Solver.DistributionCondQ(m_BlocksR[blk], blk, m);
+                                                          auto di = m_Solver->DistributionCondQ(m_BlocksR[blk], blk, m);
 
                                                           BigInteger t(0);
                                                           for (auto j = 0; j < di.size(); ++j)
@@ -329,20 +398,20 @@ void GameMgr::OpenOptimalBlocks()
     auto blk = m_Preferred.size() == 1 ? m_Preferred[0] : m_Preferred[RandomInteger(m_Preferred.size())];
     m_Preferred.clear();
     OpenBlock(blk);
-    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+    ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 }
 
 bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
 {
     if (!m_Started)
         return false;
-    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
-    m_Solver.Solve(maxDepth, true);
-    if ((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
+    ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+    m_Solver->Solve(maxDepth, true);
+    if ((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
 #ifdef _DEBUG
     {
         for (auto i = 0; i < m_Blocks.size(); ++i)
-            if (!m_Blocks[i].IsOpen && m_Solver.GetBlockStatus(i) == BlockStatus::Blank)
+            if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
                 throw;
         return false;
     }
@@ -354,10 +423,10 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
 #endif
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
-        if (m_Blocks[i].IsOpen || m_Solver.GetBlockStatus(i) != BlockStatus::Blank)
+        if (m_Blocks[i].IsOpen || m_Solver->GetBlockStatus(i) != BlockStatus::Blank)
             continue;
         OpenBlock(i);
-        ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+        ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 #ifdef _DEBUG
         flag = true;
 #endif
@@ -399,6 +468,24 @@ void GameMgr::EnableDrainer()
         return;
     m_Drainer = new Drainer(*this);
     Solve(SolvingState::Probability | SolvingState::Drained, false);
+}
+
+void GameMgr::Save(std::ostream& sw) const
+{
+#define WRITE(val) sw.write(reinterpret_cast<const char *>(&(val)), sizeof(val));
+    WRITE(m_TotalWidth);
+    WRITE(m_TotalHeight);
+    WRITE(m_TotalMines);
+    WRITE(m_Settled);
+    WRITE(m_Started);
+    WRITE(m_ToOpen);
+    if (m_Settled)
+        for (auto &blk : m_Blocks)
+        {
+            WRITE(blk.Degree);
+            WRITE(blk.IsOpen);
+            WRITE(blk.IsMine);
+        }
 }
 
 int GameMgr::GetIndex(int x, int y) const
@@ -448,13 +535,13 @@ void GameMgr::OpenBlock(int id)
         return;
     }
 
-    m_Solver.AddRestrain(id, false);
+    m_Solver->AddRestrain(id, false);
     if (m_Blocks[id].Degree == 0)
     {
         for (auto &blk : m_BlocksR[id])
             OpenBlock(blk);
     }
-    m_Solver.AddRestrain(m_BlocksR[id], m_Blocks[id].Degree);
+    m_Solver->AddRestrain(m_BlocksR[id], m_Blocks[id].Degree);
 
     if (--m_ToOpen == 0)
     {
@@ -462,5 +549,5 @@ void GameMgr::OpenBlock(int id)
         m_Succeed = true;
     }
 
-    ASSERT((m_Solver.GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+    ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 }

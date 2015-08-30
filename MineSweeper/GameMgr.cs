@@ -285,6 +285,31 @@ namespace MineSweeper
                     m_Blocks.Add(new Block(i, j, this));
         }
 
+        public GameMgr(string fileName)
+        {
+            m_NativeObject = CreateGameMgrFromFile(fileName);
+            var ptr = GetGameStatus(m_NativeObject);
+            try
+            {
+                unsafe
+                {
+                    var st = *(GameStatus*)ptr.ToPointer();
+                    TotalWidth = st.TotalWidth;
+                    TotalHeight = st.TotalHeight;
+                    TotalMines = st.TotalMines;
+                }
+            }
+            finally
+            {
+                ReleaseGameStatus(ptr);
+            }
+            m_Blocks = new List<Block>();
+            for (var i = 0; i < TotalWidth; i++)
+                for (var j = 0; j < TotalHeight; j++)
+                    m_Blocks.Add(new Block(i, j, this));
+            UpdateStatus();
+        }
+
         /// <summary>
         ///     获取某一位置的格
         /// </summary>
@@ -404,6 +429,8 @@ namespace MineSweeper
             m_Backgrounding.Start();
         }
 
+        public void Save(string fileName) => SaveGameMgrToFile(m_NativeObject, fileName);
+
         #region PInvokes
 
         [DllImport("MineSweeperSolver.dll")]
@@ -411,6 +438,12 @@ namespace MineSweeper
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern IntPtr CreateGameMgr(int width, int height, int totalMines);
+
+        [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateGameMgrFromFile(string filename);
+
+        [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Unicode)]
+        private static extern void SaveGameMgrToFile(IntPtr mgr, string filename);
 
         [DllImport("MineSweeperSolver.dll")]
         private static extern void DisposeGameMgr(IntPtr mgr);

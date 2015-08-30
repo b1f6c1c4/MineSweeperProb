@@ -2,6 +2,7 @@
 #include "GameMgr.h"
 #include "random.h"
 #include "Drainer.h"
+#include <fstream>
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
@@ -42,6 +43,21 @@ struct
 extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines)
 {
     return new GameMgr(width, height, totalMines);
+}
+
+extern "C" DLL_API GameMgr *CreateGameMgrFromFile(const wchar_t *filename)
+{
+    std::ifstream sr(filename, std::ios::binary | std::ios::_Nocreate);
+    auto mgr = new GameMgr(sr);
+    sr.close();
+    return mgr;
+}
+
+extern "C" DLL_API void SaveGameMgrToFile(GameMgr *mgr, const wchar_t *filename)
+{
+    std::ofstream sw(filename, std::ios::binary);
+    mgr->Save(sw);
+    sw.close();
 }
 
 extern "C" DLL_API void DisposeGameMgr(GameMgr *mgr)

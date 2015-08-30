@@ -13,7 +13,7 @@ namespace MineSweeper
     {
         private readonly int m_Width;
         private readonly int m_Height;
-        private readonly int m_Mines;
+        private int m_Mines;
 
         private readonly float m_ScaleFactor;
 
@@ -21,11 +21,17 @@ namespace MineSweeper
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
-        public MineSweeper(int width, int height, int mines)
+        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth,mgr.TotalHeight, mgr.TotalMines,mgr)
+        {
+            
+        }
+
+        public MineSweeper(int width, int height, int mines, GameMgr mgr = null)
         {
             m_Width = width;
             m_Height = height;
             m_Mines = mines;
+            m_Mgr = mgr;
 
             var screen = Screen.FromControl(this);
             var f = Math.Min(
@@ -152,6 +158,8 @@ namespace MineSweeper
             else
                 m_Mgr = mgr;
 
+            m_Mines = m_Mgr.TotalMines;
+
             foreach (var ub in m_UIBlocks)
                 ub.TheMgr = m_Mgr;
 
@@ -205,11 +213,18 @@ namespace MineSweeper
                                              Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
                                          };
                         if (dialog.ShowDialog() == DialogResult.OK)
-                            using (var stream = dialog.OpenFile())
+                        {
+                            var mgr = new GameMgr(dialog.FileName);
+                            if (mgr.TotalWidth == m_Width &&
+                                mgr.TotalHeight == m_Height)
+                                Reset(mgr);
+                            else
                             {
-                                var formatter = new BinaryFormatter();
-                                Reset((GameMgr)formatter.Deserialize(stream));
+                                var frm = new MineSweeper(mgr);
+                                frm.Show();
+                                Dispose();
                             }
+                        }
                     }
                     break;
                 case Keys.S:
@@ -224,12 +239,10 @@ namespace MineSweeper
                                              Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
                                          };
                         if (dialog.ShowDialog() == DialogResult.OK)
-                            using (var stream = dialog.OpenFile())
-                            {
-                                var formatter = new BinaryFormatter();
-                                formatter.Serialize(stream, m_Mgr);
-                                stream.Flush();
-                            }
+                        {
+                            m_Mgr.Save(dialog.FileName);
+                            MessageBox.Show("OK");
+                        }
                     }
                     else if (m_Mgr.Started)
                         m_Mgr.SemiAutomaticStep();

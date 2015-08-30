@@ -20,6 +20,7 @@ class
 {
 public:
     GameMgr(int width, int height, int totalMines);
+    explicit GameMgr(std::istream &sr);
     ~GameMgr();
 
     size_t DrainCriterion;
@@ -60,6 +61,8 @@ public:
 
     void EnableDrainer();
 
+    void Save(std::ostream &sw) const;
+
     friend class Drainer;
 private:
     int m_TotalWidth, m_TotalHeight, m_TotalMines;
@@ -67,7 +70,7 @@ private:
     std::vector<BlockProperty> m_Blocks;
     std::vector<BlockSet> m_BlocksR;
     int m_ToOpen;
-    Solver m_Solver;
+    Solver *m_Solver;
     double m_AllBits;
     std::vector<Block> m_Best, m_Preferred;
     Drainer *m_Drainer;
