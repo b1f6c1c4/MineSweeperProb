@@ -298,6 +298,11 @@ namespace MineSweeper
                 case Keys.C:
                     m_Mgr.Cancel();
                     break;
+                case Keys.Escape:
+                    Program.TheForm.Show();
+                    m_Mgr.Cancel();
+                    Dispose();
+                    return;
             }
             UpdateText();
         }

@@ -79,6 +79,32 @@ namespace MineSweeper
                 Convert.ToInt32(txtHeight.Text),
                 Convert.ToInt32(txtMines.Text));
             frm.Show();
+            Hide();
+        }
+
+        private void Configuration_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.O ||
+                !e.Control)
+                return;
+
+            var dialog = new OpenFileDialog
+                             {
+                                 AddExtension = true,
+                                 CheckPathExists = true,
+                                 DefaultExt = "bin",
+                                 CheckFileExists = true,
+                                 Multiselect = false,
+                                 ShowReadOnly = false,
+                                 Filter = "扫雷文件(*.bin)|*.bin|所有文件|*"
+                             };
+            if (dialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            var mgr = new GameMgr(dialog.FileName);
+            var frm = new MineSweeper(mgr);
+            frm.Show();
+            Hide();
         }
     }
 }

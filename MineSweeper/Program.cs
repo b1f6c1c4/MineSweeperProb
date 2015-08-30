@@ -21,6 +21,8 @@ namespace MineSweeper
 
         public static float ScaleFactor;
 
+        public static Configuration TheForm;
+
         /// <summary>
         ///     应用程序的主入口点。
         /// </summary>
@@ -36,7 +38,8 @@ namespace MineSweeper
             ScaleFactor = GetDeviceCaps(hdc, 88) / 96F;
             ReleaseDC(IntPtr.Zero, hdc);
 
-            Application.Run(new Configuration());
+            TheForm = new Configuration();
+            Application.Run(TheForm);
         }
     }
 }
