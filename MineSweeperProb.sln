@@ -8,8 +8,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MineSweeper", "MineSweeper\
 		{B0BB7DC3-F3CD-456A-AE21-2D32D7338B59} = {B0BB7DC3-F3CD-456A-AE21-2D32D7338B59}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MineSweeperCalc", "MineSweeperCalc\MineSweeperCalc.csproj", "{1E0A1BFE-76BE-4CD3-9C29-4A417A7F3C2E}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MineSweeperSolver", "MineSweeperSolver\MineSweeperSolver.vcxproj", "{B0BB7DC3-F3CD-456A-AE21-2D32D7338B59}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MineSweeperSimulator", "MineSweeperSimulator\MineSweeperSimulator.vcxproj", "{F0429C4F-860B-4FA8-ADEA-C6377D7AB10B}"
@@ -28,10 +26,6 @@ Global
 		{273ABFA6-1A14-4BF2-92BF-3810911BB917}.Release|x64.ActiveCfg = Release|Any CPU
 		{273ABFA6-1A14-4BF2-92BF-3810911BB917}.Release|x64.Build.0 = Release|Any CPU
 		{273ABFA6-1A14-4BF2-92BF-3810911BB917}.ReleaseSimu|x64.ActiveCfg = Release|Any CPU
-		{1E0A1BFE-76BE-4CD3-9C29-4A417A7F3C2E}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{1E0A1BFE-76BE-4CD3-9C29-4A417A7F3C2E}.DebugSimu|x64.ActiveCfg = Debug|Any CPU
-		{1E0A1BFE-76BE-4CD3-9C29-4A417A7F3C2E}.Release|x64.ActiveCfg = Release|Any CPU
-		{1E0A1BFE-76BE-4CD3-9C29-4A417A7F3C2E}.ReleaseSimu|x64.ActiveCfg = Release|Any CPU
 		{B0BB7DC3-F3CD-456A-AE21-2D32D7338B59}.Debug|x64.ActiveCfg = Debug|x64
 		{B0BB7DC3-F3CD-456A-AE21-2D32D7338B59}.Debug|x64.Build.0 = Debug|x64
 		{B0BB7DC3-F3CD-456A-AE21-2D32D7338B59}.DebugSimu|x64.ActiveCfg = Debug|x64
