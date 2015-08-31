@@ -470,6 +470,7 @@ void GameMgr::EnableDrainer()
 {
     if (m_Drainer != nullptr)
         return;
+    SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
     m_Drainer = new Drainer(*this);
     Solve(SolvingState::Probability | SolvingState::Drained, false);
 }

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Windows.Forms;
 
@@ -17,13 +16,14 @@ namespace MineSweeper
 
         private readonly float m_ScaleFactor;
 
+        private readonly bool m_InitWithMgr;
         private GameMgr m_Mgr;
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
-        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth,mgr.TotalHeight, mgr.TotalMines,mgr)
+        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth,mgr.TotalHeight, mgr.TotalMines, mgr)
         {
-            
+
         }
 
         public MineSweeper(int width, int height, int mines, GameMgr mgr = null)
@@ -32,6 +32,7 @@ namespace MineSweeper
             m_Height = height;
             m_Mines = mines;
             m_Mgr = mgr;
+            m_InitWithMgr = mgr != null;
 
             var screen = Screen.FromControl(this);
             var f = Math.Min(
@@ -64,7 +65,13 @@ namespace MineSweeper
             ResumeLayout();
         }
 
-        private void MineSweeper_Load(object sender, EventArgs e) { Reset(); }
+        private void MineSweeper_Load(object sender, EventArgs e)
+        {
+            if (m_InitWithMgr)
+                Reset(m_Mgr);
+            else
+                Reset();
+        }
 
         private static void InvokeIfRequired(ISynchronizeInvoke control, MethodInvoker action)
         {
@@ -153,6 +160,8 @@ namespace MineSweeper
             if (mgr == null)
             {
                 var mode = (m_Mgr?.Mode ?? SolvingMode.ZeroProb) & SolvingMode.ZeroProb;
+                if (m_Mgr?.Mode.HasFlag(SolvingMode.Drained)??false)
+                    mode|=SolvingMode.ZeroProb;
                 m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
             }
             else
@@ -305,6 +314,12 @@ namespace MineSweeper
                     return;
             }
             UpdateText();
+        }
+
+        private void MineSweeper_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (e.CloseReason != CloseReason.None)
+                Application.Exit();
         }
     }
 }

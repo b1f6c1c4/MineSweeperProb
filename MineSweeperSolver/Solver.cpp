@@ -20,7 +20,7 @@ void CheckOL(OrthogonalList<int> &m)
 #define ASSERT_CHECK
 #endif
 
-#define ZEROQ(val) (abs(val) < static_cast<double>(1E-3))
+#define ZEROQ(val) (abs(val) < 1E-3)
 
 static std::vector<int> Gauss(OrthogonalList<double> &matrix);
 static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);

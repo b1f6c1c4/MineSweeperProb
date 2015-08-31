@@ -52,6 +52,7 @@
             this.Margin = new System.Windows.Forms.Padding(2);
             this.Name = "MineSweeper";
             this.Text = "Form1";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MineSweeper_FormClosing);
             this.Load += new System.EventHandler(this.MineSweeper_Load);
             this.KeyUp += new System.Windows.Forms.KeyEventHandler(this.Form1_KeyUp);
             this.ResumeLayout(false);

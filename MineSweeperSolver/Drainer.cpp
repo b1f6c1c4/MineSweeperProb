@@ -246,7 +246,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
         }
 
         for (auto i = 0; i < m_Blocks.size(); ++i)
-            if (probs[i] >= ma->m_BestProb)
+            if (probs[i] > ma->m_BestProb - 1E-6)
                 ma->m_BestBlocks.push_back(i);
     }
 }
