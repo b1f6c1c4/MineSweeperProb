@@ -9,29 +9,47 @@
 
 std::mutex mtx;
 std::vector<std::thread> m_Threads;
-volatile int rest;
-volatile auto succeed = 0, total = 0;
 
-void Process()
+int numTasks;
+size_t *cert;
+volatile size_t restT, totalTT;
+volatile size_t *rest;
+volatile size_t *succeed, *succeedT;
+volatile size_t *total, *totalT;
+
+bool ProcessID(int id)
 {
-    while (true)
+    auto mgr = GameMgr(30, 16, 99);
+    mgr.DrainCriterion = cert[id];
+    mgr.OpenBlock(0, 0);
+    mgr.Automatic();
+    return mgr.GetSucceed();
+}
+
+void Process(int id, bool (*fun)(int))
+{
+    for (;;++id)
     {
+        id %= numTasks;
         {
             std::unique_lock<std::mutex> lock(mtx);
-            if (rest == 0)
+            if (restT == 0)
                 break;
-            --rest;
+
+            if (rest[id] == 0)
+                continue;
+
+            --restT;
+            --rest[id];
         }
 
-        auto mgr = GameMgr(30, 16, 99);
-        mgr.OpenBlock(0, 0);
-        mgr.Automatic();
+        auto res = fun(id);
 
         {
             std::unique_lock<std::mutex> lock(mtx);
-            if (mgr.GetSucceed())
-                ++succeed;
-            ++total;
+            if (res)
+                ++succeed[id];
+            ++total[id];
         }
     }
 }
@@ -40,57 +58,92 @@ int main()
 {
     CacheBinomials(30 * 16, 99);
 
-    int thrs, rpM, wait;
+    int thrs, wait;
     std::ifstream fin("config.txt");
-    fin >> thrs >> wait >> rpM;
+    fin >> thrs >> wait >> numTasks;
+    totalTT = restT = 0;
+    cert = new size_t[numTasks];
+    rest = new size_t[numTasks];
+    succeed = new size_t[numTasks];
+    total = new size_t[numTasks];
+    succeedT = new size_t[numTasks];
+    totalT = new size_t[numTasks];
+    for (auto i = 0; i < numTasks; ++i)
+    {
+        int r;
+        fin >> cert[i] >> r;
+        rest[i] = r;
+        restT += r;
+        succeedT[i] = succeed[i] = 0;
+        totalT[i] = total[i] = 0;
+    }
     fin.close();
 
-    std::cout << thrs << " " << wait << " " << rpM << std::endl;
-
-    rest = rpM;
+    std::cout << thrs << " " << wait << std::endl;
 
     std::ofstream fout("output.txt", std::ios::app);
 
-    auto succeedT = 0, totalT = 0;
-
     while (thrs-- > 0)
-        m_Threads.emplace_back(&Process);
+        m_Threads.emplace_back(&Process, thrs, &ProcessID);
 
     auto last = 0;
-    while (rest > 0)
+    while (true)
     {
         std::this_thread::sleep_for(std::chrono::seconds{wait});
 
+        auto flag = false;
         last += wait;
         {
             std::unique_lock<std::mutex> lock(mtx);
 
-            if (total > 0)
-                fout << succeed << " " << total << std::endl << std::flush;
-            succeedT += succeed;
-            totalT += total;
-            succeed = 0;
-            total = 0;
+            for (auto i = 0; i < numTasks;++i)
+            {
+                if (total[i] == 0)
+                    continue;
+                
+                fout << cert[i] << " " << succeed[i] << " " << total[i] << std::endl << std::flush;
+                succeedT[i] += succeed[i];
+                totalT[i] += total[i];
+                totalTT += total[i];
+                succeed[i] = 0;
+                total[i] = 0;
+            }
+            flag = restT == 0;
         }
 
-        auto est = static_cast<int>(totalT == 0 ? 0 : static_cast<float>(last) * rpM / totalT - last);
+        auto est = static_cast<int>(totalTT == 0 ? 0 : static_cast<float>(last) / totalTT * restT - last);
         auto estMin = est / 60 % 60;
         auto estHour = est / 60 / 60;
-        std::cout << succeedT << " / " << totalT << " " << estHour << ":" << estMin << ":" << est << " " << static_cast<double>(succeedT) / (totalT) << std::endl;
-        if (est < wait)
+
+        std::cout << last << " " << estHour << ":" << estMin << ":" << est << " " << static_cast<double>(totalTT) / (totalTT + restT) * 100 << "%" << std::endl;
+        for (auto i = 0; i < numTasks; ++i)
+            std::cout << cert[i] << ": " << succeedT[i] << " / " << totalT[i] << "=" << static_cast<double>(succeedT[i]) / totalT[i] << std::endl;
+        std::cout << std::endl;
+
+        if (flag)
             break;
     }
 
     for (auto &th : m_Threads)
         th.join();
 
-    if (total > 0)
-        fout << succeed << " " << total << std::endl << std::flush;
-    fout.close();
+    for (auto i = 0; i < numTasks; ++i)
+    {
+        if (total[i] == 0)
+            continue;
 
-    succeedT += succeed;
-    totalT += total;
-    std::cout << succeedT << " / " << totalT << " " << static_cast<double>(succeedT) / totalT << std::endl;
+        fout << cert[i] << " " << succeed[i] << " " << total[i] << std::endl << std::flush;
+        succeedT[i] += succeed[i];
+        totalT += total[i];
+        totalTT += total[i];
+        succeed[i] = 0;
+        total[i] = 0;
+    }
+
+    std::cout << last << " -----" << std::endl;
+    for (auto i = 0; i < numTasks; ++i)
+        std::cout << cert[i] << ": " << succeedT[i] << " / " << totalT[i] << "=" << static_cast<double>(succeedT[i]) / totalT[i] << std::endl;
+    std::cout << std::endl;
 
     system("pause");
     return 0;
