@@ -23,13 +23,13 @@ void CheckOL(OrthogonalList<int> &m)
 #define ZEROQ(val) (abs(val) < 1E-3)
 
 static std::vector<int> Gauss(OrthogonalList<double> &matrix);
-static void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to);
-static void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases);
-static unsigned __int64 Hash(const BlockSet &set);
+static void Merge(const std::vector<double> &from, std::vector<double> &to);
+static void Add(std::vector<double> &from, const std::vector<double> &cases);
+static size_t Hash(const BlockSet &set);
 template <class T>
-static unsigned __int64 HashCol(const Node<T> *ptr);
+static size_t HashCol(const Node<T> *ptr);
 
-Solver::Solver(int count) : m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count)
+Solver::Solver(int count) : m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
@@ -69,7 +69,7 @@ const double *Solver::GetProbabilities() const
     return &*m_Probability.begin();
 }
 
-const BigInteger &Solver::GetTotalStates() const
+double Solver::GetTotalStates() const
 {
     return m_TotalStates;
 }
@@ -177,7 +177,7 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
 
     if (m_BlockSets.empty())
     {
-        m_TotalStates = BigInteger(1);
+        m_TotalStates = double(1);
 
         m_Solutions.emplace_back(std::vector<int>());
         ProcessSolutions();
@@ -198,21 +198,21 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         minors.pop_back();
     else
     {
-        m_TotalStates = BigInteger(0);
+        m_TotalStates = double(0);
         return;
     }
 
     EnumerateSolutions(minors, augmentedMatrix);
     if (m_Solutions.empty())
     {
-        m_TotalStates = BigInteger(0);
+        m_TotalStates = double(0);
         return;
     }
 
     ProcessSolutions();
 }
 
-const BigInteger &Solver::ZeroCondQ(const BlockSet &set, Block blk)
+double Solver::ZeroCondQ(const BlockSet &set, Block blk)
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
     int dMines;
@@ -223,7 +223,7 @@ const BigInteger &Solver::ZeroCondQ(const BlockSet &set, Block blk)
     return ZCondQ(std::move(par));
 }
 
-const std::vector<BigInteger> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
+const std::vector<double> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
     int dMines;
@@ -237,7 +237,7 @@ const std::vector<BigInteger> &Solver::DistributionCondQ(const BlockSet &set, Bl
 
 void Solver::MergeSets()
 {
-    std::multimap<unsigned __int64, int> hash;
+    std::multimap<size_t, int> hash;
     for (auto i = 0; i < m_BlockSets.size(); ++i)
     {
         auto h = HashCol(m_Matrix.GetColHead(i).Down);
@@ -738,8 +738,8 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
 
 void Solver::ProcessSolutions()
 {
-    auto exp = std::vector<BigInteger>(m_BlockSets.size(), 0);
-    m_TotalStates = BigInteger(0);
+    auto exp = std::vector<double>(m_BlockSets.size(), 0);
+    m_TotalStates = double(0);
     for (auto &so : m_Solutions)
     {
 #ifdef _DEBUG
@@ -757,7 +757,7 @@ void Solver::ProcessSolutions()
 			ASSERT(nr->Value == v);
 		}
 #endif
-        so.States = BigInteger(1);
+        so.States = double(1);
         for (auto i = 0; i < m_BlockSets.size(); ++i)
             so.States *= Binomial(m_BlockSets[i].size(), so.Dist[i]);
         m_TotalStates += so.States;
@@ -804,16 +804,16 @@ void Solver::ProcessSolutions()
     }
 }
 
-void Merge(const std::vector<BigInteger> &from, std::vector<BigInteger> &to)
+void Merge(const std::vector<double> &from, std::vector<double> &to)
 {
     ASSERT(from.size() <= to.size());
     for (auto i = 0; i < from.size(); ++i)
         to[i] += from[i];
 }
 
-void Add(std::vector<BigInteger> &from, const std::vector<BigInteger> &cases)
+void Add(std::vector<double> &from, const std::vector<double> &cases)
 {
-    auto dicN = std::vector<BigInteger>(from.size() + cases.size() - 1, BigInteger(0));
+    auto dicN = std::vector<double>(from.size() + cases.size() - 1, double(0));
     for (auto i = 0; i < from.size(); i++)
         for (auto j = 0; j < cases.size(); j++)
             dicN[i + j] += from[i] * cases[j];
@@ -839,7 +839,7 @@ void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1
     }
 }
 
-const BigInteger &Solver::ZCondQ(DistCondQParameters &&par)
+double Solver::ZCondQ(DistCondQParameters &&par)
 {
     DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
@@ -861,7 +861,7 @@ const BigInteger &Solver::ZCondQ(DistCondQParameters &&par)
     auto &val = ptr->m_Result.front();
     for (auto &solution : m_Solutions)
     {
-        BigInteger valT(1);
+        double valT(1);
         for (auto i = 0; i < m_BlockSets.size(); i++)
         {
             auto n = m_BlockSets[i].size();
@@ -875,7 +875,7 @@ const BigInteger &Solver::ZCondQ(DistCondQParameters &&par)
     return val;
 }
 
-const std::vector<BigInteger> &Solver::DistCondQ(DistCondQParameters &&par)
+const std::vector<double> &Solver::DistCondQ(DistCondQParameters &&par)
 {
     DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
@@ -898,14 +898,14 @@ const std::vector<BigInteger> &Solver::DistCondQ(DistCondQParameters &&par)
     dic.resize(ptr->Length + 1);
     for (auto &solution : m_Solutions)
     {
-        auto dicT = std::vector<BigInteger>(1, BigInteger(1));
+        auto dicT = std::vector<double>(1, double(1));
         for (auto i = 0; i < m_BlockSets.size(); i++)
         {
             auto n = m_BlockSets[i].size();
             auto a = ptr->Sets1[i], b = i == ptr->Set2ID ? 1 : 0;
             auto m = solution.Dist[i];
 
-            auto cases = std::vector<BigInteger>();
+            auto cases = std::vector<double>();
             cases.reserve(min(m, a) + 1);
             for (auto j = 0; j <= m && j <= a; j++)
             {
@@ -943,7 +943,7 @@ DistCondQParameters::DistCondQParameters(DistCondQParameters &&other)
 
 DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()) {}
 
-unsigned long long DistCondQParameters::Hash()
+size_t DistCondQParameters::Hash()
 {
     return m_Hash = ::Hash(Sets1) << 5 ^ Set2ID;
 }
@@ -977,18 +977,18 @@ bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
     return false;
 }
 
-unsigned __int64 Hash(const BlockSet &set)
+size_t Hash(const BlockSet &set)
 {
-    unsigned __int64 hash = 5381;
+    size_t hash = 5381;
     for (auto v : set)
         hash = (hash << 5) + hash + v + 30;
     return hash;
 }
 
 template <class T>
-unsigned __int64 HashCol(const Node<T> *ptr)
+size_t HashCol(const Node<T> *ptr)
 {
-    unsigned __int64 hash = 5381;
+    size_t hash = 5381;
     for (; ptr != nullptr; ptr = ptr->Down)
         hash = (hash << 5) + hash + ptr->Row;
     return hash;

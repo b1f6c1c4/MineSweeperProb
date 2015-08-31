@@ -11,10 +11,7 @@
 #define ASSERT(val)
 #endif
 
-template <class T>
-static void Largest(std::vector<Block> &bests, std::function<T(Block)> fun);
-template <class T>
-static void Largest(std::vector<Block> &bests, std::function<const T &(Block)> fun);
+static void Largest(std::vector<Block> &bests, std::function<double(Block)> fun);
 
 GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
 {
@@ -47,10 +44,10 @@ GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_
         }
     m_Solver->AddRestrain(lst, totalMines);
 
-    m_AllBits = Binomial(width * height, totalMines).Log2();
+    m_AllBits = log2(Binomial(width * height, totalMines));
 }
 
-GameMgr::GameMgr(std::istream& sr) : DrainCriterion(64), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(std::istream &sr) : DrainCriterion(64), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val));
     READ(m_TotalWidth);
@@ -103,11 +100,11 @@ GameMgr::GameMgr(std::istream& sr) : DrainCriterion(64), m_TotalWidth(0), m_Tota
 
         for (auto &blk : m_Blocks)
             if (blk.IsOpen && !blk.IsMine && blk.Degree != 0)
-                m_Solver->AddRestrain(m_BlocksR[blk.Index],blk.Degree);
+                m_Solver->AddRestrain(m_BlocksR[blk.Index], blk.Degree);
     }
 
     CacheBinomials(m_TotalWidth * m_TotalHeight, m_TotalMines);
-    m_AllBits = Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines).Log2();
+    m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
 GameMgr::~GameMgr()
@@ -171,7 +168,7 @@ bool GameMgr::GetSucceed() const
 
 double GameMgr::GetBits() const
 {
-    return m_Solver->GetTotalStates().Log2();
+    return log2(m_Solver->GetTotalStates());
 }
 
 double GameMgr::GetAllBits() const
@@ -228,8 +225,7 @@ void GameMgr::OpenBlock(int x, int y)
     OpenBlock(GetIndex(x, y));
 }
 
-template <class T>
-void Largest(std::vector<Block> &bests, std::function<T(int)> fun)
+void Largest(std::vector<Block> &bests, std::function<double(int)> fun)
 {
     if (bests.size() <= 1)
         return;
@@ -244,29 +240,7 @@ void Largest(std::vector<Block> &bests, std::function<T(int)> fun)
             bestVal = p;
             newBests.clear();
         }
-        if (!(p < bestVal))
-            newBests.push_back(bests[i]);
-    }
-    newBests.swap(bests);
-}
-
-template <class T>
-void Largest(std::vector<Block> &bests, std::function<const T &(int)> fun)
-{
-    if (bests.size() <= 1)
-        return;
-    auto newBests = std::vector<Block>();
-    newBests.push_back(bests.front());
-    const T *bestVal = &fun(bests.front());
-    for (auto i = 1; i < bests.size(); ++i)
-    {
-        const T *p = &fun(bests[i]);
-        if (*bestVal < *p)
-        {
-            bestVal = p;
-            newBests.clear();
-        }
-        if (!(*p < *bestVal))
+        if (bestVal - abs(bestVal) * 1E-8 <= p)
             newBests.push_back(bests[i]);
     }
     newBests.swap(bests);
@@ -349,24 +323,23 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 
     Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
                                                       {
-                                                          return -m_Solver->GetProbability(blk);
+                                                          return 1 - m_Solver->GetProbability(blk);
                                                       }));
 
     if ((maxDepth & SolvingState::ZeroProb) == SolvingState::Stale)
         return;
 
-    Largest(m_Preferred, std::function<const BigInteger &(Block)>([this](Block blk)-> const BigInteger&
-                                                                  
-                                                                  {
-                                                                      return m_Solver->ZeroCondQ(m_BlocksR[blk], blk);
-                                                                  }));
+    Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
+                                                      {
+                                                          return m_Solver->ZeroCondQ(m_BlocksR[blk], blk);
+                                                      }));
 
     Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
                                                       {
                                                           int m;
                                                           auto di = m_Solver->DistributionCondQ(m_BlocksR[blk], blk, m);
 
-                                                          BigInteger t(0);
+                                                          double t = 0;
                                                           for (auto j = 0; j < di.size(); ++j)
                                                               t += di[j];
 
@@ -475,7 +448,7 @@ void GameMgr::EnableDrainer()
     Solve(SolvingState::Probability | SolvingState::Drained, false);
 }
 
-void GameMgr::Save(std::ostream& sw) const
+void GameMgr::Save(std::ostream &sw) const
 {
 #define WRITE(val) sw.write(reinterpret_cast<const char *>(&(val)), sizeof(val));
     WRITE(m_TotalWidth);

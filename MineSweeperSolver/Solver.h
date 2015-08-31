@@ -4,7 +4,6 @@
 #include "OrthogonalList.h"
 #include <set>
 #include <map>
-#include "BigInteger.h"
 
 enum class BlockStatus
 {
@@ -62,14 +61,14 @@ public:
     const BlockStatus *GetBlockStatuses() const;
     double GetProbability(Block block) const;
     const double *GetProbabilities() const;
-    const BigInteger &GetTotalStates() const;
+    double GetTotalStates() const;
 
     void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
     void Solve(SolvingState maxDepth, bool shortcut);
 
-    const BigInteger &ZeroCondQ(const BlockSet &set, Block blk);
-    const std::vector<BigInteger> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
+    double ZeroCondQ(const BlockSet &set, Block blk);
+    const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
 
     friend class Drainer;
 private:
@@ -81,8 +80,8 @@ private:
     std::vector<Solution> m_Solutions;
     std::vector<double> m_Probability;
     std::set<std::pair<int, int>> m_Pairs;
-    BigInteger m_TotalStates;
-    std::multimap<unsigned __int64, DistCondQParameters *> m_DistCondQCache;
+    double m_TotalStates;
+    std::multimap<size_t, DistCondQParameters *> m_DistCondQCache;
 
     void MergeSets();
     void ReduceRestrains();
@@ -93,8 +92,8 @@ private:
 
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 
-    const BigInteger &ZCondQ(DistCondQParameters &&par);
-    const std::vector<BigInteger> &DistCondQ(DistCondQParameters &&par);
+    double ZCondQ(DistCondQParameters &&par);
+    const std::vector<double> &DistCondQ(DistCondQParameters &&par);
     void ClearDistCondQCache();
 };
 
@@ -109,11 +108,11 @@ private:
     std::vector<int> Sets1;
     int Set2ID;
     int Length;
-    unsigned __int64 m_Hash;
+    size_t m_Hash;
 
-    unsigned __int64 Hash();
+    size_t Hash();
 
-    std::vector<BigInteger> m_Result;
+    std::vector<double> m_Result;
 
     friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
     friend bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
@@ -134,6 +133,6 @@ public:
     friend class Drainer;
 private:
     std::vector<int> Dist;
-    BigInteger States;
+    double States;
     double Ratio;
 };

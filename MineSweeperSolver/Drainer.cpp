@@ -99,12 +99,12 @@ MacroSituation::~MacroSituation()
     m_Solver = nullptr;
 }
 
-unsigned __int64 MacroSituation::Hash()
+size_t MacroSituation::Hash()
 {
     if (m_Degrees.empty())
         return m_Hash = m_BestProb < 0.5 ? 0x0000000000000000 : 0xffffffffffffffff;
 
-    unsigned __int64 hash = 5381;
+    size_t hash = 5381;
     for (auto d : m_Degrees)
         hash = (hash << 5) + hash + d;
 

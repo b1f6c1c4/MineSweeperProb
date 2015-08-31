@@ -30,12 +30,12 @@ private:
     BlockSet m_BestBlocks;
     std::vector<double> m_Probs;
 
-    unsigned __int64 m_Hash;
+    size_t m_Hash;
 
     MacroSituation();
     MacroSituation(const MacroSituation &other);
 
-    unsigned __int64 Hash();
+    size_t Hash();
 };
 
 bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
@@ -55,7 +55,7 @@ public:
 private:
     const GameMgr &m_Mgr;
     std::vector<MicroSituation> m_Micros;
-    std::multimap<unsigned __int64, MacroSituation *> m_Macros;
+    std::multimap<size_t, MacroSituation *> m_Macros;
     std::vector<Block> m_Blocks;
     std::map<Block, Block> m_BlocksLookup;
     std::vector<BlockSet> m_BlocksR;

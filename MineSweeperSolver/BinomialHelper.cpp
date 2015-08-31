@@ -1,11 +1,12 @@
 #include "BinomialHelper.h"
+#include <vector>
 
-static std::vector<std::vector<BigInteger>> BinomialCoeff;
+static std::vector<std::vector<double>> BinomialCoeff;
 
 DLL_API void CacheBinomials(int n, int m)
 {
     if (BinomialCoeff.empty())
-        BinomialCoeff.emplace_back(1, BigInteger(1));
+        BinomialCoeff.emplace_back(1, double(1));
 
     ++n , ++m;
     if (n < 0)
@@ -43,16 +44,16 @@ DLL_API void CacheBinomials(int n, int m)
     }
 }
 
-DLL_API BigInteger Binomial(int n, int m)
+DLL_API double Binomial(int n, int m)
 {
     if (n < 0)
-        return BigInteger(0);
+        return double(0);
     if (m > n ||
         m < 0)
-        return BigInteger(0);
+        return double(0);
     if (m == 0 ||
         m == n)
-        return BigInteger(1);
+        return double(1);
 
     auto mm = m <= n / 2 ? m : n - m;
 
