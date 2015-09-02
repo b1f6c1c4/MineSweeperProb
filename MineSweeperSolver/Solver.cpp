@@ -22,9 +22,6 @@ void CheckOL(OrthogonalList<int> &m)
 
 #define ZEROQ(val) (abs(val) < 1E-3)
 
-static std::vector<int> Gauss(OrthogonalList<double> &matrix);
-static void Merge(const std::vector<double> &from, std::vector<double> &to);
-static void Add(std::vector<double> &from, const std::vector<double> &cases);
 static size_t Hash(const BlockSet &set);
 template <class T>
 static size_t HashCol(const Node<T> *ptr);
@@ -92,7 +89,7 @@ void Solver::AddRestrain(Block blk, bool isMine)
 void Solver::AddRestrain(const BlockSet &set, int mines)
 {
     auto dMines = 0;
-    std::vector<int> bin;
+    auto &bin = m_IntersectionCounts_Temp;
     GetIntersectionCounts(set, bin, dMines);
 
     m_Matrix.ExtendHeight(m_Matrix.GetHeight() + 1);
@@ -179,7 +176,7 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
     {
         m_TotalStates = double(1);
 
-        m_Solutions.emplace_back(std::vector<int>());
+        m_Solutions.emplace_back();
         ProcessSolutions();
         return;
     }
@@ -191,18 +188,18 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         for (auto node = m_Matrix.GetRowHead(row).Right; node != nullptr; node = node->Right)
             nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), static_cast<double>(node->Value));
     }
-    auto minors = Gauss(augmentedMatrix);
+    Gauss(augmentedMatrix);
 
-    if (!minors.empty() &&
-        minors.back() == m_BlockSets.size())
-        minors.pop_back();
+    if (!m_Minors.empty() &&
+        m_Minors.back() == m_BlockSets.size())
+        m_Minors.pop_back();
     else
     {
         m_TotalStates = double(0);
         return;
     }
 
-    EnumerateSolutions(minors, augmentedMatrix);
+    EnumerateSolutions(augmentedMatrix);
     if (m_Solutions.empty())
     {
         m_TotalStates = double(0);
@@ -401,9 +398,11 @@ void Solver::SimpleOverlapAll()
     m_State |= SolvingState::Overlap;
     m_Pairs.clear();
 
+    auto &indexes = m_OverlapIndexes_Temp;
+    indexes.reserve(m_Matrix.GetHeight());
     for (auto col = 0; col < m_BlockSets.size(); ++col)
     {
-        std::vector<int> indexes;
+        indexes.clear();
         for (auto node = m_Matrix.GetColHead(col).Down; node != nullptr; node = node->Down)
             indexes.push_back(node->Row);
 
@@ -422,7 +421,10 @@ bool Solver::SimpleOverlap(int r1, int r2)
     if (!m_Pairs.emplace(r1, r2).second)
         return false;
 
-    std::vector<int> exceptA, exceptB, intersection;
+    auto &exceptA = m_OverlapA_Temp, &exceptB = m_OverlapB_Temp, &intersection = m_OverlapC_Temp;
+    exceptA.clear();
+    exceptB.clear();
+    intersection.clear();
 
     auto n1 = m_Matrix.GetRowHead(r1).Right, n2 = m_Matrix.GetRowHead(r2).Right;
     while (true)
@@ -526,10 +528,10 @@ bool Solver::SimpleOverlap(int r1, int r2)
     return false;
 }
 
-std::vector<int> Gauss(OrthogonalList<double> &matrix)
+void Solver::Gauss(OrthogonalList<double> &matrix)
 {
     auto n = matrix.GetWidth();
-    auto minorCol = std::vector<int>();
+    m_Minors.clear();
     auto major = 0;
     for (auto col = 0; col < n; ++col)
     {
@@ -542,11 +544,12 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
         }
         if (biasNode == nullptr)
         {
-            minorCol.push_back(col);
+            m_Minors.push_back(col);
             continue;
         }
 
-        auto vec = std::vector<std::pair<int, double>>();
+        auto &vec = m_GaussVec_Temp;
+        vec.clear();
         auto theBiasInv = 1 / biasNode->Value;
         for (auto node = matrix.GetColHead(col).Down; node != nullptr;)
         {
@@ -632,61 +635,66 @@ std::vector<int> Gauss(OrthogonalList<double> &matrix)
         }
         ++major;
     }
-    return minorCol;
 }
 
-void Solver::EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<double> &augmentedMatrix)
+void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
 {
     auto n = m_BlockSets.size();
 
-    if (minors.empty())
+    if (m_Minors.empty())
     {
-        auto lst = std::vector<int>(n);
+        m_Solutions.emplace_back();
+        auto &lst = m_Solutions.back().Dist;
+        lst.resize(n, 0);
         for (auto nc = augmentedMatrix.GetColHead(n).Down; nc != nullptr; nc = nc->Down)
             lst[nc->Row] = static_cast<int>(round(nc->Value));
-        m_Solutions.emplace_back(move(lst));
         return;
     }
 
-    auto mR = n - minors.size();
-    auto majors = std::vector<int>(mR);
-    auto cnts = std::vector<int>(mR);
-    auto sums = std::vector<double>(mR);
+    auto mR = n - m_Minors.size();
+    auto &majors = m_Majors_Temp;
+    auto &cnts = m_Counts_Temp;
+    auto &sums = m_Sums_Temp;
+    majors.clear(), majors.reserve(mR);
+    cnts.clear(), cnts.reserve(mR);
+    sums.clear(), sums.reserve(mR);
     {
         auto minorID = 0;
         auto mainRow = 0;
         auto nc = augmentedMatrix.GetColHead(n).Down;
         for (auto col = 0; col < n; col++)
-            if (minorID < minors.size() &&
-                col == minors[minorID])
+            if (minorID < m_Minors.size() &&
+                col == m_Minors[minorID])
                 ++minorID;
             else // major
             {
-                majors[mainRow] = col;
-                cnts[mainRow] = m_BlockSets[col].size();
+                majors.push_back(col);
+                cnts.push_back(m_BlockSets[col].size());
                 if (nc == nullptr || nc->Row > mainRow)
-                    sums[mainRow] = 0;
+                    sums.push_back(0);
                 else
                 {
-                    sums[mainRow] = nc->Value;
+                    sums.push_back(nc->Value);
                     nc = nc->Down;
                 }
                 ++mainRow;
             }
     }
-    auto aggr = [&sums,&minors,&augmentedMatrix](int minor, int val)
+    auto aggr = [this,&sums,&augmentedMatrix](int minor, int val)
         {
-            for (auto nc = augmentedMatrix.GetColHead(minors[minor]).Down; nc != nullptr; nc = nc->Down)
+            for (auto nc = augmentedMatrix.GetColHead(m_Minors[minor]).Down; nc != nullptr; nc = nc->Down)
                 sums[nc->Row] -= nc->Value * static_cast<double>(val);
         };
-    auto stack = std::vector<int>();
-    stack.reserve(minors.size());
+    auto &stack = m_Stack_Temp;
+    stack.clear();
+    stack.reserve(m_Minors.size());
     stack.push_back(0);
     while (true)
-        if (stack.size() == minors.size())
-            if (stack.back() <= m_BlockSets[minors.back()].size())
+        if (stack.size() == m_Minors.size())
+            if (stack.back() <= m_BlockSets[m_Minors.back()].size())
             {
-                auto lst = std::vector<int>(n);
+                auto &lst = m_Dist_Temp;
+                lst.clear(), lst.resize(n, 0);
                 auto flag = true;
                 for (auto mainRow = 0; mainRow < mR; mainRow++)
                 {
@@ -706,9 +714,10 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 }
                 if (flag)
                 {
-                    for (auto minorID = 0; minorID < minors.size(); minorID++)
-                        lst[minors[minorID]] = stack[minorID];
-                    m_Solutions.emplace_back(move(lst));
+                    for (auto minorID = 0; minorID < m_Minors.size(); minorID++)
+                        lst[m_Minors[minorID]] = stack[minorID];
+                    m_Solutions.emplace_back();
+                    m_Solutions.back().Dist.swap(lst);
                 }
 
                 aggr(stack.size() - 1, 1);
@@ -723,7 +732,7 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
                 aggr(stack.size() - 1, 1);
                 ++stack.back();
             }
-        else if (stack.back() <= m_BlockSets[minors[stack.size() - 1]].size())
+        else if (stack.back() <= m_BlockSets[m_Minors[stack.size() - 1]].size())
             stack.push_back(0); // aggr(stack.size() - 1, 0);
         else
         {
@@ -738,7 +747,8 @@ void Solver::EnumerateSolutions(const std::vector<int> &minors, const Orthogonal
 
 void Solver::ProcessSolutions()
 {
-    auto exp = std::vector<double>(m_BlockSets.size(), 0);
+    auto &exp = m_Exp_Temp;
+    exp.clear(), exp.resize(m_BlockSets.size(), 0);
     m_TotalStates = double(0);
     for (auto &so : m_Solutions)
     {
@@ -804,16 +814,17 @@ void Solver::ProcessSolutions()
     }
 }
 
-void Merge(const std::vector<double> &from, std::vector<double> &to)
+void Solver::Merge(const std::vector<double> &from, std::vector<double> &to)
 {
     ASSERT(from.size() <= to.size());
     for (auto i = 0; i < from.size(); ++i)
         to[i] += from[i];
 }
 
-void Add(std::vector<double> &from, const std::vector<double> &cases)
+void Solver::Add(std::vector<double> &from, const std::vector<double> &cases)
 {
-    auto dicN = std::vector<double>(from.size() + cases.size() - 1, double(0));
+    auto &dicN = m_Add_Temp;
+    dicN.clear(), dicN.resize(from.size() + cases.size() - 1, 0);
     for (auto i = 0; i < from.size(); i++)
         for (auto j = 0; j < cases.size(); j++)
             dicN[i + j] += from[i] * cases[j];
@@ -898,14 +909,16 @@ const std::vector<double> &Solver::DistCondQ(DistCondQParameters &&par)
     dic.resize(ptr->Length + 1);
     for (auto &solution : m_Solutions)
     {
-        auto dicT = std::vector<double>(1, double(1));
+        auto &dicT = m_DicT_Temp;
+        dicT.clear(), dicT.resize(1, 1);
         for (auto i = 0; i < m_BlockSets.size(); i++)
         {
             auto n = m_BlockSets[i].size();
             auto a = ptr->Sets1[i], b = i == ptr->Set2ID ? 1 : 0;
             auto m = solution.Dist[i];
 
-            auto cases = std::vector<double>();
+            auto &cases = m_Cases_Temp;
+            cases.clear();
             cases.reserve(min(m, a) + 1);
             for (auto j = 0; j <= m && j <= a; j++)
             {
@@ -993,7 +1006,3 @@ size_t HashCol(const Node<T> *ptr)
         hash = (hash << 5) + hash + ptr->Row;
     return hash;
 }
-
-Solution::Solution(std::vector<int> &&dist):Dist(dist), Ratio(NAN) {}
-
-Solution::~Solution() {}

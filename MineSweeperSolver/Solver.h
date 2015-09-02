@@ -77,19 +77,33 @@ private:
     std::vector<BlockSet> m_BlockSets;
     std::vector<int> m_SetIDs;
     OrthogonalList<int> m_Matrix;
+    std::vector<int> m_Minors;
     std::vector<Solution> m_Solutions;
     std::vector<double> m_Probability;
     std::set<std::pair<int, int>> m_Pairs;
     double m_TotalStates;
     std::multimap<size_t, DistCondQParameters *> m_DistCondQCache;
 
+    std::vector<int> m_IntersectionCounts_Temp;
+    std::vector<int> m_OverlapIndexes_Temp;
+    std::vector<int> m_OverlapA_Temp, m_OverlapB_Temp, m_OverlapC_Temp;
+    std::vector<std::pair<int, double>> m_GaussVec_Temp;
+    std::vector<int> m_Majors_Temp, m_Counts_Temp, m_Stack_Temp, m_Dist_Temp;
+    std::vector<double> m_Sums_Temp;
+    std::vector<double> m_Exp_Temp;
+    std::vector<double> m_DicT_Temp, m_Cases_Temp;
+    std::vector<double> m_Add_Temp;
+
     void MergeSets();
     void ReduceRestrains();
     void SimpleOverlapAll();
     bool SimpleOverlap(int r1, int r2);
-    void EnumerateSolutions(const std::vector<int> &minors, const OrthogonalList<double> &augmentedMatrix);
+    void Gauss(OrthogonalList<double> &matrix);
+    void EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix);
     void ProcessSolutions();
 
+    static void Merge(const std::vector<double> &from, std::vector<double> &to);
+    void Add(std::vector<double> &from, const std::vector<double> &cases);
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 
     double ZCondQ(DistCondQParameters &&par);
@@ -126,9 +140,6 @@ bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 class Solution
 {
 public:
-    explicit Solution(std::vector<int> &&dist);
-    ~Solution();
-
     friend class Solver;
     friend class Drainer;
 private:

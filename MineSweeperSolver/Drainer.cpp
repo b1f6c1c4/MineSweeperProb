@@ -369,16 +369,19 @@ void Drainer::GenerateMicros()
             lst.push_back(m_BlocksLookup[blk]);
     }
     std::vector<std::map<int, std::vector<std::map<int, BlockStatus>>>> dicc(sets.size());
+    std::vector<std::vector<std::map<int, BlockStatus>>*> ddic;
+    std::vector<std::vector<BlockStatus>> dists;
+    std::vector<int> stack;
     for (auto solution : m_Mgr.m_Solver->m_Solutions)
     {
-        std::vector<std::vector<std::map<int, BlockStatus>>*> ddic;
+        ddic.clear();
         for (auto i = 0; i < sets.size(); i++)
         {
             auto m = solution.Dist[i];
             auto &lst = dicc[i][m];
             if (lst.empty())
             {
-                std::vector<std::vector<BlockStatus>> dists;
+                dists.clear();
                 Combinations(sets[i].size(), m, dists);
                 for (auto l : dists)
                 {
@@ -391,7 +394,7 @@ void Drainer::GenerateMicros()
             ddic.push_back(&lst);
         }
 
-        std::vector<int> stack;
+        stack.clear();
         stack.reserve(sets.size());
         stack.push_back(0);
         while (true)
