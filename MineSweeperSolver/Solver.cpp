@@ -343,8 +343,8 @@ void Solver::ReduceRestrains()
     {
         auto dMines = 0;
         auto &set = m_BlockSets[col];
-        BlockSet setN;
-        setN.reserve(set.size());
+        auto &setN = m_Reduce_Temp;
+        setN.clear();
         for (auto it = set.begin(); it != set.end(); ++it)
         {
             switch (m_Manager[*it])
@@ -645,7 +645,7 @@ void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
     {
         m_Solutions.emplace_back();
         auto &lst = m_Solutions.back().Dist;
-        lst.resize(n, 0);
+        lst.resize(n);
         for (auto nc = augmentedMatrix.GetColHead(n).Down; nc != nullptr; nc = nc->Down)
             lst[nc->Row] = static_cast<int>(round(nc->Value));
         return;
@@ -694,16 +694,17 @@ void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
             if (stack.back() <= m_BlockSets[m_Minors.back()].size())
             {
                 auto &lst = m_Dist_Temp;
-                lst.clear(), lst.resize(n, 0);
+                lst.clear(), lst.resize(n);
                 auto flag = true;
                 for (auto mainRow = 0; mainRow < mR; mainRow++)
                 {
-                    if (!ZEROQ(round(sums[mainRow]) - sums[mainRow]))
+                    auto v = round(sums[mainRow]);
+                    if (!ZEROQ(v - sums[mainRow]))
                     {
                         flag = false;
                         break;
                     }
-                    auto val = static_cast<int>(round(sums[mainRow]));
+                    auto val = static_cast<int>(v);
                     if (val < 0 ||
                         val > cnts[mainRow])
                     {
@@ -906,7 +907,7 @@ const std::vector<double> &Solver::DistCondQ(DistCondQParameters &&par)
     }
     auto &dic = ptr->m_Result;
     dic.clear();
-    dic.resize(ptr->Length + 1);
+    dic.resize(ptr->Length + 1, 0);
     for (auto &solution : m_Solutions)
     {
         auto &dicT = m_DicT_Temp;

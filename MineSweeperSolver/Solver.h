@@ -84,6 +84,7 @@ private:
     double m_TotalStates;
     std::multimap<size_t, DistCondQParameters *> m_DistCondQCache;
 
+    BlockSet m_Reduce_Temp;
     std::vector<int> m_IntersectionCounts_Temp;
     std::vector<int> m_OverlapIndexes_Temp;
     std::vector<int> m_OverlapA_Temp, m_OverlapB_Temp, m_OverlapC_Temp;
