@@ -91,8 +91,8 @@ int main()
     {
         std::this_thread::sleep_for(std::chrono::seconds{wait});
 
-        auto flag = false;
         last += wait;
+        size_t rT;
         {
             std::unique_lock<std::mutex> lock(mtx);
 
@@ -108,19 +108,19 @@ int main()
                 succeed[i] = 0;
                 total[i] = 0;
             }
-            flag = restT == 0;
+            rT = restT;
         }
 
-        auto est = static_cast<int>(totalTT == 0 ? 0 : static_cast<float>(last) / totalTT * restT - last);
+        auto est = static_cast<int>(totalTT == 0 ? 0 : static_cast<float>(last) / totalTT * rT);
         auto estMin = est / 60 % 60;
         auto estHour = est / 60 / 60;
 
-        std::cout << last << " " << estHour << ":" << estMin << ":" << est << " " << static_cast<double>(totalTT) / (totalTT + restT) * 100 << "%" << std::endl;
+        std::cout << last << " " << estHour << ":" << estMin << ":" << est << " " << static_cast<double>(totalTT) / (totalTT + rT) * 100 << "%" << std::endl;
         for (auto i = 0; i < numTasks; ++i)
             std::cout << cert[i] << ": " << succeedT[i] << " / " << totalT[i] << "=" << static_cast<double>(succeedT[i]) / totalT[i] << std::endl;
         std::cout << std::endl;
 
-        if (flag)
+        if (rT == 0)
             break;
     }
 
@@ -134,7 +134,7 @@ int main()
 
         fout << cert[i] << " " << succeed[i] << " " << total[i] << std::endl << std::flush;
         succeedT[i] += succeed[i];
-        totalT += total[i];
+        totalT[i] += total[i];
         totalTT += total[i];
         succeed[i] = 0;
         total[i] = 0;
