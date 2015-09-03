@@ -452,15 +452,6 @@ void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet& bests)
     if (macro->m_Solver->m_TotalStates <= FullyDrainCriterion)
         return;
     LARGEST(-macro->m_Solver->GetProbability(blk));
-    if (macro->m_Solver->m_TotalStates < 2 * FullyDrainCriterion)
-        return;
-    LARGEST(macro->m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
-    if (macro->m_Solver->m_TotalStates < 4 * FullyDrainCriterion)
-        return;
-    LARGEST(macro->m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
-    if (macro->m_Solver->m_TotalStates < 8 * FullyDrainCriterion)
-        return;
-    LARGEST(macro->m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
 }
 
 void Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)

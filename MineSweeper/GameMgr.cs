@@ -331,6 +331,9 @@ namespace MineSweeper
             if (!Started)
                 return;
 
+            if (Mode.HasFlag(SolvingMode.Drained))
+                return;
+
             OpenBlock(m_NativeObject, x, y);
             FetchStatus();
             Solve();

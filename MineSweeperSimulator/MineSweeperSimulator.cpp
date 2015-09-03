@@ -12,6 +12,7 @@ std::vector<std::thread> m_Threads;
 
 int numTasks;
 size_t *cert;
+size_t *dense;
 volatile size_t restT, totalTT;
 volatile size_t *rest;
 volatile size_t *succeed, *succeedT;
@@ -31,25 +32,29 @@ void Process(int id, bool (*fun)(int))
     for (;;++id)
     {
         id %= numTasks;
+        auto d = dense[id];
+        while (d-- > 0)
         {
-            std::unique_lock<std::mutex> lock(mtx);
-            if (restT == 0)
-                break;
+            {
+                std::unique_lock<std::mutex> lock(mtx);
+                if (restT == 0)
+                    break;
 
-            if (rest[id] == 0)
-                continue;
+                if (rest[id] == 0)
+                    continue;
 
-            --restT;
-            --rest[id];
-        }
+                --restT;
+                --rest[id];
+            }
 
-        auto res = fun(id);
+            auto res = fun(id);
 
-        {
-            std::unique_lock<std::mutex> lock(mtx);
-            if (res)
-                ++succeed[id];
-            ++total[id];
+            {
+                std::unique_lock<std::mutex> lock(mtx);
+                if (res)
+                    ++succeed[id];
+                ++total[id];
+            }
         }
     }
 }
@@ -61,7 +66,10 @@ int main()
     int thrs, wait;
     std::ifstream fin("config.txt");
     fin >> thrs >> wait >> numTasks;
+#undef max
+    auto min = std::numeric_limits<size_t>().max();
     totalTT = restT = 0;
+    dense = new size_t[numTasks];
     cert = new size_t[numTasks];
     rest = new size_t[numTasks];
     succeed = new size_t[numTasks];
@@ -72,12 +80,25 @@ int main()
     {
         int r;
         fin >> cert[i] >> r;
+        dense[i] = r;
+        if (dense[i] < min)
+            min = dense[i];
         rest[i] = r;
         restT += r;
         succeedT[i] = succeed[i] = 0;
         totalT[i] = total[i] = 0;
     }
     fin.close();
+
+    size_t cnt = 0;
+    while (min != 0)
+    {
+        min >>= 1;
+        ++cnt;
+    }
+    --cnt;
+    for (auto i = 0; i < numTasks; ++i)
+        dense[i] >>= cnt;
 
     std::cout << thrs << " " << wait << std::endl;
 
