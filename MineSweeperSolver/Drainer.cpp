@@ -446,6 +446,23 @@ void Drainer::GenerateMicros()
     }
 }
 
+void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet& bests)
+{
+#define LARGEST(exp) Largest(bests, std::function<double(Block)>([this, macro](Block blk) { return exp; } ))
+    if (macro->m_Solver->m_TotalStates <= FullyDrainCriterion)
+        return;
+    LARGEST(-macro->m_Solver->GetProbability(blk));
+    if (macro->m_Solver->m_TotalStates < 2 * FullyDrainCriterion)
+        return;
+    LARGEST(macro->m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
+    if (macro->m_Solver->m_TotalStates < 4 * FullyDrainCriterion)
+        return;
+    LARGEST(macro->m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
+    if (macro->m_Solver->m_TotalStates < 8 * FullyDrainCriterion)
+        return;
+    LARGEST(macro->m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
+}
+
 void Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)
 {
     macro->m_Micros.insert(&micro);
@@ -455,11 +472,7 @@ void Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)
         if (macro->m_Degrees[i] == -1 && macro->m_Solver->m_Manager[i] == BlockStatus::Unknown)
             bests.push_back(i);
 
-    if (macro->m_Solver->m_TotalStates > FullyDrainCriterion)
-        Largest(bests, std::function<double(Block)>([macro](Block blk)
-                                                    {
-                                                        return 1 - macro->m_Solver->GetProbability(blk);
-                                                    }));
+    HeuristicPruning(macro, bests);
 
     for (auto i : bests)
     {

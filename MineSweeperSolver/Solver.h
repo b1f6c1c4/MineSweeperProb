@@ -72,6 +72,7 @@ public:
     double ZeroCondQ(const BlockSet &set, Block blk);
     double ZerosCondQ(const BlockSet &set, Block blk);
     const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
+    double QuantityCondQ(const BlockSet &set, Block blk);
 
     friend class Drainer;
     friend double Probe(const GameMgr& mgr, Block blk);
@@ -111,9 +112,9 @@ private:
     void Add(std::vector<double> &from, const std::vector<double> &cases);
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 
-    double ZCondQ(DistCondQParameters &&par);
-    double ZsCondQ(DistCondQParameters &&par);
-    const std::vector<double> &DistCondQ(DistCondQParameters &&par);
+    const DistCondQParameters &ZCondQ(DistCondQParameters &&par);
+    const DistCondQParameters &ZsCondQ(DistCondQParameters &&par);
+    const DistCondQParameters &DistCondQ(DistCondQParameters &&par);
     void ClearDistCondQCache();
 };
 
@@ -134,6 +135,7 @@ private:
 
     std::vector<double> m_Result;
     double m_Expectation;
+    double m_TotalStates;
 
     friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
     friend bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);

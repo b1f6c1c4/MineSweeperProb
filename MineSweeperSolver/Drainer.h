@@ -70,6 +70,7 @@ private:
     MacroSituation *GetOrAddMacroSituation(MacroSituation *&macro);
 
     void GenerateMicros();
+    void HeuristicPruning(MacroSituation *macro, BlockSet &bests);
     void SolveMicro(MicroSituation &micro, MacroSituation *macro);
     MacroSituation *SolveMicro(MicroSituation &micro, MacroSituation *macroOld, Block blk);
     void OpenBlock(MicroSituation &micro, MacroSituation *macro, Block blk);

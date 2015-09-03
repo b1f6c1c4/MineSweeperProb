@@ -318,8 +318,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             m_Preferred.push_back(i);
         }
 
-#define LARGEST_(exp) Largest(m_Preferred, std::function<double(Block)>([this](Block blk) exp ))
-#define LARGEST(exp) LARGEST_({ return exp; })
+#define LARGEST(exp) Largest(m_Preferred, std::function<double(Block)>([this](Block blk) { return exp; } ))
 
     LARGEST(-m_Solver->GetProbability(blk));
 
@@ -328,25 +327,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 
     LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
     LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
-    LARGEST_(
-            {
-                int m;
-                auto di = m_Solver->DistributionCondQ(m_BlocksR[blk], blk, m);
-
-                double t = 0;
-                for (auto j = 0; j < di.size(); ++j)
-                    t += di[j];
-
-                double q = 0;
-                for (auto j = 0; j < di.size(); ++j)
-                    if (di[j] != 0)
-                    {
-                        auto p = di[j] / t;
-                        q += -p * log2(p);
-                    }
-
-                return q;
-            });
+    LARGEST(m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
 }
 
 void GameMgr::OpenOptimalBlocks()

@@ -222,7 +222,7 @@ double Solver::ZeroCondQ(const BlockSet &set, Block blk)
     par.Hash();
     for (auto b : par.Sets1)
         par.Length += b;
-    return ZCondQ(std::move(par));
+    return ZCondQ(std::move(par)).m_Result.front();
 }
 
 double Solver::ZerosCondQ(const BlockSet &set, Block blk)
@@ -233,7 +233,7 @@ double Solver::ZerosCondQ(const BlockSet &set, Block blk)
     par.Hash();
     for (auto b : par.Sets1)
         par.Length += b;
-    return ZsCondQ(std::move(par));
+    return ZsCondQ(std::move(par)).m_Expectation;
 }
 
 const std::vector<double> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
@@ -245,7 +245,28 @@ const std::vector<double> &Solver::DistributionCondQ(const BlockSet &set, Block 
     for (auto b : par.Sets1)
         par.Length += b;
     min = dMines;
-    return DistCondQ(std::move(par));
+    return DistCondQ(std::move(par)).m_Result;
+}
+
+double Solver::QuantityCondQ(const BlockSet &set, Block blk)
+{
+    DistCondQParameters par(m_SetIDs[blk], 0);
+    int dMines;
+    GetIntersectionCounts(set, par.Sets1, dMines);
+    par.Hash();
+    for (auto b : par.Sets1)
+        par.Length += b;
+    auto &di = DistCondQ(std::move(par));
+
+    double q = 0;
+    for (auto j = 0; j < di.m_Result.size(); ++j)
+        if (di.m_Result[j] != 0)
+        {
+            auto p = di.m_Result[j] / di.m_TotalStates;
+            q += -p * log2(p);
+        }
+
+    return q;
 }
 
 void Solver::MergeSets()
@@ -867,7 +888,7 @@ void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1
     }
 }
 
-double Solver::ZCondQ(DistCondQParameters &&par)
+const DistCondQParameters &Solver::ZCondQ(DistCondQParameters &&par)
 {
     DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
@@ -876,7 +897,7 @@ double Solver::ZCondQ(DistCondQParameters &&par)
         if (*it->second != par)
             continue;
         if (!it->second->m_Result.empty())
-            return it->second->m_Result.front();
+            return *it->second;
         ptr = it->second;
         break;
     }
@@ -900,10 +921,10 @@ double Solver::ZCondQ(DistCondQParameters &&par)
         }
         val += valT;
     }
-    return val;
+    return *ptr;
 }
 
-double Solver::ZsCondQ(DistCondQParameters &&par)
+const DistCondQParameters &Solver::ZsCondQ(DistCondQParameters &&par)
 {
     DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
@@ -912,7 +933,7 @@ double Solver::ZsCondQ(DistCondQParameters &&par)
         if (*it->second != par)
             continue;
         if (it->second->m_Expectation != NAN)
-            return it->second->m_Expectation;
+            return *it->second;
         ptr = it->second;
         break;
     }
@@ -1004,9 +1025,9 @@ double Solver::ZsCondQ(DistCondQParameters &&par)
             }
     }
 
-    double totalState = 0;
+    ptr->m_TotalStates = 0;
     for (auto val : dic)
-        totalState += val;
+        ptr->m_TotalStates += val;
 
     ptr->m_Expectation = 0;
     std::vector<int> lst;
@@ -1034,38 +1055,14 @@ double Solver::ZsCondQ(DistCondQParameters &&par)
         if (lst.empty())
             continue;
 
-        //auto totalBlanks = 0;
-        //auto p = 0;
-        //for (auto id : lst)
-        //{
-        //    if (id > ptr->Sets1.size())
-        //    {
-        //        totalBlanks += m_BlockSets[id - ptr->Sets1.size()].size() - ptr->Sets1[id - ptr->Sets1.size()];
-        //        continue;
-        //    }
-
-        //    while (p < halves.size() && id > halves[p])
-        //        ++p;
-        //    if (p < halves.size() && id == halves[p])
-        //    {
-        //        totalBlanks += ptr->Sets1[id];
-        //        ++p;
-        //    }
-        //    else
-        //    {
-        //        totalBlanks += m_BlockSets[id].size();
-        //    }
-        //}
-
-        //ptr->m_Expectation += dic[i] * totalBlanks;
         ptr->m_Expectation += dic[i];
     }
-    ptr->m_Expectation /= totalState;
+    ptr->m_Expectation /= ptr->m_TotalStates;
 
-    return ptr->m_Expectation;
+    return *ptr;
 }
 
-const std::vector<double> &Solver::DistCondQ(DistCondQParameters &&par)
+const DistCondQParameters &Solver::DistCondQ(DistCondQParameters &&par)
 {
     DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
@@ -1074,7 +1071,7 @@ const std::vector<double> &Solver::DistCondQ(DistCondQParameters &&par)
         if (*it->second != par)
             continue;
         if (it->second->m_Result.size() == it->second->Length + 1)
-            return it->second->m_Result;
+            return *it->second;
         ptr = it->second;
         break;
     }
@@ -1109,7 +1106,10 @@ const std::vector<double> &Solver::DistCondQ(DistCondQParameters &&par)
         }
         Merge(dicT, dic);
     }
-    return ptr->m_Result;
+    ptr->m_TotalStates = 0;
+    for (auto val : dic)
+        ptr->m_TotalStates += val;
+    return *ptr;
 }
 
 void Solver::ClearDistCondQCache()
@@ -1124,11 +1124,11 @@ void Solver::ClearDistCondQCache()
     m_DistCondQCache.clear();
 }
 
-DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Expectation(other.m_Expectation)
+DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Expectation(other.m_Expectation), m_TotalStates(other.m_TotalStates)
 {
 }
 
-DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Expectation(NAN) {}
+DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Expectation(NAN), m_TotalStates(NAN) {}
 
 size_t DistCondQParameters::Hash()
 {
