@@ -36,10 +36,7 @@ Solver::Solver(int count) : m_State(SolvingState::Stale), m_Manager(count, Block
     m_Matrix.ExtendWidth(2);
 }
 
-Solver::Solver(const Solver& other) : m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates)
-{
-    
-}
+Solver::Solver(const Solver &other) : m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates) { }
 
 Solver::~Solver()
 {
@@ -692,9 +689,9 @@ void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
     auto &majors = m_Majors_Temp;
     auto &cnts = m_Counts_Temp;
     auto &sums = m_Sums_Temp;
-    majors.clear(), majors.reserve(mR);
-    cnts.clear(), cnts.reserve(mR);
-    sums.clear(), sums.reserve(mR);
+    majors.clear() , majors.reserve(mR);
+    cnts.clear() , cnts.reserve(mR);
+    sums.clear() , sums.reserve(mR);
     {
         auto minorID = 0;
         auto mainRow = 0;
@@ -731,7 +728,7 @@ void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
             if (stack.back() <= m_BlockSets[m_Minors.back()].size())
             {
                 auto &lst = m_Dist_Temp;
-                lst.clear(), lst.resize(n);
+                lst.clear() , lst.resize(n);
                 auto flag = true;
                 for (auto mainRow = 0; mainRow < mR; mainRow++)
                 {
@@ -786,7 +783,7 @@ void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
 void Solver::ProcessSolutions()
 {
     auto &exp = m_Exp_Temp;
-    exp.clear(), exp.resize(m_BlockSets.size(), 0);
+    exp.clear() , exp.resize(m_BlockSets.size(), 0);
     m_TotalStates = double(0);
     for (auto &so : m_Solutions)
     {
@@ -862,7 +859,7 @@ void Solver::Merge(const std::vector<double> &from, std::vector<double> &to)
 void Solver::Add(std::vector<double> &from, const std::vector<double> &cases)
 {
     auto &dicN = m_Add_Temp;
-    dicN.clear(), dicN.resize(from.size() + cases.size() - 1, 0);
+    dicN.clear() , dicN.resize(from.size() + cases.size() - 1, 0);
     for (auto i = 0; i < from.size(); i++)
         for (auto j = 0; j < cases.size(); j++)
             dicN[i + j] += from[i] * cases[j];
@@ -961,7 +958,7 @@ const DistCondQParameters &Solver::ZsCondQ(DistCondQParameters &&par)
         if (m_BlockSets[ptr->Set2ID].size() == solution.Dist[ptr->Set2ID])
             continue;
 
-        lb.clear(), ub.clear();
+        lb.clear() , ub.clear();
         for (auto id : halves)
         {
             lb.push_back(max(static_cast<int>(solution.Dist[id]) - static_cast<int>(m_BlockSets[id].size()) + (id == ptr->Set2ID ? 1 : 0) + ptr->Sets1[id], 0));
@@ -1086,7 +1083,7 @@ const DistCondQParameters &Solver::DistCondQ(DistCondQParameters &&par)
     for (auto &solution : m_Solutions)
     {
         auto &dicT = m_DicT_Temp;
-        dicT.clear(), dicT.resize(1, 1);
+        dicT.clear() , dicT.resize(1, 1);
         for (auto i = 0; i < m_BlockSets.size(); i++)
         {
             auto n = m_BlockSets[i].size();
@@ -1124,9 +1121,7 @@ void Solver::ClearDistCondQCache()
     m_DistCondQCache.clear();
 }
 
-DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Expectation(other.m_Expectation), m_TotalStates(other.m_TotalStates)
-{
-}
+DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Expectation(other.m_Expectation), m_TotalStates(other.m_TotalStates) {}
 
 DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Expectation(NAN), m_TotalStates(NAN) {}
 

@@ -29,7 +29,7 @@ bool ProcessID(int id)
 
 void Process(int id, bool (*fun)(int))
 {
-    for (;;++id)
+    for (;; ++id)
     {
         id %= numTasks;
         auto d = dense[id];
@@ -117,11 +117,11 @@ int main()
         {
             std::unique_lock<std::mutex> lock(mtx);
 
-            for (auto i = 0; i < numTasks;++i)
+            for (auto i = 0; i < numTasks; ++i)
             {
                 if (total[i] == 0)
                     continue;
-                
+
                 fout << cert[i] << " " << succeed[i] << " " << total[i] << std::endl << std::flush;
                 succeedT[i] += succeed[i];
                 totalT[i] += total[i];

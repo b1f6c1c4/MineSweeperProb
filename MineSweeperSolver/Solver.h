@@ -75,7 +75,7 @@ public:
     double QuantityCondQ(const BlockSet &set, Block blk);
 
     friend class Drainer;
-    friend double Probe(const GameMgr& mgr, Block blk);
+    friend double Probe(const GameMgr &mgr, Block blk);
 private:
     SolvingState m_State;
     std::vector<BlockStatus> m_Manager;
@@ -151,7 +151,7 @@ class Solution
 public:
     friend class Solver;
     friend class Drainer;
-    friend double Probe(const GameMgr& mgr, Block blk);
+    friend double Probe(const GameMgr &mgr, Block blk);
 private:
     std::vector<int> Dist;
     double States;

@@ -446,7 +446,7 @@ void Drainer::GenerateMicros()
     }
 }
 
-void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet& bests)
+void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet &bests)
 {
 #define LARGEST(exp) Largest(bests, std::function<double(Block)>([this, macro](Block blk) { return exp; } ))
     if (macro->m_Solver->m_TotalStates <= FullyDrainCriterion)

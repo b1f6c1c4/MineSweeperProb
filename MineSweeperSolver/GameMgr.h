@@ -65,7 +65,7 @@ public:
     void Save(std::ostream &sw) const;
 
     friend class Drainer;
-    friend double Probe(const GameMgr& mgr, Block blk);
+    friend double Probe(const GameMgr &mgr, Block blk);
 private:
     int m_TotalWidth, m_TotalHeight, m_TotalMines;
     bool m_Settled, m_Started, m_Succeed;

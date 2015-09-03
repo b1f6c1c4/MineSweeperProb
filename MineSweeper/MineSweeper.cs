@@ -21,10 +21,7 @@ namespace MineSweeper
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
-        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth,mgr.TotalHeight, mgr.TotalMines, mgr)
-        {
-
-        }
+        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth, mgr.TotalHeight, mgr.TotalMines, mgr) { }
 
         public MineSweeper(int width, int height, int mines, GameMgr mgr = null)
         {
@@ -135,9 +132,7 @@ namespace MineSweeper
                     //}
                     if (m_Mgr.Mode.HasFlag(SolvingMode.Drained) &&
                         m_Mgr.DrainProbabilities != null)
-                    {
                         sb.Append($" D{m_Mgr.DrainProbabilities[m_CurrentBlock.Index]:P2}");
-                    }
                 }
 
 
@@ -160,8 +155,8 @@ namespace MineSweeper
             if (mgr == null)
             {
                 var mode = (m_Mgr?.Mode ?? SolvingMode.ZeroProb) & SolvingMode.ZeroProb;
-                if (m_Mgr?.Mode.HasFlag(SolvingMode.Drained)??false)
-                    mode|=SolvingMode.ZeroProb;
+                if (m_Mgr?.Mode.HasFlag(SolvingMode.Drained) ?? false)
+                    mode |= SolvingMode.ZeroProb;
                 m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
             }
             else
