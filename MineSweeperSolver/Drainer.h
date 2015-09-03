@@ -47,6 +47,8 @@ public:
     explicit Drainer(const GameMgr &mgr);
     ~Drainer();
 
+    size_t FullyDrainCriterion;
+
     double GetBestProb() const;
     BlockSet GetBestBlocks() const;
     const double *GetBestProbabilities() const;
@@ -56,7 +58,7 @@ private:
     const GameMgr &m_Mgr;
     std::vector<MicroSituation> m_Micros;
     std::multimap<size_t, MacroSituation *> m_Macros;
-    std::vector<Block> m_Blocks;
+    BlockSet m_Blocks;
     std::map<Block, Block> m_BlocksLookup;
     std::vector<BlockSet> m_BlocksR;
     std::vector<int> m_DMines;

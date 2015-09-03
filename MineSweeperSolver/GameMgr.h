@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "Solver.h"
 #include <vector>
+#include <functional>
 
 struct
     DLL_API BlockProperty
@@ -72,7 +73,7 @@ private:
     int m_ToOpen;
     Solver *m_Solver;
     double m_AllBits;
-    std::vector<Block> m_Best, m_Preferred;
+    BlockSet m_Best, m_Preferred;
     Drainer *m_Drainer;
 
     int GetIndex(int x, int y) const;
@@ -80,3 +81,5 @@ private:
     void SettleMines(int initID);
     void OpenBlock(int id);
 };
+
+void Largest(BlockSet &bests, std::function<double(Block)> fun);

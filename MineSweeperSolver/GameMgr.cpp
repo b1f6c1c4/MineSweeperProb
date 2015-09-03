@@ -1,7 +1,6 @@
 #include "GameMgr.h"
 #include "random.h"
 #include "BinomialHelper.h"
-#include <functional>
 #include "Drainer.h"
 #include <iostream>
 
@@ -11,15 +10,13 @@
 #define ASSERT(val)
 #endif
 
-static void Largest(std::vector<Block> &bests, std::function<double(Block)> fun);
-
 GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
 {
     m_Solver = new Solver(width * height);
 
     m_Blocks.reserve(width * height);
 
-    auto lst = BlockSet();
+    BlockSet lst;
     lst.reserve(width * height);
     for (auto i = 0; i < width; ++i)
         for (auto j = 0; j < height; ++j)
@@ -225,11 +222,11 @@ void GameMgr::OpenBlock(int x, int y)
     OpenBlock(GetIndex(x, y));
 }
 
-void Largest(std::vector<Block> &bests, std::function<double(int)> fun)
+void Largest(BlockSet &bests, std::function<double(int)> fun)
 {
     if (bests.size() <= 1)
         return;
-    auto newBests = std::vector<Block>();
+    BlockSet newBests;
     newBests.push_back(bests.front());
     auto bestVal = fun(bests.front());
     for (auto i = 1; i < bests.size(); ++i)

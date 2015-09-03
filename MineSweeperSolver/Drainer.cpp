@@ -111,7 +111,7 @@ size_t MacroSituation::Hash()
     return m_Hash = hash;
 }
 
-Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
+Drainer::Drainer(const GameMgr &mgr) : FullyDrainCriterion(64), m_Mgr(mgr)
 {
     for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
     {
@@ -450,12 +450,19 @@ void Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)
 {
     macro->m_Micros.insert(&micro);
 
-    for (auto i = 0; i < macro->m_Degrees.size(); i++)
-    {
-        if (macro->m_Degrees[i] != -1 ||
-            macro->m_Solver->m_Manager[i] != BlockStatus::Unknown)
-            continue;
+    BlockSet bests;
+    for (auto i = 0; i < macro->m_Degrees.size(); ++i)
+        if (macro->m_Degrees[i] == -1 && macro->m_Solver->m_Manager[i] == BlockStatus::Unknown)
+            bests.push_back(i);
 
+    if (macro->m_Solver->m_TotalStates > FullyDrainCriterion)
+        Largest(bests, std::function<double(Block)>([macro](Block blk)
+                                                    {
+                                                        return 1 - macro->m_Solver->GetProbability(blk);
+                                                    }));
+
+    for (auto i : bests)
+    {
         auto ma = SolveMicro(micro, macro, i);
         auto maa = GetOrAddMacroSituation(ma);
 
