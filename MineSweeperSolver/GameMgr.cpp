@@ -318,38 +318,35 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             m_Preferred.push_back(i);
         }
 
-    Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
-                                                      {
-                                                          return 1 - m_Solver->GetProbability(blk);
-                                                      }));
+#define LARGEST_(exp) Largest(m_Preferred, std::function<double(Block)>([this](Block blk) exp ))
+#define LARGEST(exp) LARGEST_({ return exp; })
+
+    LARGEST(-m_Solver->GetProbability(blk));
 
     if ((maxDepth & SolvingState::ZeroProb) == SolvingState::Stale)
         return;
 
-    Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
-                                                      {
-                                                          return m_Solver->ZeroCondQ(m_BlocksR[blk], blk);
-                                                      }));
+    LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
+    LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
+    LARGEST_(
+            {
+                int m;
+                auto di = m_Solver->DistributionCondQ(m_BlocksR[blk], blk, m);
 
-    Largest(m_Preferred, std::function<double(Block)>([this](Block blk)
-                                                      {
-                                                          int m;
-                                                          auto di = m_Solver->DistributionCondQ(m_BlocksR[blk], blk, m);
+                double t = 0;
+                for (auto j = 0; j < di.size(); ++j)
+                    t += di[j];
 
-                                                          double t = 0;
-                                                          for (auto j = 0; j < di.size(); ++j)
-                                                              t += di[j];
+                double q = 0;
+                for (auto j = 0; j < di.size(); ++j)
+                    if (di[j] != 0)
+                    {
+                        auto p = di[j] / t;
+                        q += -p * log2(p);
+                    }
 
-                                                          double q = 0;
-                                                          for (auto j = 0; j < di.size(); ++j)
-                                                              if (di[j] != 0)
-                                                              {
-                                                                  auto p = di[j] / t;
-                                                                  q += -p * log2(p);
-                                                              }
-
-                                                          return q;
-                                                      }));
+                return q;
+            });
 }
 
 void GameMgr::OpenOptimalBlocks()

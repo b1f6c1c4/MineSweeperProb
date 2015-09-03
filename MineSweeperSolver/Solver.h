@@ -46,6 +46,7 @@ inline SolvingState operator|=(SolvingState &lhs, SolvingState rhs)
 typedef int Block;
 typedef std::vector<Block> BlockSet;
 
+class GameMgr;
 class Solution;
 class DistCondQParameters;
 
@@ -54,6 +55,7 @@ class
 {
 public:
     explicit Solver(int count);
+    Solver(const Solver &other);
     ~Solver();
 
     SolvingState GetSolvingState() const;
@@ -68,9 +70,11 @@ public:
     void Solve(SolvingState maxDepth, bool shortcut);
 
     double ZeroCondQ(const BlockSet &set, Block blk);
+    double ZerosCondQ(const BlockSet &set, Block blk);
     const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
 
     friend class Drainer;
+    friend double Probe(const GameMgr& mgr, Block blk);
 private:
     SolvingState m_State;
     std::vector<BlockStatus> m_Manager;
@@ -80,12 +84,12 @@ private:
     std::vector<int> m_Minors;
     std::vector<Solution> m_Solutions;
     std::vector<double> m_Probability;
-    std::set<std::pair<int, int>> m_Pairs;
     double m_TotalStates;
     std::multimap<size_t, DistCondQParameters *> m_DistCondQCache;
 
     BlockSet m_Reduce_Temp;
     std::vector<int> m_IntersectionCounts_Temp;
+    std::set<std::pair<int, int>> m_Pairs_Temp;
     std::vector<int> m_OverlapIndexes_Temp;
     std::vector<int> m_OverlapA_Temp, m_OverlapB_Temp, m_OverlapC_Temp;
     std::vector<std::pair<int, double>> m_GaussVec_Temp;
@@ -108,6 +112,7 @@ private:
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 
     double ZCondQ(DistCondQParameters &&par);
+    double ZsCondQ(DistCondQParameters &&par);
     const std::vector<double> &DistCondQ(DistCondQParameters &&par);
     void ClearDistCondQCache();
 };
@@ -128,6 +133,7 @@ private:
     size_t Hash();
 
     std::vector<double> m_Result;
+    double m_Expectation;
 
     friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
     friend bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
@@ -143,6 +149,7 @@ class Solution
 public:
     friend class Solver;
     friend class Drainer;
+    friend double Probe(const GameMgr& mgr, Block blk);
 private:
     std::vector<int> Dist;
     double States;

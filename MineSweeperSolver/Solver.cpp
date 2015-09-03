@@ -36,6 +36,11 @@ Solver::Solver(int count) : m_State(SolvingState::Stale), m_Manager(count, Block
     m_Matrix.ExtendWidth(2);
 }
 
+Solver::Solver(const Solver& other) : m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates)
+{
+    
+}
+
 Solver::~Solver()
 {
     ClearDistCondQCache();
@@ -220,6 +225,17 @@ double Solver::ZeroCondQ(const BlockSet &set, Block blk)
     return ZCondQ(std::move(par));
 }
 
+double Solver::ZerosCondQ(const BlockSet &set, Block blk)
+{
+    DistCondQParameters par(m_SetIDs[blk], 0);
+    int dMines;
+    GetIntersectionCounts(set, par.Sets1, dMines);
+    par.Hash();
+    for (auto b : par.Sets1)
+        par.Length += b;
+    return ZsCondQ(std::move(par));
+}
+
 const std::vector<double> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
@@ -396,7 +412,7 @@ void Solver::ReduceRestrains()
 void Solver::SimpleOverlapAll()
 {
     m_State |= SolvingState::Overlap;
-    m_Pairs.clear();
+    m_Pairs_Temp.clear();
 
     auto &indexes = m_OverlapIndexes_Temp;
     indexes.reserve(m_Matrix.GetHeight());
@@ -418,7 +434,7 @@ void Solver::SimpleOverlapAll()
 
 bool Solver::SimpleOverlap(int r1, int r2)
 {
-    if (!m_Pairs.emplace(r1, r2).second)
+    if (!m_Pairs_Temp.emplace(r1, r2).second)
         return false;
 
     auto &exceptA = m_OverlapA_Temp, &exceptB = m_OverlapB_Temp, &intersection = m_OverlapC_Temp;
@@ -887,6 +903,168 @@ double Solver::ZCondQ(DistCondQParameters &&par)
     return val;
 }
 
+double Solver::ZsCondQ(DistCondQParameters &&par)
+{
+    DistCondQParameters *ptr = nullptr;
+    auto itp = m_DistCondQCache.equal_range(par.m_Hash);
+    for (auto it = itp.first; it != itp.second; ++it)
+    {
+        if (*it->second != par)
+            continue;
+        if (it->second->m_Expectation != NAN)
+            return it->second->m_Expectation;
+        ptr = it->second;
+        break;
+    }
+    if (ptr == nullptr)
+    {
+        ptr = new DistCondQParameters(std::move(par));
+        m_DistCondQCache.insert(std::make_pair(ptr->m_Hash, ptr));
+    }
+    std::vector<int> halves;
+    for (auto i = 0; i < ptr->Sets1.size(); ++i)
+    {
+        if (ptr->Sets1[i] != 0 && ptr->Sets1[i] != m_BlockSets[i].size() &&
+            !(i == ptr->Set2ID && ptr->Sets1[i] == m_BlockSets[i].size() - 1))
+            halves.push_back(i);
+    }
+
+    auto &dic = ptr->m_Result;
+    dic.clear();
+    dic.resize(ptr->Length + 1, 0);
+    std::vector<std::vector<Solution>> solutions(ptr->Length + 1);
+
+    std::vector<int> stack, lb, ub;
+    for (auto &solution : m_Solutions)
+    {
+        if (m_BlockSets[ptr->Set2ID].size() == solution.Dist[ptr->Set2ID])
+            continue;
+
+        lb.clear(), ub.clear();
+        for (auto id : halves)
+        {
+            lb.push_back(max(static_cast<int>(solution.Dist[id]) - static_cast<int>(m_BlockSets[id].size()) + (id == ptr->Set2ID ? 1 : 0) + ptr->Sets1[id], 0));
+            ub.push_back(min(solution.Dist[id], ptr->Sets1[id]));
+        }
+
+        stack.clear();
+        stack.reserve(halves.size());
+        if (!lb.empty())
+            stack.push_back(lb.front());
+        while (true)
+            if (stack.size() == halves.size())
+                if (halves.empty() || stack.back() <= ub[stack.size() - 1])
+                {
+                    auto val = 0;
+                    double st = 1;
+                    std::vector<int> dist(ptr->Sets1.size() + halves.size());
+                    for (auto i = 0, p = 0; i < ptr->Sets1.size(); ++i)
+                    {
+                        if (p < halves.size() && i == halves[p])
+                        {
+                            val += dist[i] = stack[p];
+                            dist[ptr->Sets1.size() + p] = solution.Dist[i] - stack[p];
+                            st *= Binomial(ptr->Sets1[i], dist[i]);
+                            st *= Binomial(m_BlockSets[i].size() - (i == ptr->Set2ID ? 1 : 0) - ptr->Sets1[i], dist[ptr->Sets1.size() + p]);
+                            ++p;
+                        }
+                        else
+                        {
+                            dist[i] = solution.Dist[i];
+                            st *= Binomial(m_BlockSets[i].size() - (i == ptr->Set2ID ? 1 : 0), dist[i]);
+                            if (ptr->Sets1[i] != 0)
+                                val += dist[i];
+                        }
+                    }
+                    ASSERT(st > 0);
+                    dic[val] += st;
+                    solutions[val].emplace_back();
+                    solutions[val].back().Dist.swap(dist);
+                    solutions[val].back().States = st;
+
+                    if (halves.empty())
+                        break;
+                    ++stack.back();
+                }
+                else
+                {
+                    stack.pop_back();
+                    if (stack.empty())
+                        break;
+                    ++stack.back();
+                }
+            else if (stack.back() <= ub[stack.size() - 1])
+                stack.push_back(lb[stack.size()]);
+            else
+            {
+                stack.pop_back();
+                if (stack.empty())
+                    break;
+                ++stack.back();
+            }
+    }
+
+    double totalState = 0;
+    for (auto val : dic)
+        totalState += val;
+
+    ptr->m_Expectation = 0;
+    std::vector<int> lst;
+    for (auto i = 0; i <= ptr->Length; ++i)
+    {
+        if (solutions[i].empty())
+            continue;
+
+        lst.clear();
+        for (auto j = 0; j < ptr->Sets1.size(); ++j)
+            if (solutions[i][0].Dist[j] == 0)
+                lst.push_back(j);
+        for (auto j = 1; j < solutions[i].size(); ++j)
+        {
+            for (auto it = lst.begin(); it != lst.end(); ++it)
+                if (solutions[i][j].Dist[*it] != 0)
+                {
+                    it = lst.erase(it);
+                    if (it == lst.end())
+                        break;
+                }
+            if (lst.empty())
+                break;
+        }
+        if (lst.empty())
+            continue;
+
+        //auto totalBlanks = 0;
+        //auto p = 0;
+        //for (auto id : lst)
+        //{
+        //    if (id > ptr->Sets1.size())
+        //    {
+        //        totalBlanks += m_BlockSets[id - ptr->Sets1.size()].size() - ptr->Sets1[id - ptr->Sets1.size()];
+        //        continue;
+        //    }
+
+        //    while (p < halves.size() && id > halves[p])
+        //        ++p;
+        //    if (p < halves.size() && id == halves[p])
+        //    {
+        //        totalBlanks += ptr->Sets1[id];
+        //        ++p;
+        //    }
+        //    else
+        //    {
+        //        totalBlanks += m_BlockSets[id].size();
+        //    }
+        //}
+
+        //ptr->m_Expectation += dic[i] * totalBlanks;
+        ptr->m_Expectation += dic[i];
+    }
+    ptr->m_Expectation /= totalState;
+
+    return ptr->m_Expectation;
+}
+
 const std::vector<double> &Solver::DistCondQ(DistCondQParameters &&par)
 {
     DistCondQParameters *ptr = nullptr;
@@ -946,16 +1124,11 @@ void Solver::ClearDistCondQCache()
     m_DistCondQCache.clear();
 }
 
-DistCondQParameters::DistCondQParameters(DistCondQParameters &&other)
+DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Expectation(other.m_Expectation)
 {
-    Sets1.swap(other.Sets1);
-    Set2ID = other.Set2ID;
-    Length = other.Length;
-    m_Hash = other.m_Hash;
-    m_Result.swap(other.m_Result);
 }
 
-DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()) {}
+DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Expectation(NAN) {}
 
 size_t DistCondQParameters::Hash()
 {
