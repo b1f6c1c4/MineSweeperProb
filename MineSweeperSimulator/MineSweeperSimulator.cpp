@@ -166,6 +166,14 @@ int main()
         std::cout << cert[i] << ": " << succeedT[i] << " / " << totalT[i] << "=" << static_cast<double>(succeedT[i]) / totalT[i] << std::endl;
     std::cout << std::endl;
 
+    delete [] dense;
+    delete [] cert;
+    delete [] rest;
+    delete [] succeed;
+    delete [] total;
+    delete [] succeedT;
+    delete [] totalT;
+
     system("pause");
     return 0;
 }

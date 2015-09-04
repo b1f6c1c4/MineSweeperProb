@@ -375,7 +375,7 @@ void Drainer::GenerateMicros()
     for (auto solution : m_Mgr.m_Solver->m_Solutions)
     {
         ddic.clear();
-        for (auto i = 0; i < sets.size(); i++)
+        for (auto i = 0; i < sets.size(); ++i)
         {
             auto m = solution.Dist[i];
             auto &lst = dicc[i][m];

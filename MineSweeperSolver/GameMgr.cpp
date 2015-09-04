@@ -31,9 +31,9 @@ GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_
             blk.IsOpen = false;
             blk.IsMine = false;
             blkR.reserve(8);
-            for (auto di = -1; di <= 1; di++)
+            for (auto di = -1; di <= 1; ++di)
                 if (i + di >= 0 && i + di < width)
-                    for (auto dj = -1; dj <= 1; dj++)
+                    for (auto dj = -1; dj <= 1; ++dj)
                         if (j + dj >= 0 && j + dj < height)
                             if (di != 0 || dj != 0)
                                 blkR.push_back(GetIndex(i + di, j + dj));
@@ -73,9 +73,9 @@ GameMgr::GameMgr(std::istream &sr) : DrainCriterion(64), m_TotalWidth(0), m_Tota
             blk.IsOpen = false;
             blk.IsMine = false;
             blkR.reserve(8);
-            for (auto di = -1; di <= 1; di++)
+            for (auto di = -1; di <= 1; ++di)
                 if (i + di >= 0 && i + di < m_TotalWidth)
-                    for (auto dj = -1; dj <= 1; dj++)
+                    for (auto dj = -1; dj <= 1; ++dj)
                         if (j + dj >= 0 && j + dj < m_TotalHeight)
                             if (di != 0 || dj != 0)
                                 blkR.push_back(GetIndex(i + di, j + dj));

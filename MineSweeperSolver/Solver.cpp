@@ -581,7 +581,7 @@ void Solver::Gauss(double *matrix, int width, int height)
     for (auto col = 0; col < width; ++col)
     {
         int biasRow;
-        for (biasRow = major; biasRow < height; biasRow++)
+        for (biasRow = major; biasRow < height; ++biasRow)
             if (abs(M(col, biasRow)) >= 1E-8)
                 break;
         if (biasRow >= height)
@@ -610,7 +610,7 @@ void Solver::Gauss(double *matrix, int width, int height)
             {
                 auto bias = M(co, biasRow);
                 if (!ZEROQ(bias))
-                    for (auto row = 0; row < height; row++)
+                    for (auto row = 0; row < height; ++row)
                         if (row == major)
                             M(co, row) *= theBiasInv;
                         else
@@ -624,7 +624,7 @@ void Solver::Gauss(double *matrix, int width, int height)
                 if (ZEROQ(bias))
                     M(co, major) = 0, M(co, biasRow) = swap;
                 else
-                    for (auto row = 0; row < height; row++)
+                    for (auto row = 0; row < height; ++row)
                         if (row == major)
                             M(co, row) = bias * theBiasInv;
                         else if (row == biasRow)
@@ -661,7 +661,7 @@ void Solver::EnumerateSolutions(const double *matrix, int width, int height)
     {
         auto minorID = 0;
         auto mainRow = 0;
-        for (auto col = 0; col < n; col++)
+        for (auto col = 0; col < n; ++col)
             if (minorID < m_Minors.size() &&
                 col == m_Minors[minorID])
             {
@@ -698,7 +698,7 @@ void Solver::EnumerateSolutions(const double *matrix, int width, int height)
                 auto &lst = m_Dist_Temp;
                 lst.clear() , lst.resize(n);
                 auto flag = true;
-                for (auto mainRow = 0; mainRow < mR; mainRow++)
+                for (auto mainRow = 0; mainRow < mR; ++mainRow)
                 {
                     auto v = round(sums[mainRow]);
                     if (!ZEROQ(v - sums[mainRow]))
@@ -717,7 +717,7 @@ void Solver::EnumerateSolutions(const double *matrix, int width, int height)
                 }
                 if (flag)
                 {
-                    for (auto minorID = 0; minorID < m_Minors.size(); minorID++)
+                    for (auto minorID = 0; minorID < m_Minors.size(); ++minorID)
                         lst[m_Minors[minorID]] = stack[minorID];
                     m_Solutions.emplace_back();
                     m_Solutions.back().Dist.swap(lst);
@@ -828,8 +828,8 @@ void Solver::Add(std::vector<double> &from, const std::vector<double> &cases)
 {
     auto &dicN = m_Add_Temp;
     dicN.clear() , dicN.resize(from.size() + cases.size() - 1, 0);
-    for (auto i = 0; i < from.size(); i++)
-        for (auto j = 0; j < cases.size(); j++)
+    for (auto i = 0; i < from.size(); ++i)
+        for (auto j = 0; j < cases.size(); ++j)
             dicN[i + j] += from[i] * cases[j];
     dicN.swap(from);
 }
@@ -876,7 +876,7 @@ const DistCondQParameters &Solver::ZCondQ(DistCondQParameters &&par)
     for (auto &solution : m_Solutions)
     {
         double valT(1);
-        for (auto i = 0; i < m_BlockSets.size(); i++)
+        for (auto i = 0; i < m_BlockSets.size(); ++i)
         {
             auto n = m_BlockSets[i].size();
             auto a = ptr->Sets1[i], b = i == ptr->Set2ID ? 1 : 0;
@@ -1052,7 +1052,7 @@ const DistCondQParameters &Solver::DistCondQ(DistCondQParameters &&par)
     {
         auto &dicT = m_DicT_Temp;
         dicT.clear() , dicT.resize(1, 1);
-        for (auto i = 0; i < m_BlockSets.size(); i++)
+        for (auto i = 0; i < m_BlockSets.size(); ++i)
         {
             auto n = m_BlockSets[i].size();
             auto a = ptr->Sets1[i], b = i == ptr->Set2ID ? 1 : 0;
@@ -1061,7 +1061,7 @@ const DistCondQParameters &Solver::DistCondQ(DistCondQParameters &&par)
             auto &cases = m_Cases_Temp;
             cases.clear();
             cases.reserve(min(m, a) + 1);
-            for (auto j = 0; j <= m && j <= a; j++)
+            for (auto j = 0; j <= m && j <= a; ++j)
             {
                 cases.emplace_back(Binomial(a, j));
                 cases.back() *= Binomial(n - a - b, m - j);
