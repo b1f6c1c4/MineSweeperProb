@@ -24,7 +24,7 @@ volatile size_t *total, *totalT;
 
 bool ProcessID(int id)
 {
-    auto mgr = GameMgr(30, 16, 99);
+    GameMgr mgr(30, 16, 99);
     mgr.DrainCriterion = cert[id];
     mgr.OpenBlock(0, 0);
     mgr.Automatic();

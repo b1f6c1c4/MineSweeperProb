@@ -209,11 +209,14 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         m_Minors.pop_back();
     else
     {
+        delete[] matrix;
         m_TotalStates = double(0);
         return;
     }
 
     EnumerateSolutions(matrix, width, height);
+    delete[] matrix;
+
     if (m_Solutions.empty())
     {
         m_TotalStates = double(0);
@@ -665,7 +668,7 @@ void Solver::EnumerateSolutions(const double *matrix, int width, int height)
             if (minorID < m_Minors.size() &&
                 col == m_Minors[minorID])
             {
-                if (m_NonZero_Temp.size() >= minorID)
+                if (minorID >= m_NonZero_Temp.size())
                     m_NonZero_Temp.emplace_back();
                 auto &lst = m_NonZero_Temp[minorID];
                 lst.clear();
@@ -682,11 +685,10 @@ void Solver::EnumerateSolutions(const double *matrix, int width, int height)
                 ++mainRow;
             }
     }
-    auto aggr = [this,&sums,matrix,width,height,mR](int minor, int val)
-        {
-            for (auto mainRow : m_NonZero_Temp[minor])
-                sums[mainRow] -= val * M(m_Minors[minor], mainRow);
-        };
+#define AGGR(val) \
+    for (auto mainRow : m_NonZero_Temp[stack.size() - 1]) \
+        sums[mainRow] -= (val) * M(m_Minors[stack.size() - 1], mainRow)
+
     auto &stack = m_Stack_Temp;
     stack.clear();
     stack.reserve(m_Minors.size());
@@ -723,27 +725,27 @@ void Solver::EnumerateSolutions(const double *matrix, int width, int height)
                     m_Solutions.back().Dist.swap(lst);
                 }
 
-                aggr(stack.size() - 1, 1);
+                AGGR(1);
                 ++stack.back();
             }
             else
             {
-                aggr(stack.size() - 1, -stack.back());
+                AGGR(-stack.back());
                 stack.pop_back();
                 if (stack.empty())
                     break;
-                aggr(stack.size() - 1, 1);
+                AGGR(1);
                 ++stack.back();
             }
         else if (stack.back() <= m_BlockSets[m_Minors[stack.size() - 1]].size())
-            stack.push_back(0); // aggr(stack.size() - 1, 0);
+            stack.push_back(0); // AGGR(0);
         else
         {
-            aggr(stack.size() - 1, -stack.back());
+            AGGR(-stack.back());
             stack.pop_back();
             if (stack.empty())
                 break;
-            aggr(stack.size() - 1, 1);
+            AGGR(1);
             ++stack.back();
         }
 }
