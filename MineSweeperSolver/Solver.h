@@ -92,7 +92,8 @@ private:
     std::set<std::pair<int, int>> m_Pairs_Temp;
     std::vector<int> m_OverlapIndexes_Temp;
     std::vector<int> m_OverlapA_Temp, m_OverlapB_Temp, m_OverlapC_Temp;
-    std::vector<std::pair<int, double>> m_GaussVec_Temp;
+    std::vector<double> m_GaussVec_Temp;
+    std::vector<std::vector<int>> m_NonZero_Temp;
     std::vector<int> m_Majors_Temp, m_Counts_Temp, m_Stack_Temp, m_Dist_Temp;
     std::vector<double> m_Sums_Temp;
     std::vector<double> m_Exp_Temp;
@@ -103,8 +104,8 @@ private:
     void ReduceRestrains();
     void SimpleOverlapAll();
     bool SimpleOverlap(int r1, int r2);
-    void Gauss(OrthogonalList<double> &matrix);
-    void EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix);
+    void Gauss(double *matrix, int width, int height);
+    void EnumerateSolutions(const double *matrix, int width, int height);
     void ProcessSolutions();
 
     static void Merge(const std::vector<double> &from, std::vector<double> &to);

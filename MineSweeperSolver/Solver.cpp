@@ -22,6 +22,8 @@ void CheckOL(OrthogonalList<int> &m)
 
 #define ZEROQ(val) (abs(val) < 1E-3)
 
+#define M(x, y) matrix[(x) * height + (y)]
+
 static size_t Hash(const BlockSet &set);
 template <class T>
 static size_t HashCol(const Node<T> *ptr);
@@ -183,14 +185,24 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         return;
     }
 
-    OrthogonalList<double> augmentedMatrix(m_Matrix.GetWidth(), m_Matrix.GetHeight());
-    for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
+    auto width = m_Matrix.GetWidth();
+    auto height = m_Matrix.GetHeight();
+    auto matrix = new double[width * height];
+    for (auto col = 0; col < width; ++col)
     {
-        auto nr = &augmentedMatrix.GetRowHead(row);
-        for (auto node = m_Matrix.GetRowHead(row).Right; node != nullptr; node = node->Right)
-            nr = &augmentedMatrix.Add(*nr, augmentedMatrix.GetColHead(node->Col), static_cast<double>(node->Value));
+        auto node = m_Matrix.GetColHead(col).Down;
+        for (auto row = 0; row < height; ++row)
+        {
+            if (node == nullptr || node->Row > row)
+                M(col, row) = 0;
+            else
+            {
+                M(col, row) = node->Value;
+                node = node->Down;
+            }
+        }
     }
-    Gauss(augmentedMatrix);
+    Gauss(matrix, width, height);
 
     if (!m_Minors.empty() &&
         m_Minors.back() == m_BlockSets.size())
@@ -201,7 +213,7 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         return;
     }
 
-    EnumerateSolutions(augmentedMatrix);
+    EnumerateSolutions(matrix, width, height);
     if (m_Solutions.empty())
     {
         m_TotalStates = double(0);
@@ -562,21 +574,17 @@ bool Solver::SimpleOverlap(int r1, int r2)
     return false;
 }
 
-void Solver::Gauss(OrthogonalList<double> &matrix)
+void Solver::Gauss(double *matrix, int width, int height)
 {
-    auto n = matrix.GetWidth();
     m_Minors.clear();
     auto major = 0;
-    for (auto col = 0; col < n; ++col)
+    for (auto col = 0; col < width; ++col)
     {
-        auto biasNode = matrix.SeekDown(major, col).Down;
-        while (biasNode != nullptr && ZEROQ(biasNode->Value))
-        {
-            auto tmp = biasNode->Down;
-            matrix.Remove(*biasNode);
-            biasNode = tmp;
-        }
-        if (biasNode == nullptr)
+        int biasRow;
+        for (biasRow = major; biasRow < height; biasRow++)
+            if (abs(M(col, biasRow)) >= 1E-8)
+                break;
+        if (biasRow >= height)
         {
             m_Minors.push_back(col);
             continue;
@@ -584,94 +592,51 @@ void Solver::Gauss(OrthogonalList<double> &matrix)
 
         auto &vec = m_GaussVec_Temp;
         vec.clear();
-        auto theBiasInv = 1 / biasNode->Value;
-        for (auto node = matrix.GetColHead(col).Down; node != nullptr;)
+        vec.resize(height);
+        auto theBiasInv = 1 / M(col, biasRow);
+        for (auto row = 0; row < height; ++row)
         {
-            auto tmp = node->Down;
-            if (node->Row != biasNode->Row)
-            {
-                vec.emplace_back(node->Row, -node->Value * theBiasInv);
-                matrix.Remove(*node);
-            }
+            if (row != biasRow)
+                vec[row] = -M(col, row) * theBiasInv;
+#ifdef _DEBUG
+            if (row == major)
+                M(col, row) = 1;
             else
-            {
-                vec.emplace_back(node->Row, theBiasInv);
-                node->Value = 1;
-            }
-            node = tmp;
+                M(col, row) = 0;
+#endif
         }
-
-        for (auto bias = biasNode->Right; bias != nullptr; bias = bias->Right)
-        {
-            auto biasVal = bias->Value;
-            auto nc = &matrix.GetColHead(bias->Col);
-            for (auto it = vec.begin(); it != vec.end(); ++it)
+        if (major == biasRow)
+            for (auto co = col + 1; co < width; ++co)
             {
-                while (nc->Down != nullptr && nc->Down->Row < it->first)
-                    nc = nc->Down;
-
-                double oldV;
-                if (nc->Down == nullptr ||
-                    nc->Down->Row > it->first)
-                    oldV = 0;
-                else
-                    oldV = nc->Down->Value;
-
-                auto val = (it->first != biasNode->Row ? oldV : 0) + it->second * biasVal;
-
-                if (nc->Down == nullptr ||
-                    nc->Down->Row > it->first)
-                {
-                    if (ZEROQ(val))
-                        continue;
-
-                    auto nr = &matrix.SeekRight(it->first, bias->Col);
-                    nc = &matrix.Add(*nr, *nc, val);
-                }
-                else if (ZEROQ(val))
-                    matrix.Remove(*nc->Down); // probably bias ?
-                else
-                {
-                    nc = nc->Down;
-                    nc->Value = val;
-                }
+                auto bias = M(co, biasRow);
+                if (!ZEROQ(bias))
+                    for (auto row = 0; row < height; row++)
+                        if (row == major)
+                            M(co, row) *= theBiasInv;
+                        else
+                            M(co, row) += vec[row] * bias;
             }
-        }
-
-        if (major != biasNode->Row)
-        {
-            auto majNode = &matrix.GetRowHead(major);
-            auto biasRow = biasNode->Row;
-            auto biaNode = &matrix.GetRowHead(biasRow);
-            while (true)
+        else
+            for (auto co = col + 1; co < width; ++co)
             {
-                auto majID = majNode->Right != nullptr ? majNode->Right->Col : n;
-                auto biaID = biaNode->Right != nullptr ? biaNode->Right->Col : n;
-                if (majID < biaID)
-                {
-                    biaNode = &matrix.Add(biasRow, majID, majNode->Right->Value);
-                    matrix.Remove(*majNode->Right);
-                }
-                else if (majID > biaID)
-                {
-                    majNode = &matrix.Add(major, biaID, biaNode->Right->Value);
-                    matrix.Remove(*biaNode->Right);
-                }
-                else if (majNode->Right != nullptr)
-                {
-                    majNode = majNode->Right;
-                    biaNode = biaNode->Right;
-                    std::swap(biaNode->Value, majNode->Value);
-                }
+                auto swap = M(co, major);
+                auto bias = M(co, biasRow);
+                if (ZEROQ(bias))
+                    M(co, major) = 0, M(co, biasRow) = swap;
                 else
-                    break;
+                    for (auto row = 0; row < height; row++)
+                        if (row == major)
+                            M(co, row) = bias * theBiasInv;
+                        else if (row == biasRow)
+                            M(co, row) = swap + vec[major] * bias;
+                        else
+                            M(co, row) += vec[row] * bias;
             }
-        }
         ++major;
     }
 }
 
-void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
+void Solver::EnumerateSolutions(const double *matrix, int width, int height)
 {
     auto n = m_BlockSets.size();
 
@@ -679,9 +644,9 @@ void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
     {
         m_Solutions.emplace_back();
         auto &lst = m_Solutions.back().Dist;
-        lst.resize(n);
-        for (auto nc = augmentedMatrix.GetColHead(n).Down; nc != nullptr; nc = nc->Down)
-            lst[nc->Row] = static_cast<int>(round(nc->Value));
+        lst.reserve(n);
+        for (auto row = 0; row < height; ++row)
+            lst.push_back(static_cast<int>(round(M(width - 1, row))));
         return;
     }
 
@@ -692,32 +657,35 @@ void Solver::EnumerateSolutions(const OrthogonalList<double> &augmentedMatrix)
     majors.clear() , majors.reserve(mR);
     cnts.clear() , cnts.reserve(mR);
     sums.clear() , sums.reserve(mR);
+    m_NonZero_Temp.reserve(m_Minors.size());
     {
         auto minorID = 0;
         auto mainRow = 0;
-        auto nc = augmentedMatrix.GetColHead(n).Down;
         for (auto col = 0; col < n; col++)
             if (minorID < m_Minors.size() &&
                 col == m_Minors[minorID])
+            {
+                if (m_NonZero_Temp.size() >= minorID)
+                    m_NonZero_Temp.emplace_back();
+                auto &lst = m_NonZero_Temp[minorID];
+                lst.clear();
+                for (auto row = 0; row < height; ++row)
+                    if (!ZEROQ(M(col, row)))
+                        lst.push_back(row);
                 ++minorID;
+            }
             else // major
             {
                 majors.push_back(col);
                 cnts.push_back(m_BlockSets[col].size());
-                if (nc == nullptr || nc->Row > mainRow)
-                    sums.push_back(0);
-                else
-                {
-                    sums.push_back(nc->Value);
-                    nc = nc->Down;
-                }
+                sums.push_back(M(n, mainRow));
                 ++mainRow;
             }
     }
-    auto aggr = [this,&sums,&augmentedMatrix](int minor, int val)
+    auto aggr = [this,&sums,matrix,width,height,mR](int minor, int val)
         {
-            for (auto nc = augmentedMatrix.GetColHead(m_Minors[minor]).Down; nc != nullptr; nc = nc->Down)
-                sums[nc->Row] -= nc->Value * static_cast<double>(val);
+            for (auto mainRow : m_NonZero_Temp[minor])
+                sums[mainRow] -= val * M(m_Minors[minor], mainRow);
         };
     auto &stack = m_Stack_Temp;
     stack.clear();
