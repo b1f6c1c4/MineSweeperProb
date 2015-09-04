@@ -111,7 +111,7 @@ size_t MacroSituation::Hash()
     return m_Hash = hash;
 }
 
-Drainer::Drainer(const GameMgr &mgr) : FullyDrainCriterion(64), m_Mgr(mgr)
+Drainer::Drainer(const GameMgr &mgr, size_t crit) : FullyDrainCriterion(crit), m_Mgr(mgr)
 {
     for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
     {

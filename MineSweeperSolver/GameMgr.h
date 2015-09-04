@@ -65,7 +65,6 @@ public:
     void Save(std::ostream &sw) const;
 
     friend class Drainer;
-    friend double Probe(const GameMgr &mgr, Block blk);
 private:
     int m_TotalWidth, m_TotalHeight, m_TotalMines;
     bool m_Settled, m_Started, m_Succeed;
@@ -81,6 +80,9 @@ private:
 
     void SettleMines(int initID);
     void OpenBlock(int id);
+
+    int FrontierDist(Block blk) const;
 };
 
+void Largest(BlockSet &bests, std::function<int(Block)> fun);
 void Largest(BlockSet &bests, std::function<double(Block)> fun);

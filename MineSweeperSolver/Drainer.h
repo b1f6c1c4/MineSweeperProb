@@ -44,7 +44,7 @@ bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 class Drainer
 {
 public:
-    explicit Drainer(const GameMgr &mgr);
+    explicit Drainer(const GameMgr &mgr, size_t crit);
     ~Drainer();
 
     size_t FullyDrainCriterion;

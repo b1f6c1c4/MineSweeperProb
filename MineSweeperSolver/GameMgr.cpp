@@ -222,6 +222,26 @@ void GameMgr::OpenBlock(int x, int y)
     OpenBlock(GetIndex(x, y));
 }
 
+void Largest(BlockSet &bests, std::function<int(int)> fun)
+{
+    if (bests.size() <= 1)
+        return;
+    BlockSet newBests;
+    newBests.push_back(bests.front());
+    auto bestVal = fun(bests.front());
+    for (auto i = 1; i < bests.size(); ++i)
+    {
+        auto p = fun(bests[i]);
+        if (bestVal < p)
+        {
+            bestVal = p;
+            newBests.clear();
+        }
+        if (bestVal <= p)
+            newBests.push_back(bests[i]);
+    }
+    newBests.swap(bests);
+}
 void Largest(BlockSet &bests, std::function<double(int)> fun)
 {
     if (bests.size() <= 1)
@@ -295,9 +315,6 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         (maxDepth & SolvingState::Drained) == SolvingState::Stale)
         return;
 
-#ifdef _DEBUG
-#endif
-
     if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
         if (m_Drainer == nullptr && m_Solver->GetTotalStates() <= DrainCriterion &&
             (m_Solver->GetTotalStates() > 2 || m_ToOpen > 1))
@@ -328,6 +345,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
     LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
     LARGEST(m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
+    LARGEST(-FrontierDist(blk));
 }
 
 void GameMgr::OpenOptimalBlocks()
@@ -419,7 +437,7 @@ void GameMgr::EnableDrainer()
     if (m_Drainer != nullptr)
         return;
     SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
-    m_Drainer = new Drainer(*this);
+    m_Drainer = new Drainer(*this, DrainCriterion == 0 ? 64 : DrainCriterion >> 3);
     Solve(SolvingState::Probability | SolvingState::Drained, false);
 }
 
@@ -503,4 +521,19 @@ void GameMgr::OpenBlock(int id)
     }
 
     ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
+}
+
+int GameMgr::FrontierDist(Block blk) const
+{
+    auto &bt = m_Blocks[blk];
+    auto d = max(m_TotalWidth, m_TotalHeight);
+    for (auto b : m_Blocks)
+    {
+        if (!b.IsOpen)
+            continue;
+        auto v = max(abs(b.X - bt.X), abs(b.Y - bt.Y));
+        if (v < d)
+            d = v;
+    }
+    return d;
 }
