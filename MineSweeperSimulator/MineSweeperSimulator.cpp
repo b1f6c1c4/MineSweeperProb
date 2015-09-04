@@ -38,7 +38,7 @@ void Process(int id, bool (*fun)(int))
             {
                 std::unique_lock<std::mutex> lock(mtx);
                 if (restT == 0)
-                    break;
+                    return;
 
                 if (rest[id] == 0)
                     continue;
