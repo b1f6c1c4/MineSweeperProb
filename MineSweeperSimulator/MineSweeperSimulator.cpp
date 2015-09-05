@@ -45,7 +45,7 @@ void Process(int id, bool (*fun)(int))
                     return;
 
                 if (rest[id] == 0)
-                    continue;
+                    break;
 
                 --restT;
                 --rest[id];
@@ -122,8 +122,6 @@ int Save(std::ostringstream *sout)
                 continue;
 
             fout << cert[i] << " " << succeed[i] << " " << total[i] << std::endl;
-            if (sout != nullptr)
-                *sout << cert[i] << " " << succeed[i] << " " << total[i] << std::endl;
             succeedT[i] += succeed[i];
             totalT[i] += total[i];
             totalTT += total[i];
@@ -133,6 +131,17 @@ int Save(std::ostringstream *sout)
         rT = restT;
     }
     fout.close();
+
+    if (sout == nullptr)
+        return rT;
+    *sout << "{";
+    for (auto i = 0; i < numTasks; ++i)
+    {
+        if (i > 0)
+            *sout << ",";
+        *sout << cert[i] << "->{" << succeedT[i] << "," << totalT[i] << "}";
+    }
+    *sout << "}";
     return rT;
 }
 
@@ -248,9 +257,9 @@ int main()
             {
                 auto rT = Save(&sout);
                 if (rT != 0)
-                    sout << "Resume " << rT << " tests";
+                    sout << " Resume " << rT << " tests";
                 else
-                    sout << "Finished";
+                    sout << " Finished";
             }
             auto str = sout.str();
             if (sendto(theSocket, str.c_str(), str.length(), 0, &addr, addrLen) == SOCKET_ERROR)
@@ -308,7 +317,7 @@ int main()
             else
             {
                 auto rT = Save(&sout);
-                sout << "Resume " << rT << " tests, terminating";
+                sout << " Resume " << rT << " tests, terminating";
             }
             auto str = sout.str();
             if (sendto(theSocket, str.c_str(), str.length(), 0, &addr, addrLen) == SOCKET_ERROR)
