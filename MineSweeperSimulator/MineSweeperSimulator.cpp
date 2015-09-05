@@ -173,8 +173,8 @@ int main()
     addrinfo *result = nullptr, hints;
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = IPPROTO_UDP;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
     if (getaddrinfo(nullptr, "27015", &hints, &result) != 0)
     {
@@ -206,144 +206,142 @@ int main()
     char recvBuff[BUFF_LENGTH];
     while (true)
     {
-        std::cout << "Wait for command: ";
-
-        sockaddr addr;
-        int addrLen = sizeof(addr);
-        auto ret = recvfrom(theSocket, recvBuff, BUFF_LENGTH, 0, &addr, &addrLen);
-        if (ret == 0)
-            continue;
-        if (ret < 0)
+        if (listen(theSocket, SOMAXCONN) == SOCKET_ERROR)
         {
+            std::cout << WSAGetLastError() << std::endl;
             Save(nullptr);
             closesocket(theSocket);
             WSACleanup();
             return 1;
         }
 
-        recvBuff[ret] = '\0';
+        std::cout << "Wait for client: ";
 
-        std::cout << recvBuff << std::endl;
-
-        std::istringstream sin(recvBuff);
-
-        std::string action;
-        sin >> action;
-        if (action == "launch")
+        auto client = accept(theSocket, nullptr, nullptr);
+        if (client == INVALID_SOCKET)
         {
-            std::ostringstream sout;
-            if (Launch(sin))
-                sout << "Launched " << m_Threads.size() << " threads";
-            else
-                sout << "Already launched";
-            auto str = sout.str();
-            if (sendto(theSocket, str.c_str(), str.length(), 0, &addr, addrLen) == SOCKET_ERROR)
+            std::cout << WSAGetLastError() << std::endl;
+            Save(nullptr);
+            closesocket(theSocket);
+            WSACleanup();
+            return 1;
+        }
+
+        std::cout << " connected" << std::endl;
+
+        while (true)
+        {
+            std::cout << "    Wait for command: ";
+
+            auto ret = recv(client, recvBuff, BUFF_LENGTH, 0);
+            if (ret == 0)
             {
-                std::cout << WSAGetLastError() << std::endl;
+                std::cout << std::endl;
+                break;
+            }
+            if (ret < 0)
+            {
                 Save(nullptr);
                 closesocket(theSocket);
                 WSACleanup();
-                system("pause");
                 return 1;
             }
-            continue;
-        }
-        if (action == "save")
-        {
-            std::ostringstream sout;
-            if (numTasks == 0)
-                sout << "Not yet launched";
-            else
+
+            recvBuff[ret] = '\0';
+
+            std::cout << recvBuff << std::endl;
+
+#define SEND \
+            do \
+            { \
+                auto str = sout.str(); \
+                if (send(client, str.c_str(), str.length(), 0) == SOCKET_ERROR) \
+                { \
+                    std::cout << WSAGetLastError() << std::endl; \
+                    Save(nullptr); \
+                    closesocket(theSocket); \
+                    WSACleanup(); \
+                    system("pause"); \
+                    return 1; \
+                } \
+            } while (false)
+
+
+            std::istringstream sin(recvBuff);
+
+            std::string action;
+            sin >> action;
+            if (action == "launch")
             {
-                auto rT = Save(&sout);
-                if (rT != 0)
-                    sout << " Resume " << rT << " tests";
+                std::ostringstream sout;
+                if (Launch(sin))
+                    sout << "Launched " << m_Threads.size() << " threads";
                 else
-                    sout << " Finished";
+                    sout << "Already launched";
+                SEND;
+                continue;
             }
-            auto str = sout.str();
-            if (sendto(theSocket, str.c_str(), str.length(), 0, &addr, addrLen) == SOCKET_ERROR)
+            if (action == "save")
             {
-                std::cout << WSAGetLastError() << std::endl;
-                Save(nullptr);
-                closesocket(theSocket);
-                WSACleanup();
-                system("pause");
-                return 1;
-            }
-            continue;
-        }
-        if (action == "reset")
-        {
-            std::ostringstream sout;
-            if (numTasks == 0)
-                sout << "Not yet launched";
-            else
-            {
-                size_t rT;
-                {
-                    std::unique_lock<std::mutex> lock(mtx);
-                    rT = restT;
-                }
-                if (rT != 0)
-                    sout << "Not yet finished";
+                std::ostringstream sout;
+                if (numTasks == 0)
+                    sout << "Not yet launched";
                 else
                 {
-                    for (auto &th : m_Threads)
-                        th.join();
-                    m_Threads.clear();
-                    Clear();
-                    numTasks = 0;
-                    sout << "Reset OK";
+                    auto rT = Save(&sout);
+                    if (rT != 0)
+                        sout << " Resume " << rT << " tests";
+                    else
+                        sout << " Finished";
                 }
+                SEND;
+                continue;
             }
-            auto str = sout.str();
-            if (sendto(theSocket, str.c_str(), str.length(), 0, &addr, addrLen) == SOCKET_ERROR)
+            if (action == "reset")
             {
-                std::cout << WSAGetLastError() << std::endl;
-                Save(nullptr);
-                closesocket(theSocket);
-                WSACleanup();
-                system("pause");
-                return 1;
+                std::ostringstream sout;
+                if (numTasks == 0)
+                    sout << "Not yet launched";
+                else
+                {
+                    size_t rT;
+                    {
+                        std::unique_lock<std::mutex> lock(mtx);
+                        rT = restT;
+                    }
+                    if (rT != 0)
+                        sout << "Not yet finished";
+                    else
+                    {
+                        for (auto &th : m_Threads)
+                            th.join();
+                        m_Threads.clear();
+                        Clear();
+                        numTasks = 0;
+                        sout << "Reset OK";
+                    }
+                }
+                SEND;
+                continue;
             }
-            continue;
-        }
-        if (action == "terminate")
-        {
-            std::ostringstream sout;
-            if (numTasks == 0)
-                sout << "Not yet launched, terminating";
-            else
+            if (action == "terminate")
             {
-                auto rT = Save(&sout);
-                sout << " Resume " << rT << " tests, terminating";
+                std::ostringstream sout;
+                if (numTasks == 0)
+                    sout << "Not yet launched, terminating";
+                else
+                {
+                    auto rT = Save(&sout);
+                    sout << " Resume " << rT << " tests, terminating";
+                }
+                SEND;
+                Clear();
+                return 0;
             }
-            auto str = sout.str();
-            if (sendto(theSocket, str.c_str(), str.length(), 0, &addr, addrLen) == SOCKET_ERROR)
             {
-                std::cout << WSAGetLastError() << std::endl;
-                Save(nullptr);
-                closesocket(theSocket);
-                WSACleanup();
-                system("pause");
-                return 1;
-            }
-            Clear();
-            return 0;
-        }
-        {
-            std::ostringstream sout;
-            sout << "Invalid command";
-            auto str = sout.str();
-            if (sendto(theSocket, str.c_str(), str.length(), 0, &addr, addrLen) == SOCKET_ERROR)
-            {
-                std::cout << WSAGetLastError() << std::endl;
-                Save(nullptr);
-                closesocket(theSocket);
-                WSACleanup();
-                system("pause");
-                return 1;
+                std::ostringstream sout;
+                sout << "Invalid command";
+                SEND;
             }
         }
     }
