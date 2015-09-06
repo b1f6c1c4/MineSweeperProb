@@ -36,6 +36,9 @@
     <ClInclude Include="Drainer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Strategies.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

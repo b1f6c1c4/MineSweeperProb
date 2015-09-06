@@ -111,7 +111,7 @@ size_t MacroSituation::Hash()
     return m_Hash = hash;
 }
 
-Drainer::Drainer(const GameMgr &mgr, size_t crit) : FullyDrainCriterion(crit), m_Mgr(mgr)
+Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
 {
     for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
     {
@@ -442,12 +442,52 @@ void Drainer::GenerateMicros()
     }
 }
 
+int Drainer::FrontierDist(const MacroSituation *macro, Block blk) const
+{
+    auto &bt = m_Mgr.m_Blocks[blk];
+    auto d = max(m_Mgr.m_TotalWidth, m_Mgr.m_TotalHeight);
+    for (auto b : m_Mgr.m_Blocks)
+    {
+        if (macro->m_Degrees[b.Index] < 0)
+            continue;
+        auto v = max(abs(b.X - bt.X), abs(b.Y - bt.Y));
+        if (v < d)
+            d = v;
+    }
+    return d;
+}
+
 void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet &bests)
 {
-#define LARGEST(exp) Largest(bests, std::function<double(Block)>([this, macro](Block blk) { return exp; } ))
-    if (macro->m_Solver->m_TotalStates <= FullyDrainCriterion)
+    if (!m_Mgr.BasicStrategy.PruningEnabled)
         return;
-    LARGEST(-macro->m_Solver->GetProbability(blk));
+#define LARGEST(exp) Largest(bests, std::function<double(Block)>([this, macro](Block blk) { return exp; } ))
+    if (macro->m_Solver->m_TotalStates <= m_Mgr.BasicStrategy.ExhaustCriterion)
+        return;
+    for (auto heu : m_Mgr.BasicStrategy.PruningDecisionTree)
+        switch (heu)
+        {
+        case HeuristicMethod::MinMineProb:
+            LARGEST(-macro->m_Solver->GetProbability(blk));
+            break;
+        case HeuristicMethod::MaxZeroProb:
+            LARGEST(macro->m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MaxZerosProb:
+            LARGEST(macro->m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MaxZerosExp:
+            LARGEST(macro->m_Solver->ZerosECondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MaxQuantityExp:
+            LARGEST(macro->m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MinFrontierDist:
+            LARGEST(-FrontierDist(macro, blk));
+            break;
+        default:
+            break;
+        }
 }
 
 void Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)

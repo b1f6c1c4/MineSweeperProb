@@ -10,7 +10,7 @@
 #define ASSERT(val)
 #endif
 
-GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
 {
     m_Solver = new Solver(width * height);
 
@@ -44,7 +44,7 @@ GameMgr::GameMgr(int width, int height, int totalMines) : DrainCriterion(64), m_
     m_AllBits = log2(Binomial(width * height, totalMines));
 }
 
-GameMgr::GameMgr(std::istream &sr) : DrainCriterion(64), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val));
     READ(m_TotalWidth);
@@ -312,21 +312,24 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 #endif
 
     if ((maxDepth & SolvingState::Probability) == SolvingState::Stale &&
-        (maxDepth & SolvingState::ZeroProb) == SolvingState::Stale &&
+        (maxDepth & SolvingState::Heuristic) == SolvingState::Stale &&
         (maxDepth & SolvingState::Drained) == SolvingState::Stale)
         return;
 
-    if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
-        if (m_Drainer == nullptr && m_Solver->GetTotalStates() <= DrainCriterion &&
+    if ((maxDepth & SolvingState::Drained) == SolvingState::Drained && BasicStrategy.ExhaustEnabled)
+        if (m_Drainer == nullptr && m_Solver->GetTotalStates() <= (BasicStrategy.PruningEnabled ? BasicStrategy.PruningCriterion : BasicStrategy.ExhaustCriterion) &&
             (m_Solver->GetTotalStates() > 2 || m_ToOpen > 1))
             EnableDrainer();
 
     if (m_Drainer != nullptr)
     {
         m_Drainer->Update();
-        if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
+        if ((maxDepth & SolvingState::Drained) == SolvingState::Drained && BasicStrategy.ExhaustEnabled)
             m_Preferred = m_Drainer->GetBestBlocks();
     }
+
+    if (!BasicStrategy.HeuristicEnabled)
+        return;
 
     if (m_Preferred.empty())
         for (auto i = 0; i < m_Blocks.size(); ++i)
@@ -338,15 +341,30 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 
 #define LARGEST(exp) Largest(m_Preferred, std::function<double(Block)>([this](Block blk) { return exp; } ))
 
-    LARGEST(-m_Solver->GetProbability(blk));
-
-    if ((maxDepth & SolvingState::ZeroProb) == SolvingState::Stale)
-        return;
-
-    LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
-    LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
-    LARGEST(m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
-    LARGEST(-FrontierDist(blk));
+    for (auto heu : BasicStrategy.PruningDecisionTree)
+        switch (heu)
+        {
+        case HeuristicMethod::MinMineProb:
+            LARGEST(-m_Solver->GetProbability(blk));
+            break;
+        case HeuristicMethod::MaxZeroProb:
+            LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MaxZerosProb:
+            LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MaxZerosExp:
+            LARGEST(m_Solver->ZerosECondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MaxQuantityExp:
+            LARGEST(m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
+            break;
+        case HeuristicMethod::MinFrontierDist:
+            LARGEST(-FrontierDist(blk));
+            break;
+        default:
+            break;
+        }
 }
 
 void GameMgr::OpenOptimalBlocks()
@@ -427,9 +445,46 @@ void GameMgr::AutomaticStep(SolvingState maxDepth)
 
 void GameMgr::Automatic()
 {
+    SolvingState st;
+    switch (BasicStrategy.Logic)
+    {
+    case LogicMethod::None: 
+        st = SolvingState::Stale;
+        break;
+    case LogicMethod::Single:
+        st = SolvingState::Reduce;
+        break;
+    case LogicMethod::Double:
+        st = SolvingState::Reduce | SolvingState::Overlap;
+        break;
+    case LogicMethod::Full: 
+        st = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
+        break;
+    default:
+        throw;
+    }
+
     while (m_Started)
-        if (SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability))
-            AutomaticStep(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::ZeroProb | SolvingState::Drained);
+    {
+        if (!m_Settled && BasicStrategy.InitialPositionSpecified)
+            OpenBlock(BasicStrategy.X, BasicStrategy.Y);
+        
+        if (st == SolvingState::Stale && !BasicStrategy.HeuristicEnabled)
+        {
+            m_Started = false;
+            break;
+        }
+
+        SemiAutomatic(st);
+
+        if (!BasicStrategy.HeuristicEnabled)
+        {
+            m_Started = false;
+            break;
+        }
+
+        AutomaticStep(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic | SolvingState::Drained);
+    }
 }
 
 void GameMgr::EnableDrainer()
@@ -437,7 +492,7 @@ void GameMgr::EnableDrainer()
     if (m_Drainer != nullptr)
         return;
     SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
-    m_Drainer = new Drainer(*this, DrainCriterion == 0 ? 64 : DrainCriterion >> 3);
+    m_Drainer = new Drainer(*this);
     Solve(SolvingState::Probability | SolvingState::Drained, false);
 }
 

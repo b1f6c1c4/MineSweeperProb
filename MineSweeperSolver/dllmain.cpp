@@ -42,7 +42,17 @@ struct
 
 extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines)
 {
-    return new GameMgr(width, height, totalMines);
+    auto mgr = new GameMgr(width, height, totalMines);
+    mgr->BasicStrategy.InitialPositionSpecified = false;
+    mgr->BasicStrategy.Logic = LogicMethod::Full;
+    mgr->BasicStrategy.HeuristicEnabled = true;
+    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MinMineProb);
+    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MaxZerosProb);
+    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MaxZeroProb);
+    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MaxQuantityExp);
+    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MinFrontierDist);
+    mgr->BasicStrategy.ExhaustEnabled = false;
+    return mgr;
 }
 
 extern "C" DLL_API GameMgr *CreateGameMgrFromFile(const wchar_t *filename)
@@ -124,7 +134,7 @@ extern "C" DLL_API bool SemiAutomatic(GameMgr *mgr, SolvingState maxDepth)
 
 extern "C" DLL_API void AutomaticStep(GameMgr *mgr)
 {
-    mgr->AutomaticStep(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::ZeroProb);
+    mgr->AutomaticStep(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic);
 }
 
 extern "C" DLL_API void Automatic(GameMgr *mgr)

@@ -3,6 +3,7 @@
 #include "Solver.h"
 #include <vector>
 #include <functional>
+#include "Strategies.h"
 
 struct
     DLL_API BlockProperty
@@ -24,7 +25,7 @@ public:
     explicit GameMgr(std::istream &sr);
     ~GameMgr();
 
-    size_t DrainCriterion;
+    Strategy BasicStrategy;
 
     Solver &GetSolver();
     const Solver &GetSolver() const;

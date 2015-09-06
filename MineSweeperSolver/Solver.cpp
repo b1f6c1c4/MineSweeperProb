@@ -259,6 +259,17 @@ double Solver::ZerosCondQ(const BlockSet &set, Block blk)
     par.Hash();
     for (auto b : par.Sets1)
         par.Length += b;
+    return ZsCondQ(std::move(par)).m_Probability;
+}
+
+double Solver::ZerosECondQ(const BlockSet& set, Block blk)
+{
+    DistCondQParameters par(m_SetIDs[blk], 0);
+    int dMines;
+    GetIntersectionCounts(set, par.Sets1, dMines);
+    par.Hash();
+    for (auto b : par.Sets1)
+        par.Length += b;
     return ZsCondQ(std::move(par)).m_Expectation;
 }
 
@@ -1083,6 +1094,7 @@ const DistCondQParameters &Solver::ZsCondQ(DistCondQParameters &&par)
     for (auto val : dic)
         ptr->m_TotalStates += val;
 
+    ptr->m_Probability = 0;
     ptr->m_Expectation = 0;
     std::vector<int> lst;
     for (auto i = 0; i <= ptr->Length; ++i)
@@ -1109,8 +1121,34 @@ const DistCondQParameters &Solver::ZsCondQ(DistCondQParameters &&par)
         if (lst.empty())
             continue;
 
-        ptr->m_Expectation += dic[i];
+        ptr->m_Probability += dic[i];
+
+        auto totalBlanks = 0;
+        auto p = 0;
+        for (auto id : lst)
+        {
+            if (id > ptr->Sets1.size())
+            {
+                totalBlanks += m_BlockSets[id - ptr->Sets1.size()].size() - ptr->Sets1[id - ptr->Sets1.size()];
+                continue;
+            }
+
+            while (p < halves.size() && id > halves[p])
+                ++p;
+            if (p < halves.size() && id == halves[p])
+            {
+                totalBlanks += ptr->Sets1[id];
+                ++p;
+            }
+            else
+            {
+                totalBlanks += m_BlockSets[id].size();
+            }
+        }
+
+        ptr->m_Expectation += dic[i] * totalBlanks;
     }
+    ptr->m_Probability /= ptr->m_TotalStates;
     ptr->m_Expectation /= ptr->m_TotalStates;
 
     return *ptr;
@@ -1214,9 +1252,9 @@ void Solver::CheckForConsistency(bool complete)
 }
 #endif
 
-DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Expectation(other.m_Expectation), m_TotalStates(other.m_TotalStates) {}
+DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Probability(other.m_Probability), m_Expectation(other.m_Expectation), m_TotalStates(other.m_TotalStates) {}
 
-DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Expectation(NAN), m_TotalStates(NAN) {}
+DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Probability(NAN), m_Expectation(NAN), m_TotalStates(NAN) {}
 
 size_t DistCondQParameters::Hash()
 {

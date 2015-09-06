@@ -45,10 +45,8 @@ bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 class Drainer
 {
 public:
-    explicit Drainer(const GameMgr &mgr, size_t crit);
+    explicit Drainer(const GameMgr &mgr);
     ~Drainer();
-
-    size_t FullyDrainCriterion;
 
     double GetBestProb() const;
     BlockSet GetBestBlocks() const;
@@ -71,6 +69,7 @@ private:
     MacroSituation *GetOrAddMacroSituation(MacroSituation *&macro);
 
     void GenerateMicros();
+    int FrontierDist(const MacroSituation *macro, Block blk) const;
     void HeuristicPruning(MacroSituation *macro, BlockSet &bests);
     void SolveMicro(MicroSituation &micro, MacroSituation *macro);
     MacroSituation *SolveMicro(MicroSituation &micro, MacroSituation *macroOld, Block blk);

@@ -16,7 +16,7 @@ enum class SolvingState
     Reduce = 0x1,
     Overlap = 0x2,
     Probability = 0x4,
-    ZeroProb = 0x8,
+    Heuristic = 0x8,
     Drained = 0x8000
 };
 
@@ -89,6 +89,7 @@ public:
 
     double ZeroCondQ(const BlockSet &set, Block blk);
     double ZerosCondQ(const BlockSet &set, Block blk);
+    double ZerosECondQ(const BlockSet &set, Block blk);
     const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
     double QuantityCondQ(const BlockSet &set, Block blk);
 
@@ -166,7 +167,7 @@ private:
     size_t Hash();
 
     std::vector<double> m_Result;
-    double m_Expectation;
+    double m_Probability, m_Expectation;
     double m_TotalStates;
 
     friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);

@@ -161,6 +161,7 @@
     <ClInclude Include="random.h" />
     <ClInclude Include="Solver.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="Strategies.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
