@@ -208,7 +208,7 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
     auto width = m_BlockSets.size() + 1;
     auto height = m_Matrix.front().size();
     auto matrix = new double[width * height];
-    for (auto col = 0; col < width; ++col)
+    for (auto col = 0; col < width - 1; ++col)
         for (auto row = 0; row < height; ++row)
             if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
                 M(col, row) = 1;
