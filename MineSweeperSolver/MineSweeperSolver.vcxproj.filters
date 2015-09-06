@@ -21,9 +21,6 @@
     <ClInclude Include="targetver.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="OrthogonalList.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Solver.h">
       <Filter>头文件</Filter>
     </ClInclude>

@@ -109,7 +109,7 @@ bool Launch(std::istringstream &sin)
     return true;
 }
 
-int Save(std::ostringstream *sout)
+size_t Save(std::ostringstream *sout)
 {
     std::ofstream fout("output.txt", std::ios::app);
     size_t rT;

@@ -1,7 +1,7 @@
 #include "Drainer.h"
 
 #ifdef _DEBUG
-#define ASSERT(val) if (!(val)) throw;
+#define ASSERT(val) if (!(val)) throw
 #else
 #define ASSERT(val)
 #endif
@@ -169,10 +169,11 @@ Drainer::Drainer(const GameMgr &mgr, size_t crit) : FullyDrainCriterion(crit), m
                 setC.push_back(blkC);
                 ASSERT(macro->m_Solver->m_SetIDs[blkC] == -1);
                 macro->m_Solver->m_SetIDs[blkC] = macro->m_Solver->m_BlockSets.size() - 1;
-                ASSERT(&setC == &macro->m_Solver->m_BlockSets[macro->m_Solver->m_SetIDs[blkC]])
+                ASSERT(&setC == &macro->m_Solver->m_BlockSets[macro->m_Solver->m_SetIDs[blkC]]);
             }
         }
         macro->m_Solver->m_Matrix = m_Mgr.m_Solver->m_Matrix;
+        macro->m_Solver->m_MatrixAugment = m_Mgr.m_Solver->m_MatrixAugment;
         macro->Hash();
         m_RootMacro = GetOrAddMacroSituation(macro);
     }
@@ -408,21 +409,16 @@ void Drainer::GenerateMicros()
                         for (auto kvp : ddic[i]->at(stack[i]))
                             lst[kvp.first] = kvp.second;
 #ifdef _DEBUG
-					for (auto row = 0; row < m_Mgr.m_Solver->m_Matrix.GetHeight(); ++row)
-					{
-						auto v = 0;
-						auto nr = m_Mgr.m_Solver->m_Matrix.GetRowHead(row).Right;
-						ASSERT(nr != nullptr);
-						while (nr->Col != m_Mgr.m_Solver->m_BlockSets.size())
-						{
-							for (auto blk : m_Mgr.m_Solver->m_BlockSets[nr->Col])
-								if (lst[m_BlocksLookup[blk]] == BlockStatus::Mine)
-									++v;
-							nr = nr->Right;
-							ASSERT(nr != nullptr);
-						}
-						ASSERT(nr->Value == v);
-					}
+                    for (auto row = 0; row < m_Mgr.m_Solver->m_MatrixAugment.size(); ++row)
+                    {
+                        auto v = 0;
+                        for (auto col = 0; col < m_Mgr.m_Solver->m_BlockSets.size(); ++col)
+                            if (NZ(m_Mgr.m_Solver->m_Matrix[CNT(col)][row], SHF(col)))
+                                for (auto blk : m_Mgr.m_Solver->m_BlockSets[col])
+                                    if (lst[m_BlocksLookup[blk]] == BlockStatus::Mine)
+                                        ++v;
+                        ASSERT(m_Mgr.m_Solver->m_MatrixAugment[row] == v);
+                    }
 #endif
 
                     ++stack.back();
@@ -502,38 +498,23 @@ MacroSituation *Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro
 
     while (true)
     {
-        ASSERT((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
-        macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, true);
-        if ((macro->m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
-#ifdef _DEBUG
-		{
-			for (auto i = 0; i < macro->m_Degrees.size(); ++i)
-				if (macro->m_Degrees[i] < 0 && macro->m_Solver->m_Manager[i] == BlockStatus::Blank)
-					throw;
-			return macro;
-		}
-#else
-            return macro;
-#endif
+        if (macro->m_Solver->CanOpenForSure == 0)
+            macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, true);
 
-#ifdef _DEBUG
-		auto flag = false;
-#endif
+        if (macro->m_Solver->CanOpenForSure == 0)
+            return macro;
+
         for (auto i = 0; i < macro->m_Degrees.size(); ++i)
         {
             if (macro->m_Degrees[i] >= 0 || macro->m_Solver->m_Manager[i] != BlockStatus::Blank)
                 continue;
             OpenBlock(micro, macro, i);
-#ifdef _DEBUG
-            flag = true;
-#endif
             if (macro->m_ToOpen == 0)
             {
                 delete macro;
                 return m_SucceedMacro;
             }
         }
-        ASSERT(flag);
     }
 }
 
@@ -542,6 +523,8 @@ void Drainer::OpenBlock(MicroSituation &micro, MacroSituation *macro, Block blk)
     if (macro->m_Degrees[blk] >= 0)
         return;
     ASSERT(micro[blk] == BlockStatus::Blank);
+    if (macro->m_Solver->GetBlockStatus(blk) == BlockStatus::Blank)
+        --macro->m_Solver->CanOpenForSure;
     macro->m_Solver->AddRestrain(blk, false);
     auto degree = 0;
     for (auto b : m_BlocksR[blk])

@@ -5,7 +5,7 @@
 #include <iostream>
 
 #ifdef _DEBUG
-#define ASSERT(val) if (!(val)) throw;
+#define ASSERT(val) if (!(val)) throw
 #else
 #define ASSERT(val)
 #endif
@@ -200,7 +200,7 @@ const Block *GameMgr::GetBestBlocks() const
     return &*m_Best.begin();
 }
 
-int GameMgr::GetBestBlockCount() const
+size_t GameMgr::GetBestBlockCount() const
 {
     return m_Best.size();
 }
@@ -212,7 +212,7 @@ const Block *GameMgr::GetPreferredBlocks() const
     return &*m_Preferred.begin();
 }
 
-int GameMgr::GetPreferredBlockCount() const
+size_t GameMgr::GetPreferredBlockCount() const
 {
     return m_Preferred.size();
 }
@@ -295,8 +295,9 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         }
 #endif
 
-    if ((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
+    if (m_Solver->CanOpenForSure != 0)
     {
+        ASSERT(m_Solver->CanOpenForSure >= 0);
         for (auto i = 0; i < m_Blocks.size(); ++i)
             if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
                 m_Best.push_back(i);
@@ -368,16 +369,16 @@ void GameMgr::OpenOptimalBlocks()
     auto blk = m_Preferred.size() == 1 ? m_Preferred[0] : m_Preferred[RandomInteger(m_Preferred.size())];
     m_Preferred.clear();
     OpenBlock(blk);
-    ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 }
 
 bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
 {
     if (!m_Started)
         return false;
-    ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
-    m_Solver->Solve(maxDepth, true);
-    if ((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale)
+    
+    if (m_Solver->CanOpenForSure == 0)
+        m_Solver->Solve(maxDepth, true);
+    if (m_Solver->CanOpenForSure == 0)
 #ifdef _DEBUG
     {
         for (auto i = 0; i < m_Blocks.size(); ++i)
@@ -396,7 +397,6 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
         if (m_Blocks[i].IsOpen || m_Solver->GetBlockStatus(i) != BlockStatus::Blank)
             continue;
         OpenBlock(i);
-        ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 #ifdef _DEBUG
         flag = true;
 #endif
@@ -506,6 +506,9 @@ void GameMgr::OpenBlock(int id)
         return;
     }
 
+    if (m_Solver->GetBlockStatus(id) == BlockStatus::Blank)
+        --m_Solver->CanOpenForSure;
+    ASSERT(m_Solver->CanOpenForSure >= 0);
     m_Solver->AddRestrain(id, false);
     if (m_Blocks[id].Degree == 0)
     {
@@ -519,8 +522,6 @@ void GameMgr::OpenBlock(int id)
         m_Started = false;
         m_Succeed = true;
     }
-
-    ASSERT((m_Solver->GetSolvingState() & SolvingState::CanOpenForSure) == SolvingState::Stale);
 }
 
 int GameMgr::FrontierDist(Block blk) const

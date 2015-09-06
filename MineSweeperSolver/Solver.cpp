@@ -1,23 +1,11 @@
 #include "Solver.h"
+#include <algorithm>
 #include "BinomialHelper.h"
 
 #ifdef _DEBUG
-#define ASSERT(val) if (!(val)) throw;
-#define ASSERT_CHECK CheckOL(m_Matrix);
-void CheckOL(OrthogonalList<int> &m)
-{
-    ASSERT(Check(m));
-    for (auto row = 0; row < m.GetHeight(); ++row)
-    {
-        auto &n = m.SeekDown(row, m.GetWidth() - 1);
-        ASSERT(n.Down != nullptr);
-        ASSERT(n.Down->Row == row);
-        ASSERT(n.Down->Value >= 0);
-    }
-}
+#define ASSERT(val) if (!(val)) throw
 #else
 #define ASSERT(val)
-#define ASSERT_CHECK
 #endif
 
 #define ZEROQ(val) (abs(val) < 1E-3)
@@ -25,29 +13,24 @@ void CheckOL(OrthogonalList<int> &m)
 #define M(x, y) matrix[(x) * height + (y)]
 
 static size_t Hash(const BlockSet &set);
-template <class T>
-static size_t HashCol(const Node<T> *ptr);
 
-Solver::Solver(int count) : m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN)
+Solver::Solver(size_t count) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
     for (auto i = 0; i < count; ++i)
         lst[i] = i;
     m_SetIDs.resize(count, 0);
-    m_Matrix.ExtendWidth(2);
+    m_Matrix.emplace_back();
 }
 
-Solver::Solver(const Solver &other) : m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates) { }
+Solver::Solver(const Solver &other) : CanOpenForSure(other.CanOpenForSure), m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_MatrixAugment(other.m_MatrixAugment), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0) { }
 
 Solver::~Solver()
 {
     ClearDistCondQCache();
-}
-
-SolvingState Solver::GetSolvingState() const
-{
-    return m_State;
+    if (m_Pairs_Temp != nullptr)
+        delete[] m_Pairs_Temp;
 }
 
 BlockStatus Solver::GetBlockStatus(Block block) const
@@ -84,6 +67,8 @@ void Solver::AddRestrain(Block blk, bool isMine)
         return;
     }
     m_State &= SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
+    if (m_SetIDs[blk] >= 0)
+        ReduceBlockSet(m_SetIDs[blk]);
     if (m_Manager[blk] == BlockStatus::Blank && isMine)
         throw;
     if (m_Manager[blk] == BlockStatus::Mine && !isMine)
@@ -92,13 +77,43 @@ void Solver::AddRestrain(Block blk, bool isMine)
 
 void Solver::AddRestrain(const BlockSet &set, int mines)
 {
+
     auto dMines = 0;
     auto &bin = m_IntersectionCounts_Temp;
     GetIntersectionCounts(set, bin, dMines);
 
-    m_Matrix.ExtendHeight(m_Matrix.GetHeight() + 1);
+    if (mines == dMines)
+    {
+        for (auto blk : set)
+            if (m_Manager[blk] == BlockStatus::Unknown)
+            {
+                m_Manager[blk] = BlockStatus::Blank;
+                ++CanOpenForSure;
+            }
+        for (auto blk : set)
+            if (m_SetIDs[blk] >= 0)
+                ReduceBlockSet(m_SetIDs[blk]);
+        return;
+    }
+    {
+        auto t = 0;
+        for (auto v : bin)
+            t += v;
+        if (mines == t + dMines)
+        {
+            for (auto blk : set)
+                if (m_Manager[blk] == BlockStatus::Unknown)
+                    m_Manager[blk] = BlockStatus::Mine;
+            for (auto blk : set)
+                if (m_SetIDs[blk] >= 0)
+                    ReduceBlockSet(m_SetIDs[blk]);
+            return;
+        }
+    }
 
-    auto nr = &m_Matrix.GetRowHead(m_Matrix.GetHeight() - 1);
+    for (auto &containers : m_Matrix)
+        containers.push_back(CONT_ZERO);
+
     for (auto col = 0; col < bin.size(); ++col)
     {
         if (bin[col] == 0)
@@ -106,16 +121,9 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
 
         if (bin[col] == m_BlockSets[col].size())
         {
-            nr = &m_Matrix.Add(*nr, m_Matrix.GetColHead(col), 1);
+            SB(m_Matrix[CNT(col)].back(), SHF(col));
             continue;
         }
-
-        m_Matrix.InsertCol(m_Matrix.GetWidth() - 1);
-        auto nodeX = &m_Matrix.GetColHead(m_Matrix.GetWidth() - 2);
-        for (auto node = m_Matrix.GetColHead(col).Down; node != nullptr; node = node->Down)
-            nodeX = &m_Matrix.Add(*node, *nodeX, node->Value);
-        m_Matrix.Add(*nr, *nodeX, 1);
-        ASSERT(Check(m_Matrix));
 
         m_BlockSets.emplace_back();
         auto &it = m_BlockSets.back();
@@ -135,16 +143,28 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
                 m_SetIDs[set[p++]] = m_BlockSets.size() - 1;
             }
         }
+
+        if (CONTS(m_BlockSets.size()) > m_Matrix.size())
+        {
+            ASSERT(CONTS(m_BlockSets.size()) == m_Matrix.size() + 1);
+            m_Matrix.emplace_back(m_Matrix.front().size(), CONT_ZERO);
+        }
+        for (auto i = 0; i < m_Matrix[CNT(col)].size() - 1; ++i)
+            if (NZ(m_Matrix[CNT(col)][i], SHF(col)))
+                SB(m_Matrix[CNT(m_BlockSets.size() - 1)][i], SHF(m_BlockSets.size() - 1));
+        SB(m_Matrix[CNT(m_BlockSets.size() - 1)].back(), SHF(m_BlockSets.size() - 1));
     }
 
-    m_Matrix.Add(*nr, m_Matrix.GetColHead(m_BlockSets.size()), mines - dMines);
-    ASSERT_CHECK;
+    m_MatrixAugment.push_back(mines - dMines);
     m_State = SolvingState::Stale;
 }
 
 void Solver::Solve(SolvingState maxDepth, bool shortcut)
 {
     if ((m_State & maxDepth) == maxDepth)
+        return;
+
+    if (shortcut && CanOpenForSure > 0)
         return;
 
     m_Solutions.clear();
@@ -155,13 +175,13 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         while ((m_State & SolvingState::Reduce) == SolvingState::Stale)
         {
             ReduceRestrains();
-            if (shortcut && (m_State & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
+            if (shortcut && CanOpenForSure > 0)
                 return;
         }
         if ((maxDepth & SolvingState::Overlap) == SolvingState::Stale)
             break;
         SimpleOverlapAll();
-        if (shortcut && (m_State & SolvingState::CanOpenForSure) == SolvingState::CanOpenForSure)
+        if (shortcut && CanOpenForSure > 0)
             return;
         if ((m_State & SolvingState::Overlap) == SolvingState::Overlap)
             break;
@@ -185,23 +205,17 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
         return;
     }
 
-    auto width = m_Matrix.GetWidth();
-    auto height = m_Matrix.GetHeight();
+    auto width = m_BlockSets.size() + 1;
+    auto height = m_Matrix.front().size();
     auto matrix = new double[width * height];
     for (auto col = 0; col < width; ++col)
-    {
-        auto node = m_Matrix.GetColHead(col).Down;
         for (auto row = 0; row < height; ++row)
-        {
-            if (node == nullptr || node->Row > row)
-                M(col, row) = 0;
+            if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
+                M(col, row) = 1;
             else
-            {
-                M(col, row) = node->Value;
-                node = node->Down;
-            }
-        }
-    }
+                M(col, row) = 0;
+    for (auto row = 0; row < height; ++row)
+        M(m_BlockSets.size(), row) = m_MatrixAugment[row];
     Gauss(matrix, width, height);
 
     if (!m_Minors.empty() &&
@@ -281,34 +295,196 @@ double Solver::QuantityCondQ(const BlockSet &set, Block blk)
     return q;
 }
 
+void Solver::DropColumn(int col)
+{
+#ifdef _DEBUG
+    for (auto blk : m_BlockSets[col])
+        ASSERT(m_SetIDs[blk] != col);
+#endif
+    auto last = m_BlockSets.size() - 1;
+    if (col != last)
+        m_BlockSets.back().swap(m_BlockSets[col]);
+    m_BlockSets.pop_back();
+    if (col != last)
+    {
+        for (auto blk : m_BlockSets[col])
+        {
+            ASSERT(m_Manager[blk] != BlockStatus::Unknown || m_SetIDs[blk] == last);
+            m_SetIDs[blk] = col;
+        }
+        for (auto j = 0; j < m_Matrix[CNT(last)].size(); ++j)
+            if (NZ(m_Matrix[CNT(last)][j], SHF(last)))
+                SB(m_Matrix[CNT(col)][j], SHF(col));
+            else
+                CB(m_Matrix[CNT(col)][j], SHF(col));
+    }
+    for (auto j = 0; j < m_Matrix[CNT(last)].size(); ++j)
+        CB(m_Matrix[CNT(last)][j], SHF(last));
+    if (last % CONT_SIZE == 0)
+        m_Matrix.pop_back();
+}
+
+void Solver::DropRow(int row)
+{
+    if (row != m_MatrixAugment.size() - 1)
+    {
+        m_MatrixAugment[row] = m_MatrixAugment.back();
+        m_MatrixAugment.pop_back();
+        for (auto &containers : m_Matrix)
+        {
+            containers[row] = containers.back();
+            containers.pop_back();
+        }
+    }
+    else
+    {
+        m_MatrixAugment.pop_back();
+        for (auto &containers : m_Matrix)
+            containers.pop_back();
+    }
+}
+
+bool Solver::ReduceBlockSet(int col)
+{
+    auto dMines = 0;
+    auto &setN = m_Reduce_Temp;
+    setN.clear();
+    for (auto it = m_BlockSets[col].begin(); it != m_BlockSets[col].end(); ++it)
+    {
+        switch (m_Manager[*it])
+        {
+        case BlockStatus::Mine:
+            ++dMines;
+            m_SetIDs[*it] = -1;
+            break;
+        case BlockStatus::Blank:
+            m_SetIDs[*it] = -2;
+            break;
+        case BlockStatus::Unknown:
+            ASSERT(m_SetIDs[*it] == col);
+            setN.push_back(*it);
+            continue;
+        default:
+            ASSERT(false);
+        }
+    }
+    setN.swap(m_BlockSets[col]);
+    if (dMines != 0)
+    {
+        for (auto j = 0; j < m_Matrix[CNT(col)].size(); ++j)
+            if (NZ(m_Matrix[CNT(col)][j], SHF(col)))
+            {
+                m_MatrixAugment[j] -= dMines;
+                ASSERT(m_MatrixAugment[j] >= 0);
+            }
+        m_State = SolvingState::Stale;
+    }
+    if (m_BlockSets[col].empty())
+    {
+        DropColumn(col);
+        m_State = SolvingState::Stale;
+        return true;
+    }
+    return false;
+}
+
+bool Solver::ReduceRestrainBlank(int row)
+{
+    ASSERT(m_MatrixAugment[row] >= 0);
+    if (m_MatrixAugment[row] != 0)
+        return false;
+
+    for (auto col = 0; col < m_BlockSets.size(); ++col)
+    {
+        if (Z(m_Matrix[CNT(col)][row], SHF(col)))
+            continue;
+
+        for (auto blk : m_BlockSets[col])
+        {
+            ASSERT(m_Manager[blk] == BlockStatus::Blank || m_SetIDs[blk] == col);
+            m_SetIDs[blk] = -2;
+            if (m_Manager[blk] == BlockStatus::Blank)
+                continue;
+            ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+            m_Manager[blk] = BlockStatus::Blank;
+            ++CanOpenForSure;
+            m_State = SolvingState::Stale;
+        }
+        DropColumn(col--);
+    }
+    DropRow(row);
+    return true;
+}
+
+bool Solver::ReduceRestrainMine(int row)
+{
+    auto &sum = m_ReduceCount_Temp;
+    ASSERT(m_MatrixAugment[row] <= sum[row]);
+    if (m_MatrixAugment[row] != sum[row])
+        return false;
+
+    for (auto col = 0; col < m_BlockSets.size(); ++col)
+    {
+        if (Z(m_Matrix[CNT(col)][row], SHF(col)))
+            continue;
+
+        for (auto j = 0; j < m_Matrix[CNT(col)].size(); ++j)
+            if (NZ(m_Matrix[CNT(col)][j], SHF(col)))
+            {
+                m_MatrixAugment[j] -= m_BlockSets[col].size();
+                sum[j] -= m_BlockSets[col].size();
+                ASSERT(m_MatrixAugment[j] >= 0);
+            }
+        for (auto blk : m_BlockSets[col])
+        {
+            ASSERT(m_Manager[blk] == BlockStatus::Mine || m_SetIDs[blk] == col);
+            m_SetIDs[blk] = -1;
+            if (m_Manager[blk] == BlockStatus::Mine)
+                continue;
+            ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+            m_Manager[blk] = BlockStatus::Mine;
+            m_State = SolvingState::Stale;
+        }
+        DropColumn(col--);
+    }
+    if (row != sum.size() - 1)
+        sum[row] = sum.back();
+    sum.pop_back();
+    DropRow(row);
+    return true;
+}
+
 void Solver::MergeSets()
 {
     std::multimap<size_t, int> hash;
     for (auto i = 0; i < m_BlockSets.size(); ++i)
     {
-        auto h = HashCol(m_Matrix.GetColHead(i).Down);
+        size_t h = 5381;
+        for (auto v : m_Matrix[CNT(i)])
+            h = (h << 5) + h + B(v, SHF(i));
         auto itp = hash.equal_range(h);
-        auto flag = false;
+        auto flag = true;
         for (auto it = itp.first; it != itp.second; ++it)
         {
-            auto nc1 = m_Matrix.GetColHead(it->second).Down, nc2 = m_Matrix.GetColHead(i).Down;
-            for (; nc1 != nullptr && nc2 != nullptr; nc1 = nc1->Down , nc2 = nc2->Down)
-                if (nc1->Row != nc2->Row)
+            for (auto j = 0; j < m_Matrix[CNT(i)].size(); ++j)
+                if (B(m_Matrix[CNT(i)][j], SHF(i)) != B(m_Matrix[CNT(it->second)][j], SHF(it->second)))
+                {
+                    flag = false;
                     break;
-            if (nc1 == nullptr && nc2 == nullptr)
+                }
+            if (flag)
             {
-                flag = true;
                 m_BlockSets[it->second].reserve(m_BlockSets[it->second].size() + m_BlockSets[i].size());
                 for (auto &blk : m_BlockSets[i])
                     m_BlockSets[it->second].push_back(blk);
-                m_BlockSets.erase(m_BlockSets.begin() + i);
-                for (auto &id : m_SetIDs)
-                    if (id > i)
-                        --id;
-                    else if (id == i)
-                        id = it->second;
-                m_Matrix.RemoveCol(i);
-                ASSERT_CHECK;
+                sort(m_BlockSets[it->second].begin(), m_BlockSets[it->second].end());
+                for (auto &blk : m_BlockSets[i])
+                {
+                    ASSERT(m_Manager[blk] != BlockStatus::Unknown || m_SetIDs[blk] == i);
+                    m_SetIDs[blk] = it->second;
+                }
+                DropColumn(i);
+
                 --i;
                 break;
             }
@@ -321,202 +497,104 @@ void Solver::MergeSets()
 void Solver::ReduceRestrains()
 {
     m_State |= SolvingState::Reduce;
-    auto row = 0;
-    auto n = m_Matrix.GetColHead(m_BlockSets.size()).Down;
-    while (row < m_Matrix.GetHeight())
-    {
-        if (n == nullptr || n->Row > row || n->Value == 0)
-        {
-            for (auto nr = m_Matrix.GetRowHead(row).Right; nr->Col != n->Col;)
-            {
-                auto col = nr->Col;
-                nr = nr->Right;
-                for (auto &blk : m_BlockSets[col])
-                {
-                    ASSERT(m_Manager[blk] == BlockStatus::Blank || m_SetIDs[blk] == col);
-                    m_SetIDs[blk] = -2;
-                    if (m_Manager[blk] == BlockStatus::Blank)
-                        continue;
-                    ASSERT(m_Manager[blk] == BlockStatus::Unknown);
-                    m_Manager[blk] = BlockStatus::Blank;
-                    m_State = SolvingState::CanOpenForSure;
-                }
-                m_Matrix.RemoveCol(col);
-                ASSERT_CHECK;
-                m_BlockSets.erase(m_BlockSets.begin() + col);
-                for (auto &id : m_SetIDs)
-                    if (id > col)
-                        --id;
-                    else if (id == col)
-                    ASSERT(false);
-                m_State &= SolvingState::CanOpenForSure;
-            }
-            if (n != nullptr && n->Row == row)
-                n = n->Down;
-
-            m_Matrix.RemoveRow(row);
-            ASSERT_CHECK;
-            continue;
-        }
-        auto count = 0;
-        for (auto nr = m_Matrix.GetRowHead(row).Right; nr != n; nr = nr->Right)
-            count += m_BlockSets[nr->Col].size();
-        ASSERT(n->Value <= count);
-        if (n->Value == count)
-        {
-            for (auto nr = m_Matrix.GetRowHead(row).Right; nr != n; nr = nr->Right)
-                for (auto &blk : m_BlockSets[nr->Col])
-                {
-                    ASSERT(m_Manager[blk] == BlockStatus::Mine || m_SetIDs[blk] == nr->Col);
-                    m_SetIDs[blk] = -1;
-                    if (m_Manager[blk] == BlockStatus::Mine)
-                        continue;
-                    ASSERT(m_Manager[blk] == BlockStatus::Unknown);
-                    m_Manager[blk] = BlockStatus::Mine;
-                    m_State &= SolvingState::CanOpenForSure;
-                }
-            ASSERT_CHECK;
-            ASSERT(n != nullptr && n->Row == row);
-            n = n->Down;
-
-            m_Matrix.RemoveRow(row);
-            ASSERT_CHECK;
-            continue;
-        }
-        ASSERT(n != nullptr && n->Row == row);
-        n = n->Down;
-        ++row;
-    }
 
     for (auto col = 0; col < m_BlockSets.size(); ++col)
-    {
-        auto dMines = 0;
-        auto &set = m_BlockSets[col];
-        auto &setN = m_Reduce_Temp;
-        setN.clear();
-        for (auto it = set.begin(); it != set.end(); ++it)
+        if (ReduceBlockSet(col))
+            --col;
+
+    for (auto row = 0; row < m_MatrixAugment.size(); ++row)
+        if (ReduceRestrainBlank(row))
+            --row;
+
+    auto &sum = m_ReduceCount_Temp;
+    sum.clear();
+    sum.resize(m_Matrix.front().size(), CONT_ZERO);
+    for (auto cnt = 0; cnt < m_Matrix.size(); ++cnt)
+        for (auto i = 0; i < m_Matrix[cnt].size(); ++i)
         {
-            switch (m_Manager[*it])
-            {
-            case BlockStatus::Mine:
-                ++dMines;
-                m_SetIDs[*it] = -1;
-                break;
-            case BlockStatus::Blank:
-                m_SetIDs[*it] = -2;
-                break;
-            case BlockStatus::Unknown:
-                ASSERT(m_SetIDs[*it] == col);
-                setN.push_back(*it);
-                continue;
-            default:
-                ASSERT(false);
-            }
+            auto v = m_Matrix[cnt][i];
+            for (auto shift = 0; shift < (cnt == m_Matrix.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                if (NZ(v, 0))
+                    sum[i] += m_BlockSets[cnt * CONT_SIZE + shift].size();
+                else if (v == 0)
+                    break;
         }
-        setN.swap(set);
-        if (dMines != 0)
-        {
-            auto ncc = &m_Matrix.GetColHead(m_BlockSets.size());
-            for (auto nc = m_Matrix.GetColHead(col).Down; nc != nullptr; nc = nc->Down)
-            {
-                auto node = &m_Matrix.SeekDown(nc->Row, *ncc);
-                ASSERT(node->Down != nullptr);
-                ASSERT(node->Down->Row == nc->Row);
-                node->Down->Value -= dMines;
-                ASSERT(node->Down->Value >= 0);
-                ncc = node->Down;
-            }
-            m_State &= SolvingState::CanOpenForSure;
-        }
-        if (set.empty())
-        {
-            m_Matrix.RemoveCol(col);
-            ASSERT_CHECK;
-            m_BlockSets.erase(m_BlockSets.begin() + col);
-            for (auto &id : m_SetIDs)
-                if (id > col)
-                    --id;
-            m_State &= SolvingState::CanOpenForSure;
-        }
-    }
-    ASSERT_CHECK;
+
+    for (auto row = 0; row < m_MatrixAugment.size(); ++row)
+        if (ReduceRestrainMine(row))
+            --row;
 }
 
 void Solver::SimpleOverlapAll()
 {
     m_State |= SolvingState::Overlap;
-    m_Pairs_Temp.clear();
 
-    auto &indexes = m_OverlapIndexes_Temp;
-    indexes.reserve(m_Matrix.GetHeight());
-    for (auto col = 0; col < m_BlockSets.size(); ++col)
+    auto d = m_MatrixAugment.size();
+    auto sz = (d - 1) * d / 2;
+    if (m_Pairs_Temp != nullptr && m_Pairs_Temp_Size < sz)
     {
-        indexes.clear();
-        for (auto node = m_Matrix.GetColHead(col).Down; node != nullptr; node = node->Down)
-            indexes.push_back(node->Row);
+        delete[] m_Pairs_Temp;
+        m_Pairs_Temp = nullptr;
+    }
+    if (m_Pairs_Temp == nullptr)
+    {
+        m_Pairs_Temp_Size = sz;
+        m_Pairs_Temp = new bool[sz];
+        ZeroMemory(m_Pairs_Temp, sizeof(bool) * m_Pairs_Temp_Size);
+    }
 
-        for (auto i = 0; i < indexes.size() - 1; ++i)
-            for (auto j = i + 1; j < indexes.size(); ++j)
-                if (SimpleOverlap(indexes[i], indexes[j]))
+    for (auto cnt = 0; cnt < m_Matrix.size(); ++cnt)
+    {
+        auto id = 0;
+        for (auto p = 0; p < d - 1; ++p)
+            for (auto q = p + 1; q < d; ++q, ++id)
+                if (!m_Pairs_Temp[id])
                 {
-                    m_State &= SolvingState::CanOpenForSure;
-                    return;
+                    auto a = m_Matrix[cnt][p], b = m_Matrix[cnt][q];
+                    if ((cnt == m_Matrix.size() - 1 ? LB(a & b, SHF(m_BlockSets.size())) : a & b) != CONT_ZERO)
+                    {
+                        if (SimpleOverlap(p, q))
+                        {
+                            m_State = SolvingState::Stale;
+                            return;
+                        }
+                        
+                        m_Pairs_Temp[id] = true;
+                    }
                 }
+        ASSERT(id == sz);
     }
 }
 
 bool Solver::SimpleOverlap(int r1, int r2)
 {
-    if (!m_Pairs_Temp.emplace(r1, r2).second)
-        return false;
-
     auto &exceptA = m_OverlapA_Temp, &exceptB = m_OverlapB_Temp, &intersection = m_OverlapC_Temp;
-    exceptA.clear();
-    exceptB.clear();
-    intersection.clear();
+    exceptA.clear() , exceptA.reserve(m_Matrix.size());
+    exceptB.clear() , exceptB.reserve(m_Matrix.size());
+    intersection.clear() , intersection.reserve(m_Matrix.size());
 
-    auto n1 = m_Matrix.GetRowHead(r1).Right, n2 = m_Matrix.GetRowHead(r2).Right;
-    while (true)
+
+    for (auto &containers : m_Matrix)
     {
-        if (n1->Col < n2->Col)
-        {
-            exceptA.push_back(n1->Col);
-            n1 = n1->Right;
-        }
-        else if (n1->Col > n2->Col)
-        {
-            exceptB.push_back(n2->Col);
-            n2 = n2->Right;
-        }
-        else
-        {
-            if (n1->Col == m_BlockSets.size())
-                break;
-            intersection.push_back(n1->Col);
-            n1 = n1->Right;
-            n2 = n2->Right;
-        }
-        ASSERT(n1 != nullptr);
-        ASSERT(n2 != nullptr);
-    }
-
-    if (exceptA.empty() && exceptB.empty())
-    {
-        ASSERT_CHECK;
-        ASSERT(n1->Value == n2->Value);
-
-        m_Matrix.RemoveRow(r2);
-        ASSERT_CHECK;
-        return true;
+        exceptA.push_back(containers[r1] & ~containers[r2]);
+        exceptB.push_back(~containers[r1] & containers[r2]);
+        intersection.push_back(containers[r1] & containers[r2]);
     }
 
     typedef std::pair<int, int> Iv;
 
-    auto sum = [this](const std::vector<int> &lst)-> Iv
+    auto sum = [this](const std::vector<Container> &lst)-> Iv
         {
             Iv iv(0, 0);
-            for (const auto &index : lst)
-                iv.second += m_BlockSets[index].size();
+            for (auto cnt = 0; cnt < lst.size(); ++cnt)
+            {
+                auto v = lst[cnt];
+                for (auto shift = 0; shift < (cnt == lst.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                    if (NZ(v, 0))
+                        iv.second += m_BlockSets[cnt * CONT_SIZE + shift].size();
+                    else if (v == 0)
+                        break;
+            }
             return iv;
         };
 
@@ -529,7 +607,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
             return Iv(max(i1.first, i2.first), min(i1.second, i2.second));
         };
 
-    auto ivAC = Iv(n1->Value, n1->Value), ivBC = Iv(n2->Value, n2->Value);
+    auto ivAC = Iv(m_MatrixAugment[r1], m_MatrixAugment[r1]), ivBC = Iv(m_MatrixAugment[r2], m_MatrixAugment[r2]);
     auto ivA0 = sum(exceptA), ivB0 = sum(exceptB), ivC0 = sum(intersection);
     auto ivA = ivA0, ivB = ivB0, ivC = ivC0;
     ivA = ints(ivA, subs(ivAC, ivC));
@@ -539,45 +617,59 @@ bool Solver::SimpleOverlap(int r1, int r2)
     ivB = ints(ivB, subs(ivBC, ivC));
     ivC = ints(ivC, ints(subs(ivAC, ivA), subs(ivBC, ivB)));
 
-    auto proc = [this](const std::vector<int> &lst, const Iv &iv0,const Iv &iv)
+    auto proc = [this](const std::vector<Container> &lst, const Iv &iv0,const Iv &iv)
         {
             if (lst.empty())
                 return;
             if (iv0.second == iv.first)
-            {
-                for (const auto &id : lst)
-                    for (const auto &blk : m_BlockSets[id])
-                    {
-                        if (m_Manager[blk] == BlockStatus::Mine)
-                            continue;
-                        ASSERT(m_Manager[blk] == BlockStatus::Unknown);
-                        m_Manager[blk] = BlockStatus::Mine;
-                        m_State &= SolvingState::CanOpenForSure;
-                    }
-            }
+                for (auto cnt = 0; cnt < lst.size(); ++cnt)
+                {
+                    auto v = lst[cnt];
+                    for (auto shift = 0; shift < (cnt == lst.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                        if (NZ(v, 0))
+                        {
+                            for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
+                            {
+                                if (m_Manager[blk] == BlockStatus::Mine)
+                                    continue;
+                                ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+                                m_Manager[blk] = BlockStatus::Mine;
+                                m_State = SolvingState::Stale;
+                            }
+                        }
+                        else if (v == 0)
+                            break;
+                }
             else if (iv0.first == iv.second)
-            {
-                for (const auto &id : lst)
-                    for (const auto &blk : m_BlockSets[id])
-                    {
-                        if (m_Manager[blk] == BlockStatus::Blank)
-                            continue;
-                        ASSERT(m_Manager[blk] == BlockStatus::Unknown);
-                        m_Manager[blk] = BlockStatus::Blank;
-                        m_State = SolvingState::CanOpenForSure;
-                    }
-            }
+                for (auto cnt = 0; cnt < lst.size(); ++cnt)
+                {
+                    auto v = lst[cnt];
+                    for (auto shift = 0; shift < (cnt == lst.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                        if (NZ(v, 0))
+                        {
+                            for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
+                            {
+                                if (m_Manager[blk] == BlockStatus::Blank)
+                                    continue;
+                                ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+                                m_Manager[blk] = BlockStatus::Blank;
+                                ++CanOpenForSure;
+                                m_State = SolvingState::Stale;
+                            }
+                        }
+                        else if (v == 0)
+                            break;
+                }
         };
 
     proc(exceptA, ivA0, ivA);
     proc(exceptB, ivB0, ivB);
     proc(intersection, ivC0, ivC);
 
-    ASSERT_CHECK;
     return false;
 }
 
-void Solver::Gauss(double *matrix, int width, int height)
+void Solver::Gauss(double *matrix, size_t width, size_t height)
 {
     m_Minors.clear();
     auto major = 0;
@@ -639,7 +731,7 @@ void Solver::Gauss(double *matrix, int width, int height)
     }
 }
 
-void Solver::EnumerateSolutions(const double *matrix, int width, int height)
+void Solver::EnumerateSolutions(const double *matrix, size_t width, size_t height)
 {
     auto n = m_BlockSets.size();
 
@@ -758,18 +850,13 @@ void Solver::ProcessSolutions()
     for (auto &so : m_Solutions)
     {
 #ifdef _DEBUG
-		for (auto row = 0; row < m_Matrix.GetHeight(); ++row)
+		for (auto row = 0; row < m_MatrixAugment.size(); ++row)
 		{
 			auto v = 0;
-			auto nr = m_Matrix.GetRowHead(row).Right;
-			ASSERT(nr != nullptr);
-			while (nr->Col != m_BlockSets.size())
-			{
-				v += so.Dist[nr->Col];
-				nr = nr->Right;
-				ASSERT(nr != nullptr);
-			}
-			ASSERT(nr->Value == v);
+            for (auto col = 0; col < m_BlockSets.size(); ++col)
+                if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
+                    v += so.Dist[col];
+			ASSERT(m_MatrixAugment[row] == v);
 		}
 #endif
         so.States = double(1);
@@ -799,8 +886,8 @@ void Solver::ProcessSolutions()
                     continue;
                 ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                 m_Manager[blk] = BlockStatus::Blank;
-                m_State &= SolvingState::Overlap | SolvingState::Probability | SolvingState::CanOpenForSure;
-                m_State |= SolvingState::CanOpenForSure;
+                ++CanOpenForSure;
+                m_State &= SolvingState::Overlap | SolvingState::Probability;
             }
         }
         else if (exp[i] == prod)
@@ -810,7 +897,7 @@ void Solver::ProcessSolutions()
                     continue;
                 ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                 m_Manager[blk] = BlockStatus::Mine;
-                m_State &= SolvingState::Overlap | SolvingState::Probability | SolvingState::CanOpenForSure;
+                m_State &= SolvingState::Overlap | SolvingState::Probability;
             }
 
         auto p = exp[i] / prod;
@@ -1091,6 +1178,42 @@ void Solver::ClearDistCondQCache()
     m_DistCondQCache.clear();
 }
 
+#ifdef _DEBUG
+void Solver::CheckForConsistency(bool complete)
+{
+    std::vector<int> sum(m_Matrix.front().size(), CONT_ZERO);
+    for (auto cnt = 0; cnt < m_Matrix.size(); ++cnt)
+        for (auto i = 0; i < m_Matrix[cnt].size(); ++i)
+        {
+            auto v = m_Matrix[cnt][i];
+            for (auto shift = 0; shift < (cnt == m_Matrix.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                if (NZ(v, 0))
+                    sum[i] += m_BlockSets[cnt * CONT_SIZE + shift].size();
+                else if (v == 0)
+                    break;
+        }
+    for (auto i = 0; i < m_MatrixAugment.size(); ++i)
+        ASSERT(m_MatrixAugment[i] >= 0 && m_MatrixAugment[i] <= sum[i]);
+    for (auto i = 0; i < m_BlockSets.size(); ++i)
+        for (auto blk : m_BlockSets[i])
+            ASSERT(m_SetIDs[blk] == i || (!complete && m_SetIDs[blk] < 0));
+    for (auto i = 0; i < m_SetIDs.size(); ++i)
+        if (m_SetIDs[i] >= 0)
+        {
+            if (complete)
+                ASSERT(m_Manager[i] == BlockStatus::Unknown);
+            ASSERT(m_SetIDs[i] < m_BlockSets.size());
+            ASSERT(std::find(m_BlockSets[m_SetIDs[i]].begin(), m_BlockSets[m_SetIDs[i]].end(), i) != m_BlockSets[m_SetIDs[i]].end());
+        }
+        else if (m_SetIDs[i] == -1)
+            ASSERT(m_Manager[i] == BlockStatus::Mine);
+        else if (m_SetIDs[i] == -2)
+            ASSERT(m_Manager[i] == BlockStatus::Blank);
+        else
+            ASSERT(false);
+}
+#endif
+
 DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Result(std::move(other.m_Result)), m_Expectation(other.m_Expectation), m_TotalStates(other.m_TotalStates) {}
 
 DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Expectation(NAN), m_TotalStates(NAN) {}
@@ -1134,14 +1257,5 @@ size_t Hash(const BlockSet &set)
     size_t hash = 5381;
     for (auto v : set)
         hash = (hash << 5) + hash + v + 30;
-    return hash;
-}
-
-template <class T>
-size_t HashCol(const Node<T> *ptr)
-{
-    size_t hash = 5381;
-    for (; ptr != nullptr; ptr = ptr->Down)
-        hash = (hash << 5) + hash + ptr->Row;
     return hash;
 }

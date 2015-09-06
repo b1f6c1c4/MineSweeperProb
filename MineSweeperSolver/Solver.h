@@ -1,8 +1,6 @@
 #pragma once
 #include "stdafx.h"
 #include <vector>
-#include "OrthogonalList.h"
-#include <set>
 #include <map>
 
 enum class BlockStatus
@@ -19,8 +17,7 @@ enum class SolvingState
     Overlap = 0x2,
     Probability = 0x4,
     ZeroProb = 0x8,
-    Drained = 0x8000,
-    CanOpenForSure = 0x10000
+    Drained = 0x8000
 };
 
 inline SolvingState operator&(SolvingState lhs, SolvingState rhs)
@@ -45,6 +42,26 @@ inline SolvingState operator|=(SolvingState &lhs, SolvingState rhs)
 
 typedef int Block;
 typedef std::vector<Block> BlockSet;
+typedef size_t Container;
+
+#define CONT_ZERO static_cast<Container>(0)
+#define CONT_ONE static_cast<Container>(1)
+#define CONT_SIZE (sizeof(Container) * 8)
+#define CONTS(offset) (((offset) + CONT_SIZE - 1) / CONT_SIZE)
+#define CNT(offset) ((offset) / CONT_SIZE)
+#define SHF(offset) ((offset) % CONT_SIZE)
+#define MASK(shift) (CONT_ONE << (shift))
+#define MASKL(lng) (MASK((lng)) - CONT_ONE)
+#define MASKH(lng) (~(MASK(CONT_SIZE - (lng)) - CONT_ONE))
+#define LB1(val) (MASK(0) & (val))
+#define HB1(val) ((MASK(CONT_SIZE - 1) & (val)) >> (CONT_SIZE - 1))
+#define LB(val, lng) (MASKL((lng)) & (val))
+#define HB(val, lng) ((MASKH((lng)) & (val)) >> (CONT_SIZE - (lng)))
+#define B(val, shift) ((MASK((shift)) & (val)) >> (shift))
+#define Z(val, shift) (B((val), (shift)) == CONT_ZERO)
+#define NZ(val, shift) (B((val), (shift)) != CONT_ZERO)
+#define SB(lval, shift) (lval) |= MASK((shift))
+#define CB(lval, shift) (lval) &= ~MASK((shift))
 
 class GameMgr;
 class Solution;
@@ -54,11 +71,12 @@ class
     DLL_API Solver
 {
 public:
-    explicit Solver(int count);
+    explicit Solver(size_t count);
     Solver(const Solver &other);
     ~Solver();
 
-    SolvingState GetSolvingState() const;
+    int CanOpenForSure;
+
     BlockStatus GetBlockStatus(Block block) const;
     const BlockStatus *GetBlockStatuses() const;
     double GetProbability(Block block) const;
@@ -80,7 +98,8 @@ private:
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;
     std::vector<int> m_SetIDs;
-    OrthogonalList<int> m_Matrix;
+    std::vector<std::vector<Container>> m_Matrix;
+    std::vector<int> m_MatrixAugment;
     std::vector<int> m_Minors;
     std::vector<Solution> m_Solutions;
     std::vector<double> m_Probability;
@@ -88,24 +107,33 @@ private:
     std::multimap<size_t, DistCondQParameters *> m_DistCondQCache;
 
     BlockSet m_Reduce_Temp;
+    std::vector<size_t> m_ReduceCount_Temp;
     std::vector<int> m_IntersectionCounts_Temp;
-    std::set<std::pair<int, int>> m_Pairs_Temp;
+    bool *m_Pairs_Temp;
+    size_t m_Pairs_Temp_Size;
     std::vector<int> m_OverlapIndexes_Temp;
-    std::vector<int> m_OverlapA_Temp, m_OverlapB_Temp, m_OverlapC_Temp;
+    std::vector<Container> m_OverlapA_Temp, m_OverlapB_Temp, m_OverlapC_Temp;
     std::vector<double> m_GaussVec_Temp;
     std::vector<std::vector<int>> m_NonZero_Temp;
-    std::vector<int> m_Majors_Temp, m_Counts_Temp, m_Stack_Temp, m_Dist_Temp;
+    std::vector<size_t> m_Counts_Temp;
+    std::vector<int> m_Majors_Temp, m_Stack_Temp, m_Dist_Temp;
     std::vector<double> m_Sums_Temp;
     std::vector<double> m_Exp_Temp;
     std::vector<double> m_DicT_Temp, m_Cases_Temp;
     std::vector<double> m_Add_Temp;
 
+    void DropColumn(int col);
+    void DropRow(int row);
+    bool ReduceBlockSet(int col);
+    bool ReduceRestrainBlank(int row);
+    bool ReduceRestrainMine(int row);
+
     void MergeSets();
     void ReduceRestrains();
     void SimpleOverlapAll();
     bool SimpleOverlap(int r1, int r2);
-    void Gauss(double *matrix, int width, int height);
-    void EnumerateSolutions(const double *matrix, int width, int height);
+    void Gauss(double *matrix, size_t width, size_t height);
+    void EnumerateSolutions(const double *matrix, size_t width, size_t height);
     void ProcessSolutions();
 
     static void Merge(const std::vector<double> &from, std::vector<double> &to);
@@ -116,6 +144,10 @@ private:
     const DistCondQParameters &ZsCondQ(DistCondQParameters &&par);
     const DistCondQParameters &DistCondQ(DistCondQParameters &&par);
     void ClearDistCondQCache();
+
+#ifdef _DEBUG
+    void CheckForConsistency(bool complete);
+#endif
 };
 
 class DistCondQParameters

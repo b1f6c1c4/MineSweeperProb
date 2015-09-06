@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <set>
 #include "Solver.h"
 #include "GameMgr.h"
 

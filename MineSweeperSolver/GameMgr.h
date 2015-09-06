@@ -45,9 +45,9 @@ public:
     BlockStatus GetInferredStatus(int x, int y) const;
 
     const Block *GetBestBlocks() const;
-    int GetBestBlockCount() const;
+    size_t GetBestBlockCount() const;
     const Block *GetPreferredBlocks() const;
-    int GetPreferredBlockCount() const;
+    size_t GetPreferredBlockCount() const;
 
     void OpenBlock(int x, int y);
 
