@@ -49,7 +49,7 @@ Strategy DLL_API ReadStrategy(std::string str)
 #define R(field, type, length) field = ReadBits<type>(buf, cur, length)
 
     R(st.Index, int, 9);
-    st.InitialPositionSpecified = st.Index == 480;
+    st.InitialPositionSpecified = st.Index != 480;
 
     R(st.Logic, LogicMethod, 2);
     R(st.HeuristicEnabled, bool, 1);

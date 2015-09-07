@@ -43,15 +43,7 @@ struct
 extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines)
 {
     auto mgr = new GameMgr(width, height, totalMines);
-    mgr->BasicStrategy.InitialPositionSpecified = false;
-    mgr->BasicStrategy.Logic = LogicMethod::Full;
-    mgr->BasicStrategy.HeuristicEnabled = true;
-    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MinMineProb);
-    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MaxZerosProb);
-    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MaxZeroProb);
-    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MaxQuantityExp);
-    mgr->BasicStrategy.DecisionTree.push_back(HeuristicMethod::MinFrontierDist);
-    mgr->BasicStrategy.ExhaustEnabled = false;
+    mgr->BasicStrategy = ReadStrategy("4N9MNQAAAA==");
     return mgr;
 }
 
@@ -59,6 +51,7 @@ extern "C" DLL_API GameMgr *CreateGameMgrFromFile(const wchar_t *filename)
 {
     std::ifstream sr(filename, std::ios::binary | std::ios::_Nocreate);
     auto mgr = new GameMgr(sr);
+    mgr->BasicStrategy = ReadStrategy("4N9MNQAAAA==");
     sr.close();
     return mgr;
 }

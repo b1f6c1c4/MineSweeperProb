@@ -319,12 +319,15 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     if ((maxDepth & SolvingState::Drained) == SolvingState::Drained && BasicStrategy.ExhaustEnabled)
         if (m_Drainer == nullptr && m_Solver->GetTotalStates() <= (BasicStrategy.PruningEnabled ? BasicStrategy.PruningCriterion : BasicStrategy.ExhaustCriterion) &&
             (m_Solver->GetTotalStates() > 2 || m_ToOpen > 1))
+        {
             EnableDrainer();
+            return;
+        }
 
     if (m_Drainer != nullptr)
     {
         m_Drainer->Update();
-        if ((maxDepth & SolvingState::Drained) == SolvingState::Drained && BasicStrategy.ExhaustEnabled)
+        if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
             m_Preferred = m_Drainer->GetBestBlocks();
     }
 
@@ -341,7 +344,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 
 #define LARGEST(exp) Largest(m_Preferred, std::function<double(Block)>([this](Block blk) { return exp; } ))
 
-    for (auto heu : BasicStrategy.PruningDecisionTree)
+    for (auto heu : BasicStrategy.DecisionTree)
         switch (heu)
         {
         case HeuristicMethod::MinMineProb:
@@ -466,9 +469,12 @@ void GameMgr::Automatic()
 
     while (m_Started)
     {
-        if (!m_Settled && BasicStrategy.InitialPositionSpecified)
-            OpenBlock(BasicStrategy.Index);
-        
+        if (!m_Settled)
+            if (BasicStrategy.InitialPositionSpecified)
+                OpenBlock(BasicStrategy.Index);
+            else if (!BasicStrategy.HeuristicEnabled)
+                OpenBlock(RandomInteger(m_Blocks.size()));
+
         if (st == SolvingState::Stale && !BasicStrategy.HeuristicEnabled)
         {
             m_Started = false;

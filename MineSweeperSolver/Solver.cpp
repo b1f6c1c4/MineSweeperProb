@@ -12,6 +12,8 @@
 
 #define M(x, y) matrix[(x) * height + (y)]
 
+#define CONT_WIDTH(lst, cnt) (cnt == lst.size() - 1 && SHF(m_BlockSets.size()) > 0 ? SHF(m_BlockSets.size()) : CONT_SIZE)
+
 static size_t Hash(const BlockSet &set);
 
 Solver::Solver(size_t count) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0)
@@ -63,12 +65,12 @@ void Solver::AddRestrain(Block blk, bool isMine)
     if (m_Manager[blk] == BlockStatus::Unknown)
     {
         m_Manager[blk] = isMine ? BlockStatus::Mine : BlockStatus::Blank;
+        if (m_SetIDs[blk] >= 0)
+            ReduceBlockSet(m_SetIDs[blk]);
         m_State = SolvingState::Stale;
         return;
     }
     m_State &= SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
-    if (m_SetIDs[blk] >= 0)
-        ReduceBlockSet(m_SetIDs[blk]);
     if (m_Manager[blk] == BlockStatus::Blank && isMine)
         throw;
     if (m_Manager[blk] == BlockStatus::Mine && !isMine)
@@ -524,7 +526,7 @@ void Solver::ReduceRestrains()
         for (auto i = 0; i < m_Matrix[cnt].size(); ++i)
         {
             auto v = m_Matrix[cnt][i];
-            for (auto shift = 0; shift < (cnt == m_Matrix.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+            for (auto shift = 0; shift < CONT_WIDTH(m_Matrix, cnt); ++shift, v >>= 1)
                 if (NZ(v, 0))
                     sum[i] += m_BlockSets[cnt * CONT_SIZE + shift].size();
                 else if (v == 0)
@@ -600,7 +602,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
             for (auto cnt = 0; cnt < lst.size(); ++cnt)
             {
                 auto v = lst[cnt];
-                for (auto shift = 0; shift < (cnt == lst.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift, v >>= 1)
                     if (NZ(v, 0))
                         iv.second += m_BlockSets[cnt * CONT_SIZE + shift].size();
                     else if (v == 0)
@@ -636,7 +638,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
                 for (auto cnt = 0; cnt < lst.size(); ++cnt)
                 {
                     auto v = lst[cnt];
-                    for (auto shift = 0; shift < (cnt == lst.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                    for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift, v >>= 1)
                         if (NZ(v, 0))
                         {
                             for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
@@ -655,7 +657,7 @@ bool Solver::SimpleOverlap(int r1, int r2)
                 for (auto cnt = 0; cnt < lst.size(); ++cnt)
                 {
                     auto v = lst[cnt];
-                    for (auto shift = 0; shift < (cnt == lst.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
+                    for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift, v >>= 1)
                         if (NZ(v, 0))
                         {
                             for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
