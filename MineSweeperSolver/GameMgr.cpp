@@ -15,6 +15,7 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
     m_Solver = new Solver(width * height);
 
     m_Blocks.reserve(width * height);
+    m_BlocksR.reserve(width * height);
 
     BlockSet lst;
     lst.reserve(width * height);
@@ -57,6 +58,7 @@ GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalM
     m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
 
     m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
+    m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
 
     auto lst = BlockSet();
     lst.reserve(m_TotalWidth * m_TotalHeight);
@@ -93,7 +95,6 @@ GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalM
             if (blk.IsOpen && !blk.IsMine)
                 m_Solver->AddRestrain(blk.Index, false);
         }
-        m_Solver->Solve(SolvingState::Reduce, false);
 
         for (auto &blk : m_Blocks)
             if (blk.IsOpen && !blk.IsMine && blk.Degree != 0)
@@ -311,7 +312,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 				throw;
 #endif
 
-    if ((maxDepth & SolvingState::Probability) == SolvingState::Stale &&
+    if (!BasicStrategy.HeuristicEnabled ||
         (maxDepth & SolvingState::Heuristic) == SolvingState::Stale &&
         (maxDepth & SolvingState::Drained) == SolvingState::Stale)
         return;
@@ -467,30 +468,44 @@ void GameMgr::Automatic()
         throw;
     }
 
-    while (m_Started)
+    if (!m_Settled)
+        if (BasicStrategy.InitialPositionSpecified)
+            OpenBlock(BasicStrategy.Index);
+        else if (!BasicStrategy.HeuristicEnabled)
+            OpenBlock(RandomInteger(m_Blocks.size()));
+
+    if (st == SolvingState::Stale)
     {
-        if (!m_Settled)
-            if (BasicStrategy.InitialPositionSpecified)
-                OpenBlock(BasicStrategy.Index);
-            else if (!BasicStrategy.HeuristicEnabled)
-                OpenBlock(RandomInteger(m_Blocks.size()));
-
-        if (st == SolvingState::Stale && !BasicStrategy.HeuristicEnabled)
-        {
-            m_Started = false;
-            break;
-        }
-
-        SemiAutomatic(st);
-
         if (!BasicStrategy.HeuristicEnabled)
         {
             m_Started = false;
-            break;
+            return;
         }
 
-        AutomaticStep(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic | SolvingState::Drained);
+        while (m_Started)
+        {
+            for (auto i = 0; i < m_Blocks.size(); ++i)
+            {
+                if (m_Blocks[i].IsOpen)
+                    continue;
+                m_Preferred.push_back(i);
+            }
+            OpenOptimalBlocks();
+        }
     }
+    else
+        while (m_Started)
+        {
+            SemiAutomatic(st);
+
+            if (!BasicStrategy.HeuristicEnabled)
+            {
+                m_Started = false;
+                break;
+            }
+
+            AutomaticStep(st | SolvingState::Heuristic | SolvingState::Drained);
+        }
 }
 
 void GameMgr::EnableDrainer()

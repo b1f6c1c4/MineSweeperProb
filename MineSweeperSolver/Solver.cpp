@@ -519,6 +519,12 @@ void Solver::ReduceRestrains()
         if (ReduceRestrainBlank(row))
             --row;
 
+    if (m_Matrix.empty())
+    {
+        m_MatrixAugment.clear();
+        return;
+    }
+
     auto &sum = m_ReduceCount_Temp;
     sum.clear();
     sum.resize(m_Matrix.front().size(), CONT_ZERO);
@@ -860,18 +866,25 @@ void Solver::ProcessSolutions()
     auto &exp = m_Exp_Temp;
     exp.clear() , exp.resize(m_BlockSets.size(), 0);
     m_TotalStates = double(0);
+    std::vector<int> flags(m_BlockSets.size(), 3);
     for (auto &so : m_Solutions)
     {
-#ifdef _DEBUG
 		for (auto row = 0; row < m_MatrixAugment.size(); ++row)
 		{
 			auto v = 0;
             for (auto col = 0; col < m_BlockSets.size(); ++col)
                 if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
+                {
                     v += so.Dist[col];
+                    if (flags[col] == 0)
+                        continue;
+                    if (flags[col] & 1 && so.Dist[col] != 0)
+                        flags[col] &= ~1;
+                    if (flags[col] & 2 && so.Dist[col] != m_BlockSets[col].size())
+                        flags[col] &= ~2;
+                }
 			ASSERT(m_MatrixAugment[row] == v);
 		}
-#endif
         so.States = double(1);
         for (auto i = 0; i < m_BlockSets.size(); ++i)
             so.States *= Binomial(m_BlockSets[i].size(), so.Dist[i]);
@@ -890,8 +903,7 @@ void Solver::ProcessSolutions()
     for (auto i = 0; i < m_BlockSets.size(); ++i)
     {
         auto prod = m_TotalStates * m_BlockSets[i].size();
-        ASSERT(exp[i] <= prod);
-        if (exp[i] == 0)
+        if (flags[i] & 1)
         {
             for (auto &blk : m_BlockSets[i])
             {
@@ -903,7 +915,7 @@ void Solver::ProcessSolutions()
                 m_State &= SolvingState::Overlap | SolvingState::Probability;
             }
         }
-        else if (exp[i] == prod)
+        else if (flags[i] & 2)
             for (auto &blk : m_BlockSets[i])
             {
                 if (m_Manager[blk] == BlockStatus::Mine)
@@ -1221,6 +1233,8 @@ void Solver::ClearDistCondQCache()
 #ifdef _DEBUG
 void Solver::CheckForConsistency(bool complete)
 {
+    if (m_Matrix.empty())
+        return;
     std::vector<int> sum(m_Matrix.front().size(), CONT_ZERO);
     for (auto cnt = 0; cnt < m_Matrix.size(); ++cnt)
         for (auto i = 0; i < m_Matrix[cnt].size(); ++i)

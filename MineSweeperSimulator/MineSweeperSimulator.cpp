@@ -142,7 +142,7 @@ size_t Save(std::ostringstream *sout)
     {
         if (i > 0)
             *sout << ",";
-        *sout << certD[i] << "->{" << succeedT[i] << "," << totalT[i] << "}";
+        *sout << "\"" << certD[i] << "\"->{" << succeedT[i] << "," << totalT[i] << "}";
     }
     *sout << "}";
     return rT;
