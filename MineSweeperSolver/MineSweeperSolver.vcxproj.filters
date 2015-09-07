@@ -39,6 +39,9 @@
     <ClInclude Include="Strategies.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="base64.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -60,6 +63,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Drainer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Strategies.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="base64.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,21 +1,23 @@
 #include "stdafx.h"
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <thread>
 #include <mutex>
 #include "../MineSweeperSolver/GameMgr.h"
 #include "../MineSweeperSolver/BinomialHelper.h"
+#include "../MineSweeperSolver/Strategies.h"
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 
 #pragma comment (lib, "Ws2_32.lib")
-#include <iostream>
 
 std::mutex mtx;
 std::vector<std::thread> m_Threads;
 
 int numTasks;
-size_t *cert;
+std::string *certD;
+Strategy *cert;
 size_t *dense;
 volatile size_t restT, totalTT;
 volatile size_t *rest;
@@ -25,8 +27,7 @@ volatile size_t *total, *totalT;
 bool ProcessID(int id)
 {
     GameMgr mgr(30, 16, 99);
-    mgr.DrainCriterion = cert[id];
-    mgr.OpenBlock(0, 0);
+    mgr.BasicStrategy = cert[id];
     mgr.Automatic();
     return mgr.GetSucceed();
 }
@@ -74,7 +75,8 @@ bool Launch(std::istringstream &sin)
     auto min = std::numeric_limits<size_t>().max();
     totalTT = restT = 0;
     dense = new size_t[numTasks];
-    cert = new size_t[numTasks];
+    certD = new std::string[numTasks];
+    cert = new Strategy[numTasks];
     rest = new size_t[numTasks];
     succeed = new size_t[numTasks];
     total = new size_t[numTasks];
@@ -83,10 +85,11 @@ bool Launch(std::istringstream &sin)
     for (auto i = 0; i < numTasks; ++i)
     {
         int r;
-        sin >> cert[i] >> r;
+        sin >> certD[i] >> r;
         dense[i] = r;
         if (dense[i] < min)
             min = dense[i];
+        cert[i] = ReadStrategy(certD[i]);
         rest[i] = r;
         restT += r;
         succeedT[i] = succeed[i] = 0;
@@ -121,7 +124,7 @@ size_t Save(std::ostringstream *sout)
             if (total[i] == 0)
                 continue;
 
-            fout << cert[i] << " " << succeed[i] << " " << total[i] << std::endl;
+            fout << certD[i] << " " << succeed[i] << " " << total[i] << std::endl;
             succeedT[i] += succeed[i];
             totalT[i] += total[i];
             totalTT += total[i];
@@ -139,7 +142,7 @@ size_t Save(std::ostringstream *sout)
     {
         if (i > 0)
             *sout << ",";
-        *sout << cert[i] << "->{" << succeedT[i] << "," << totalT[i] << "}";
+        *sout << certD[i] << "->{" << succeedT[i] << "," << totalT[i] << "}";
     }
     *sout << "}";
     return rT;
@@ -150,6 +153,7 @@ void Clear()
     if (numTasks != 0)
     {
         delete[] dense;
+        delete[] certD;
         delete[] cert;
         delete[] rest;
         delete[] succeed;

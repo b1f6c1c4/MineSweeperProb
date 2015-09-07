@@ -467,7 +467,7 @@ void GameMgr::Automatic()
     while (m_Started)
     {
         if (!m_Settled && BasicStrategy.InitialPositionSpecified)
-            OpenBlock(BasicStrategy.X, BasicStrategy.Y);
+            OpenBlock(BasicStrategy.Index);
         
         if (st == SolvingState::Stale && !BasicStrategy.HeuristicEnabled)
         {

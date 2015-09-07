@@ -155,6 +155,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="base64.h" />
     <ClInclude Include="BinomialHelper.h" />
     <ClInclude Include="Drainer.h" />
     <ClInclude Include="GameMgr.h" />
@@ -165,6 +166,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="base64.cpp" />
     <ClCompile Include="BinomialHelper.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
@@ -185,6 +187,7 @@
     <ClCompile Include="random.cpp" />
     <ClCompile Include="Solver.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="Strategies.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
