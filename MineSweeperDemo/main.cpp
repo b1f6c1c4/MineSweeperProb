@@ -16,7 +16,8 @@ class MineSweeperDemo : public GuiWindow
 {
 public:
     MineSweeperDemo()
-        :GuiWindow(GetCurrentTheme()->CreateWindowStyle())
+        :GuiWindow(GetCurrentTheme()->CreateWindowStyle()),
+        m_Manual(true)
     {
         this->GuiControlHost::SetText(L"MineSweeperDemo");
         this->GetContainerComposition()->SetMinSizeLimitation(GuiGraphicsComposition::LimitToElementAndChildren);
@@ -43,9 +44,14 @@ public:
                 table->AddChild(cell);
                 cell->SetSite(i % 16, i / 16, 1, 1);
 
-                auto label = g::NewLabel();
+                auto label = GuiSolidLabelElement::Create();
                 label->SetFont(font);
+                label->SetHorizontalAlignment(Alignment::Center);
+                label->SetVerticalAlignment(Alignment::Center);
                 m_Labels.push_back(label);
+                auto labelB = new GuiBoundsComposition;
+                labelB->SetAlignmentToParent(Margin(0, 0, 2, 1));
+                labelB->SetOwnedElement(label);
 
                 auto color = GuiSolidBackgroundElement::Create();
                 m_Backs.push_back(color);
@@ -54,9 +60,11 @@ public:
                 colorB->SetOwnedElement(color);
 
                 cell->AddChild(colorB);
-                cell->AddChild(label->GetBoundsComposition());
+                cell->AddChild(labelB);
             }
         }
+
+        this->Update();
 
         m_Thread = std::thread(&MineSweeperDemo::Process, this);
         m_LastX = 0, m_LastY = 0;
@@ -77,6 +85,16 @@ public:
 
     void Update()
     {
+        if (m_Mgr == nullptr)
+        {
+            for (auto i = 0; i < 480; ++i)
+            {
+                m_Labels[i]->SetText(L"");
+                m_Backs[i]->SetColor(Color(204, 204, 204));
+            }
+            return;
+        }
+
         for (auto i = 0; i < 480; ++i)
         {
             auto &b = m_Mgr->GetBlockProperties()[i];
@@ -119,12 +137,36 @@ public:
         }
     }
 
+    void KeyUp(const NativeWindowKeyInfo& info) override
+    {
+        switch (info.code)
+        {
+        case 0x20:
+            m_Manual ^= true;
+            break;
+        case 0x52:
+            if (m_Mgr != nullptr)
+            {
+                delete m_Mgr;
+                m_Mgr = nullptr;
+            }
+            m_Mgr = new GameMgr(30, 16, 99);
+            m_Mgr->BasicStrategy = ReadStrategy("4O+McoEAAQA=");
+            this->Update();
+            break;
+        case 0x43:
+            this->Update();
+            break;
+        }
+    }
+
 private:
     std::thread m_Thread;
-    std::vector<GuiLabel *> m_Labels;
+    std::vector<GuiSolidLabelElement *> m_Labels;
     std::vector<GuiSolidBackgroundElement *> m_Backs;
     GameMgr *m_Mgr;
     int m_LastX, m_LastY;
+    bool m_Manual;
 
     void Process()
     {
@@ -133,21 +175,27 @@ private:
         {
             if (m_Mgr == nullptr)
             {
-                m_Mgr = new GameMgr(30, 16, 99);
-                m_Mgr->BasicStrategy = ReadStrategy("4O+McoEAAQA=");
-                GetApplication()->InvokeLambdaInMainThreadAndWait([this]() {this->Update(); });
+                if (!m_Manual)
+                {
+                    m_Mgr = new GameMgr(30, 16, 99);
+                    m_Mgr->BasicStrategy = ReadStrategy("4O+McoEAAQA=");
+                    GetApplication()->InvokeLambdaInMainThreadAndWait([this]() { this->Update(); });
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds{ 100 });
                 continue;
             }
 
             if (!m_Mgr->GetStarted())
             {
-                GetApplication()->InvokeLambdaInMainThreadAndWait([this]() {this->Update(); });
+                GetApplication()->InvokeLambdaInMainThreadAndWait([this]() { this->Update(); });
                 auto s = m_Mgr->GetSucceed();
+                delete m_Mgr;
                 m_Mgr = nullptr;
                 std::this_thread::sleep_for(std::chrono::milliseconds{ s ? 700 : 1200 });
                 continue;
             }
+
+            GetApplication()->InvokeLambdaInMainThread([this]() {this->Update(); });
 
             m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic, true);
 
@@ -183,9 +231,15 @@ private:
                 m_Mgr->OpenBlock(m_LastX, m_LastY);
             }
 
-            GetApplication()->InvokeLambdaInMainThreadAndWait([this]() {this->Update(); });
-            m_Backs[m_LastX * 16 + m_LastY]->SetColor(flag ? Color(255 - 170, 255, 0) : Color(255, 170, 0));
-            std::this_thread::sleep_for(std::chrono::milliseconds{ 10 * static_cast<int>(sqrt(bestV)) + 10 });
+            auto bbb = m_LastX * 16 + m_LastY;
+            GetApplication()->InvokeLambdaInMainThread([this, flag, bbb]() {
+                this->Update();
+                m_Backs[bbb]->SetColor(flag ? Color(255 - 170, 255, 0) : Color(255, 170, 0));
+            });
+            auto ms = 5 * static_cast<int>(sqrt(bestV)) + 1;
+            if (!flag)
+                ms *= 3;
+            std::this_thread::sleep_for(std::chrono::milliseconds{ ms });
         }
     }
 };
