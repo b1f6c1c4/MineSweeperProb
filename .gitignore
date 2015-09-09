@@ -13,6 +13,7 @@ $RECYCLE.BIN/
 MineSweeper/bin/
 MineSweeper/obj/
 MineSweeperSolver/x64/
+MineSweeperDemo/x64/
 MineSweeperSimulator/x64/
 SimulatorManagerClient/bin/
 SimulatorManagerClient/obj/
@@ -20,3 +21,4 @@ SimulatorsManager/bin/
 SimulatorsManager/obj/
 /x64/
 /.vs/
+/ipch/
