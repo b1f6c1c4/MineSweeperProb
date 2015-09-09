@@ -370,6 +370,7 @@ bool Solver::ReduceBlockSet(int col)
         case BlockStatus::Unknown:
             ASSERT(m_SetIDs[*it] == col);
             setN.push_back(*it);
+            break;
         default:
             ASSERT(false);
         }
