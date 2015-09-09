@@ -1,11 +1,5 @@
 #include "Drainer.h"
 
-#ifdef _DEBUG
-#define ASSERT(val) if (!(val)) throw
-#else
-#define ASSERT(val)
-#endif
-
 static void Combinations(int n, int m, std::vector<std::vector<BlockStatus>> &dists)
 {
     auto count = 0;

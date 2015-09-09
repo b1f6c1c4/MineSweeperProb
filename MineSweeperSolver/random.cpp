@@ -1,7 +1,6 @@
 #include "random.h"
 #include <wincrypt.h>
 #include <cmath>
-#include <assert.h>
 
 #pragma comment(lib, "advapi32.lib")
 
@@ -10,7 +9,7 @@ static HCRYPTPROV hProvider = 0;
 void RandomInit()
 {
     DWORD result = CryptAcquireContextW(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
-    assert(result);
+    ASSERT(result);
 }
 
 void RandomClose()
@@ -22,7 +21,7 @@ BYTE *Random(int length)
 {
     auto pbBuffer = new BYTE[length];
     DWORD result = CryptGenRandom(hProvider, length, pbBuffer);
-    assert(result);
+    ASSERT(result);
     return pbBuffer;
 }
 

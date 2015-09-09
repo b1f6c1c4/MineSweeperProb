@@ -9,3 +9,9 @@
 #else
 #define DLL_API __declspec(dllimport)
 #endif
+
+#ifdef _DEBUG
+#define ASSERT(val) do { ASSERT(val) if (!(val)) throw; } while (false)
+#else
+#define ASSERT(val)
+#endif

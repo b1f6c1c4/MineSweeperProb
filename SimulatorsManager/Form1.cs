@@ -35,6 +35,7 @@ namespace SimulatorsManager
             UpdateSimulators();
             dataGridView1.AutoGenerateColumns = false;
             dataGridView1.DataSource = m_Simulators;
+            dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             m_Udp = new UdpClient(27016);
             foreach (
                 var ip in

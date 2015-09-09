@@ -4,12 +4,6 @@
 #include "Drainer.h"
 #include <iostream>
 
-#ifdef _DEBUG
-#define ASSERT(val) if (!(val)) throw
-#else
-#define ASSERT(val)
-#endif
-
 GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
 {
     m_Solver = new Solver(width * height);

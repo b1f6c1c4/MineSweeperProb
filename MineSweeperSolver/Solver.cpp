@@ -2,12 +2,6 @@
 #include <algorithm>
 #include "BinomialHelper.h"
 
-#ifdef _DEBUG
-#define ASSERT(val) if (!(val)) throw
-#else
-#define ASSERT(val)
-#endif
-
 #define ZEROQ(val) (abs(val) < 1E-3)
 
 #define M(x, y) matrix[(x) * height + (y)]
@@ -376,7 +370,6 @@ bool Solver::ReduceBlockSet(int col)
         case BlockStatus::Unknown:
             ASSERT(m_SetIDs[*it] == col);
             setN.push_back(*it);
-            continue;
         default:
             ASSERT(false);
         }
