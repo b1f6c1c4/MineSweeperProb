@@ -1,0 +1,109 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8"/>
+    <title>MineSweeper - Simulators Manager</title>
+    <script src="jquery-2.1.4.min.js" type="text/javascript"></script>
+    <style type="text/css">
+        * {
+            font-family: Consolas;
+        }
+        #cmdWrapper {
+            display: inline-block;
+            background-color: #c0c0c0;
+            margin: 5px;
+            padding: 5px;
+        }
+        .cmd {
+            display: inline-block;
+            text-align: center;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            margin: 5px;
+            padding: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+<h1>Simulators Manager</h1>
+<form method="POST">
+    <div id="cmdWrapper">
+        <div id="cmdRef" class="cmd" style="background-color: #32ef32">ref</div>
+        <div id="cmdState" class="cmd" style="background-color: #32cd32">st.</div>
+        <div id="cmdStart" class="cmd" style="background-color: #d2ed12">str</div>
+        <div id="cmdLaunch" class="cmd" style="background-color: #f2f212">:la</div>
+        <div id="cmdSave" class="cmd" style="background-color: #f4a460">:sa</div>
+        <div id="cmdTerminate" class="cmd" style="background-color: #f5302a">tre</div>
+        <div id="cmdOut" class="cmd" style="background-color: #6495ed">out</div>
+        <div id="cmdDrop" class="cmd" style="background-color: #8050e0">dro</div>
+    </div>
+    <div>
+        <table>
+            <thead>
+            <tr>
+                <th></th>
+                <td>ID</td>
+                <td>IP</td>
+                <td>State</td>
+                <td>Response</td>
+            </tr>
+            </thead>
+            <tbody id="mainTableBody">
+            </tbody>
+        </table>
+    </div>
+</form>
+<script type="text/javascript">
+    var updateFrom = function(msg) {
+        if ($('#mainTableBody tr').length === msg.length) {
+            $.each(msg, function(i, item) {
+                var tr = $('#mainTableBody tr')[i];
+                $(tr).find('th input:checkbox').prop('checked', item.Checked);
+                $(tr).find('td:eq(0)').text(item.ID);
+                $(tr).find('td:eq(1)').text(item.IP);
+                $(tr).find('td:eq(2)').text(item.State);
+                $(tr).find('td:eq(3)').text(item.Response);
+            });
+        } else {
+            $('#mainTableBody tr').remove();
+            $.each(msg, function(i, item) {
+                var box = $('<input type="checkbox"/>')
+                    .prop('checked', item.Checked)
+                    .change(function () {
+                        $.ajax(
+                        {
+                            method: "POST",
+                            url: "/check",
+                            data: JSON.stringify({ 'Checked': box.prop('checked'), 'ID': item.ID }),
+                            contentType: "application/json",
+                            success: updateFrom
+                        });
+                    });
+                $('<tr>').append(
+                    $('<th>').append(box),
+                    $('<td>').text(item.ID),
+                    $('<td>').text(item.IP),
+                    $('<td>').text(item.State),
+                    $('<td>').text(item.Response)
+                ).appendTo('#mainTableBody');
+            });
+        }
+    };
+    var updateFun = function() {
+        $.ajax(
+        {
+            method: "POST",
+            url: "/",
+            success: updateFrom
+        });
+    };
+
+    $('#cmdRef').click(updateFun);
+
+    $(document).ready(updateFun);
+</script>
+</body>
+</html>

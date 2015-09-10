@@ -1,15 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace SimulatorsManager
 {
@@ -26,6 +30,7 @@ namespace SimulatorsManager
         // ReSharper disable PrivateFieldCanBeConvertedToLocalVariable
         private readonly Thread m_TcpThread;
         private readonly Thread m_UdpThread;
+        private readonly SimpleHttpServer m_HttpServer;
         // ReSharper restore PrivateFieldCanBeConvertedToLocalVariable
 
         public Form1()
@@ -37,36 +42,167 @@ namespace SimulatorsManager
             dataGridView1.DataSource = m_Simulators;
             dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             m_Udp = new UdpClient(27016);
+            IPAddress ipW = null, ipL = null;
             foreach (
                 var ip in
                     Dns.GetHostEntry(Dns.GetHostName())
                        .AddressList.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork))
-            {
                 if (ip.ToString().StartsWith("43.", StringComparison.Ordinal))
-                    continue;
-                m_Tcp = new TcpListener(ip, 27016);
-                break;
+                    ipW = ip;
+                else
+                    ipL = ip;
+            if (ipL == null)
+            {
+                MessageBox.Show("ipL == null");
+                throw new Exception();
             }
+            if (ipW == null)
+                ipW = IPAddress.Parse(ipL.ToString());
+
             m_FileTranser = 0;
-            m_TcpThread = new Thread(TcpProcess) { IsBackground = true };
+            m_Tcp = new TcpListener(ipL, 27016);
+            m_TcpThread = new Thread(TcpProcess)
+                              {
+                                  IsBackground = true,
+                                  Name = "TcpProcess"
+                              };
             m_TcpThread.Start();
-            m_UdpThread = new Thread(UdpProcess) { IsBackground = true };
+
+            m_UdpThread = new Thread(UdpProcess)
+                              {
+                                  IsBackground = true,
+                                  Name = "UdpThread"
+                              };
             m_UdpThread.Start();
+
+            m_HttpServer = new SimpleHttpServer(ipW, 27015);
+            m_HttpServer.OnHttpRequest += OnHttpRequest;
         }
 
-        void TcpProcess()
+        private HttpResponse OnHttpRequest(HttpRequest request)
+        {
+            if (request.Method == "HEAD")
+            {
+                if (request.Uri.EndsWith("/", StringComparison.Ordinal))
+                    return
+                        new HttpResponse
+                            {
+                                ResponseCode = 200,
+                                Header =
+                                    new Dictionary<string, string>
+                                        {
+                                            { "Content-Type", "text/html" }
+                                        }
+                            };
+                if (request.Uri.EndsWith("/jquery-2.1.4.min.js", StringComparison.Ordinal))
+                    return
+                        new HttpResponse
+                            {
+                                ResponseCode = 200,
+                                Header =
+                                    new Dictionary<string, string>
+                                        {
+                                            { "Content-Type", "application/x-javascript" }
+                                        }
+                            };
+                throw new HttpException(404);
+            }
+            if (request.Method == "GET")
+            {
+                if (request.Uri.EndsWith("/", StringComparison.Ordinal))
+                    return
+                        new HttpResponse
+                            {
+                                ResponseCode = 200,
+                                Header =
+                                    new Dictionary<string, string>
+                                        {
+                                            { "Content-Type", "text/html" }
+                                        },
+                                ResponseStream =
+                                    Assembly.GetExecutingAssembly()
+                                            .GetManifestResourceStream("SimulatorsManager.wwwroot.default.html")
+                            };
+                if (request.Uri.EndsWith("/jquery-2.1.4.min.js", StringComparison.Ordinal))
+                    return
+                        new HttpResponse
+                        {
+                            ResponseCode = 200,
+                            Header =
+                                    new Dictionary<string, string>
+                                        {
+                                            { "Content-Type", "application/x-javascript" }
+                                        },
+                            ResponseStream =
+                                    Assembly.GetExecutingAssembly()
+                                            .GetManifestResourceStream("SimulatorsManager.wwwroot.jquery-2.1.4.min.js")
+                        };
+                if (request.Uri.EndsWith("/favicon.ico", StringComparison.Ordinal))
+                    return
+                        new HttpResponse
+                        {
+                            ResponseCode = 404,
+                        };
+                throw new HttpException(404);
+            }
+            if (request.Method == "POST")
+            {
+                if (request.Uri.EndsWith("/", StringComparison.Ordinal))
+                    return GenerateHttpResponse();
+                if (request.Uri.EndsWith("/check", StringComparison.Ordinal))
+                {
+                    var buff = new byte[4096];
+                    var sz = request.RequestStream.Read(
+                                                        buff,
+                                                        0,
+                                                        Math.Min(
+                                                                 buff.Length,
+                                                                 Convert.ToInt32(request.Header["Content-Length"])));
+                    var json = JObject.Parse(Encoding.UTF8.GetString(buff, 0, sz));
+                    var id = m_Simulators.FindIndex(s => s.ID == (string)json["ID"]);
+                    m_Simulators[id].Checked = (bool)json["Checked"];
+                    dataGridView1.InvalidateCell(0, id);
+                    return GenerateHttpResponse();
+                }
+                throw new HttpException(404);
+            }
+            throw new HttpException(405);
+        }
+
+        private HttpResponse GenerateHttpResponse()
+        {
+            var stream = new MemoryStream();
+            var sw = new StreamWriter(stream);
+            sw.Write(JsonConvert.SerializeObject(m_Simulators));
+            sw.Flush();
+            stream.Position = 0;
+            return
+                new HttpResponse
+                    {
+                        ResponseCode = 200,
+                        Header =
+                            new Dictionary<string, string>
+                                {
+                                    { "Content-Type", "text/json" },
+                                    { "Content-Length", stream.Length.ToString(CultureInfo.InvariantCulture) }
+                                },
+                        ResponseStream = stream
+                    };
+        }
+
+        private void TcpProcess()
         {
             var buff = new byte[4096];
             m_Tcp.Start();
             while (true)
-            {
                 try
                 {
-                    using (var tcp = m_Tcp.AcceptTcpClient())
-                        switch (m_FileTranser)
-                        {
-                            case 0:
-                                using (var stream = tcp.GetStream())
+                    var tcp = m_Tcp.AcceptTcpClient();
+                    switch (m_FileTranser)
+                    {
+                        case 0:
+                            using (var stream = tcp.GetStream())
+                            {
                                 using (var file = File.OpenRead("MineSweeperSolver.dll"))
                                     while (true)
                                     {
@@ -75,10 +211,13 @@ namespace SimulatorsManager
                                             break;
                                         stream.Write(buff, 0, count);
                                     }
-                                tcp.Close();
-                                break;
-                            case 1:
-                                using (var stream = tcp.GetStream())
+                                stream.Close();
+                            }
+                            tcp.Close();
+                            break;
+                        case 1:
+                            using (var stream = tcp.GetStream())
+                            {
                                 using (var file = File.OpenRead("MineSweeperSimulator.exe"))
                                     while (true)
                                     {
@@ -87,10 +226,14 @@ namespace SimulatorsManager
                                             break;
                                         stream.Write(buff, 0, count);
                                     }
-                                tcp.Close();
-                                break;
-                            case 2:
-                                using (var stream = tcp.GetStream())
+                                stream.Close();
+                            }
+                            tcp.Close();
+                            tcp.Close();
+                            break;
+                        case 2:
+                            using (var stream = tcp.GetStream())
+                            {
                                 using (var file = File.OpenRead("SimulatorManagerClient.exe"))
                                     while (true)
                                     {
@@ -99,10 +242,14 @@ namespace SimulatorsManager
                                             break;
                                         stream.Write(buff, 0, count);
                                     }
-                                tcp.Close();
-                                break;
-                            case 3:
-                                using (var stream = tcp.GetStream())
+                                stream.Close();
+                            }
+                            tcp.Close();
+                            tcp.Close();
+                            break;
+                        case 3:
+                            using (var stream = tcp.GetStream())
+                            {
                                 using (var file = File.Open("output.txt", FileMode.Append))
                                     while (true)
                                     {
@@ -111,34 +258,35 @@ namespace SimulatorsManager
                                             break;
                                         file.Write(buff, 0, count);
                                     }
-                                break;
-                        }
+                                stream.Close();
+                            }
+                            tcp.Close();
+                            break;
+                    }
                 }
                 catch (Exception)
                 {
                     // ignored
                 }
-            }
             // ReSharper disable once FunctionNeverReturns
         }
 
-        void UdpProcess()
+        private void UdpProcess()
         {
             while (true)
-            {
                 try
                 {
                     var ip = new IPEndPoint(IPAddress.Any, 27016);
                     var data = m_Udp.Receive(ref ip);
                     var id = m_Simulators.FindIndex(s => s.IP == ip.Address.ToString());
-                    m_Simulators[id].Returns = ip.Port + ":" + Encoding.UTF8.GetString(data);
+                    m_Simulators[id].Returns =
+                        $"{ip.Port}@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{Encoding.UTF8.GetString(data)}";
                     dataGridView1.UpdateCellValue(4, id);
                 }
                 catch (Exception)
                 {
                     // ignored
                 }
-            }
             // ReSharper disable once FunctionNeverReturns
         }
 
@@ -170,6 +318,7 @@ namespace SimulatorsManager
                                          Returns = string.Empty
                                      });
             }
+            m_Simulators.Reverse();
             dataGridView1.Invalidate();
         }
 
@@ -183,8 +332,8 @@ namespace SimulatorsManager
                                    {
                                        "Timestamp",
                                        //DateTime.Now.ToUniversalTime()
-                                       new DateTime(2015,09,07,12,29,42)
-                                               .ToString("yyyy-MM-ddTHH:mm:ss000Z")
+                                       new DateTime(2015, 09, 07, 12, 29, 42)
+                                       .ToString("yyyy-MM-ddTHH:mm:ss000Z")
                                    },
                                    { "Region", "Beijing" },
                                    { "SignatureMethod", "HmacSHA256" },
@@ -193,7 +342,7 @@ namespace SimulatorsManager
 
             if (dic != null)
                 foreach (var kvp in dic)
-                    postData.Add(kvp.Key,kvp.Value);
+                    postData.Add(kvp.Key, kvp.Value);
 
             var ks = postData.Keys.ToList();
             ks.Sort(StringComparer.Ordinal);
@@ -262,7 +411,6 @@ namespace SimulatorsManager
         {
             var sb = new StringBuilder();
             foreach (var c in s)
-            {
                 if (char.IsDigit(c) ||
                     char.IsLetter(c) ||
                     c == '-' ||
@@ -273,7 +421,6 @@ namespace SimulatorsManager
                 else
                     foreach (var b in Encoding.UTF8.GetBytes(new string(c, 1)))
                         sb.AppendFormat("%{0:X2}", b);
-            }
             return sb.ToString();
         }
 
@@ -354,7 +501,7 @@ namespace SimulatorsManager
             }
             catch (SocketException e)
             {
-                Returns = e.ToString();
+                Returns = $"localhost@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{e}";
             }
         }
 
@@ -377,14 +524,13 @@ namespace SimulatorsManager
                     }
                     tcp.Close();
                 }
-                Returns = "27015:" + Encoding.ASCII.GetString(buff, 0, count);
+                Returns =
+                    $"27015@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{Encoding.ASCII.GetString(buff, 0, count)}";
             }
             catch (SocketException e)
             {
-                Returns = "localhost:" + e;
+                Returns = $"localhost@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{e}";
             }
         }
     }
-
-
 }
