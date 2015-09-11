@@ -148,7 +148,7 @@ namespace SimulatorsManager
             if (request.Method == "POST")
             {
                 if (request.Uri.EndsWith("/", StringComparison.Ordinal))
-                    return GenerateHttpResponse();
+                    return GenerateHttpResponse(JsonConvert.SerializeObject(m_Simulators));
                 if (request.Uri.EndsWith("/check", StringComparison.Ordinal))
                 {
                     var buff = new byte[4096];
@@ -161,19 +161,31 @@ namespace SimulatorsManager
                     var json = JObject.Parse(Encoding.UTF8.GetString(buff, 0, sz));
                     var id = m_Simulators.FindIndex(s => s.ID == (string)json["ID"]);
                     m_Simulators[id].Checked = (bool)json["Checked"];
-                    dataGridView1.InvalidateCell(0, id);
-                    return GenerateHttpResponse();
+                    dataGridView1.UpdateCellValue(0, id);
+                    return GenerateHttpResponse(JsonConvert.SerializeObject(m_Simulators));
+                }
+                if (request.Uri.EndsWith("/command", StringComparison.Ordinal))
+                {
+                    var buff = new byte[4096];
+                    var sz = request.RequestStream.Read(
+                                                        buff,
+                                                        0,
+                                                        Math.Min(
+                                                                 buff.Length,
+                                                                 Convert.ToInt32(request.Header["Content-Length"])));
+                    ProcessCommand(Encoding.UTF8.GetString(buff, 0, sz));
+                    return GenerateHttpResponse("ok", "text/plain");
                 }
                 throw new HttpException(404);
             }
             throw new HttpException(405);
         }
 
-        private HttpResponse GenerateHttpResponse()
+        private static HttpResponse GenerateHttpResponse(string str, string contentType = "text/json")
         {
             var stream = new MemoryStream();
             var sw = new StreamWriter(stream);
-            sw.Write(JsonConvert.SerializeObject(m_Simulators));
+            sw.Write(str);
             sw.Flush();
             stream.Position = 0;
             return
@@ -183,7 +195,7 @@ namespace SimulatorsManager
                         Header =
                             new Dictionary<string, string>
                                 {
-                                    { "Content-Type", "text/json" },
+                                    { "Content-Type", contentType },
                                     { "Content-Length", stream.Length.ToString(CultureInfo.InvariantCulture) }
                                 },
                         ResponseStream = stream
@@ -429,12 +441,19 @@ namespace SimulatorsManager
             if (e.KeyCode != Keys.Enter)
                 return;
 
-            var sp = textBox1.Text.Split(new[] { ':' }, 2, StringSplitOptions.None);
+            var cmd = textBox1.Text;
+            if (ProcessCommand(cmd))
+            textBox1.Clear();
+        }
+
+        private bool ProcessCommand(string cmd)
+        {
+            var sp = cmd.Split(new[] { ':' }, 2, StringSplitOptions.None);
             switch (sp[0])
             {
                 case "":
                     if (sp.Length == 1)
-                        return;
+                        return false;
                     for (var i = 0; i < m_Simulators.Count; i++)
                     {
                         if (!m_Simulators[i].Checked)
@@ -476,8 +495,7 @@ namespace SimulatorsManager
                         simulator.Udp(m_Udp, sp[0]);
                     break;
             }
-
-            textBox1.Clear();
+            return true;
         }
     }
 
