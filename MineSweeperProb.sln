@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimulatorsManager", "Simula
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MineSweeperDemo", "MineSweeperDemo\MineSweeperDemo.vcxproj", "{4AF838F1-BDA7-4C68-9641-314596BB700D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MineSweeperSpeed", "MineSweeperSpeed\MineSweeperSpeed.vcxproj", "{DDA295CC-175B-4744-BCCD-97D71D1F0C60}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -220,6 +222,40 @@ Global
 		{4AF838F1-BDA7-4C68-9641-314596BB700D}.ReleaseSimu|x64.Build.0 = Release|x64
 		{4AF838F1-BDA7-4C68-9641-314596BB700D}.ReleaseSimu|x86.ActiveCfg = Release|x64
 		{4AF838F1-BDA7-4C68-9641-314596BB700D}.ReleaseSimu|x86.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Debug|x64.ActiveCfg = Debug|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Debug|x64.Build.0 = Debug|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Debug|x86.ActiveCfg = Debug|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Debug|x86.Build.0 = Debug|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugDemo|Any CPU.ActiveCfg = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugDemo|Any CPU.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugDemo|x64.ActiveCfg = Debug|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugDemo|x64.Build.0 = Debug|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugDemo|x86.ActiveCfg = Debug|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugDemo|x86.Build.0 = Debug|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugSimu|Any CPU.ActiveCfg = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugSimu|Any CPU.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugSimu|x64.ActiveCfg = Debug|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugSimu|x64.Build.0 = Debug|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugSimu|x86.ActiveCfg = Debug|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.DebugSimu|x86.Build.0 = Debug|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Release|Any CPU.ActiveCfg = Release|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Release|x64.ActiveCfg = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Release|x64.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Release|x86.ActiveCfg = Release|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.Release|x86.Build.0 = Release|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseDemo|Any CPU.ActiveCfg = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseDemo|Any CPU.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseDemo|x64.ActiveCfg = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseDemo|x64.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseDemo|x86.ActiveCfg = Release|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseDemo|x86.Build.0 = Release|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseSimu|Any CPU.ActiveCfg = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseSimu|Any CPU.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseSimu|x64.ActiveCfg = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseSimu|x64.Build.0 = Release|x64
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseSimu|x86.ActiveCfg = Release|Win32
+		{DDA295CC-175B-4744-BCCD-97D71D1F0C60}.ReleaseSimu|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
