@@ -23,6 +23,7 @@ namespace SimulatorsManager
         private const string Secret = "4f78d93ad02942c9b9dcdafd17f9f0c2";
 
         private readonly List<Simulator> m_Simulators = new List<Simulator>();
+        private readonly BindingSource m_Binding = new BindingSource();
 
         private readonly UdpClient m_Udp;
         private readonly TcpListener m_Tcp;
@@ -37,9 +38,10 @@ namespace SimulatorsManager
         {
             InitializeComponent();
 
-            UpdateSimulators();
             dataGridView1.AutoGenerateColumns = false;
-            dataGridView1.DataSource = m_Simulators;
+            dataGridView1.DataSource = m_Binding;
+            m_Binding.DataSource = m_Simulators;
+            UpdateSimulators();
             dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             m_Udp = new UdpClient(27016);
             IPAddress ipW = null, ipL = null;
@@ -293,7 +295,7 @@ namespace SimulatorsManager
                     var id = m_Simulators.FindIndex(s => s.IP == ip.Address.ToString());
                     m_Simulators[id].Returns =
                         $"{ip.Port}@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{Encoding.UTF8.GetString(data)}";
-                    dataGridView1.UpdateCellValue(4, id);
+                    m_Binding.ResetItem(id);
                 }
                 catch (Exception)
                 {
@@ -304,7 +306,7 @@ namespace SimulatorsManager
 
         private void UpdateSimulators()
         {
-            m_Simulators.Clear();
+            m_Binding.Clear();
             var xml = SendAction("DescribeInstances", null);
             if (xml.DocumentElement == null)
                 throw new Exception();
@@ -320,18 +322,17 @@ namespace SimulatorsManager
                     throw new Exception();
                 if (element["ipAddresses"] == null)
                     throw new Exception();
-                m_Simulators.Add(
-                                 new Simulator
-                                     {
-                                         ID = element["instanceName"].InnerText,
-                                         Checked = true,
-                                         State = element["status"].InnerText,
-                                         IP = element["ipAddresses"].InnerText,
-                                         Returns = string.Empty
-                                     });
+                var simu = new Simulator
+                               {
+                                   ID = element["instanceName"].InnerText,
+                                   Checked = true,
+                                   State = element["status"].InnerText,
+                                   IP = element["ipAddresses"].InnerText,
+                                   Returns = string.Empty
+                               };
+                simu.Updated += () => m_Binding.ResetItem(m_Simulators.IndexOf(simu));
+                m_Binding.Insert(0, simu);
             }
-            m_Simulators.Reverse();
-            dataGridView1.Invalidate();
         }
 
         private static XmlDocument SendAction(string action, IDictionary<string, string> dic)
@@ -490,6 +491,18 @@ namespace SimulatorsManager
                     foreach (var simulator in m_Simulators.Where(simulator => simulator.Checked))
                         simulator.Udp(m_Udp, "upload");
                     break;
+                case "fake":
+                    var simu = new Simulator
+                                   {
+                                       Checked = true,
+                                       ID = "",
+                                       IP = "127.0.0.1",
+                                       State = "fake",
+                                       Returns = ""
+                                   };
+                    simu.Updated += () => m_Binding.ResetItem(m_Simulators.IndexOf(simu));
+                    m_Binding.Add(simu);
+                    break;
                 default:
                     foreach (var simulator in m_Simulators.Where(simulator => simulator.Checked))
                         simulator.Udp(m_Udp, sp[0]);
@@ -502,6 +515,9 @@ namespace SimulatorsManager
 
     internal class Simulator
     {
+        public delegate void UpdatedEventHandler();
+        public event UpdatedEventHandler Updated;
+
         // ReSharper disable UnusedAutoPropertyAccessor.Global
         public bool Checked { get; set; }
         public string ID { get; set; }
@@ -520,6 +536,7 @@ namespace SimulatorsManager
             catch (SocketException e)
             {
                 Returns = $"localhost@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{e}";
+                Updated?.Invoke();
             }
         }
 
@@ -549,6 +566,7 @@ namespace SimulatorsManager
             {
                 Returns = $"localhost@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{e}";
             }
+            Updated?.Invoke();
         }
     }
 }
