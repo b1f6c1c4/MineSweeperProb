@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include <vector>
 #include <map>
+#include <functional>
 
 enum class BlockStatus
 {
@@ -90,6 +91,7 @@ public:
     double ZeroCondQ(const BlockSet &set, Block blk);
     double ZerosCondQ(const BlockSet &set, Block blk);
     double ZerosECondQ(const BlockSet &set, Block blk);
+    double UpperBoundCondQ(const BlockSet &set, Block blk);
     const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
     double QuantityCondQ(const BlockSet &set, Block blk);
 
@@ -141,9 +143,14 @@ private:
     void Add(std::vector<double> &from, const std::vector<double> &cases);
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 
+    void GetHalves(DistCondQParameters &par) const;
+    void GetSolutions(DistCondQParameters &par) const;
+
+    DistCondQParameters *TryGetCache(DistCondQParameters &&par, std::function<bool(const DistCondQParameters &)> pre);
     const DistCondQParameters &ZCondQ(DistCondQParameters &&par);
     const DistCondQParameters &ZsCondQ(DistCondQParameters &&par);
     const DistCondQParameters &DistCondQ(DistCondQParameters &&par);
+    const DistCondQParameters &UCondQ(DistCondQParameters &&par);
     void ClearDistCondQCache();
 
 #ifdef _DEBUG
@@ -166,8 +173,12 @@ private:
 
     size_t Hash();
 
+    std::vector<int> m_Halves;
+    std::vector<std::vector<Solution>> m_Solutions;
+    std::vector<double> m_States;
+
     std::vector<double> m_Result;
-    double m_Probability, m_Expectation;
+    double m_Probability, m_Expectation, m_UpperBound;
     double m_TotalStates;
 
     friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);

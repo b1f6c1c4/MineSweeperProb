@@ -18,7 +18,8 @@ enum class HeuristicMethod
     MaxZerosProb = 0x03,
     MaxZerosExp = 0x04,
     MaxQuantityExp = 0x05,
-    MinFrontierDist = 0x06
+    MinFrontierDist = 0x06,
+    MaxUpperBound = 0x07
 };
 
 struct Strategy

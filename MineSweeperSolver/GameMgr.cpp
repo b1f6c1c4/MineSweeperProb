@@ -360,6 +360,9 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         case HeuristicMethod::MinFrontierDist:
             LARGEST(-FrontierDist(blk));
             break;
+        case HeuristicMethod::MaxUpperBound:
+            LARGEST(m_Solver->UpperBoundCondQ(m_BlocksR[blk], blk));
+            break;
         default:
             break;
         }
