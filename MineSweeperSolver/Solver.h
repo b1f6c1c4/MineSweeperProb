@@ -148,7 +148,6 @@ private:
 
     DistCondQParameters *TryGetCache(DistCondQParameters &&par, std::function<bool(const DistCondQParameters &)> pre);
     const DistCondQParameters &ZCondQ(DistCondQParameters &&par);
-    const DistCondQParameters &ZsCondQ(DistCondQParameters &&par);
     const DistCondQParameters &DistCondQ(DistCondQParameters &&par);
     const DistCondQParameters &UCondQ(DistCondQParameters &&par);
     void ClearDistCondQCache();

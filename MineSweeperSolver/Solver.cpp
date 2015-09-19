@@ -255,7 +255,7 @@ double Solver::ZerosCondQ(const BlockSet &set, Block blk)
     par.Hash();
     for (auto b : par.Sets1)
         par.Length += b;
-    return ZsCondQ(std::move(par)).m_Probability;
+    return UCondQ(std::move(par)).m_Probability;
 }
 
 double Solver::ZerosECondQ(const BlockSet& set, Block blk)
@@ -266,7 +266,7 @@ double Solver::ZerosECondQ(const BlockSet& set, Block blk)
     par.Hash();
     for (auto b : par.Sets1)
         par.Length += b;
-    return ZsCondQ(std::move(par)).m_Expectation;
+    return UCondQ(std::move(par)).m_Expectation;
 }
 
 double Solver::UpperBoundCondQ(const BlockSet& set, Block blk)
@@ -1110,74 +1110,6 @@ const DistCondQParameters &Solver::ZCondQ(DistCondQParameters &&par)
         val += valT;
     }
     ptr->m_Result.push_back(val);
-    return *ptr;
-}
-
-const DistCondQParameters &Solver::ZsCondQ(DistCondQParameters &&par)
-{
-    auto pre = [](const DistCondQParameters &p) { return !std::isnan(p.m_Expectation); };
-    auto ptr = TryGetCache(std::move(par), pre);
-    if (pre(*ptr))
-        return *ptr;
-
-    GetHalves(*ptr);
-    GetSolutions(*ptr);
-
-    ptr->m_Probability = 0;
-    ptr->m_Expectation = 0;
-    std::vector<int> lst;
-    for (auto i = 0; i <= ptr->Length; ++i)
-    {
-        if (ptr->m_Solutions[i].empty())
-            continue;
-
-        lst.clear();
-        for (auto j = 0; j < ptr->Sets1.size() + ptr->m_Halves.size(); ++j)
-            if (ptr->m_Solutions[i][0].Dist[j] == 0)
-                lst.push_back(j);
-        for (auto j = 1; j < ptr->m_Solutions[i].size(); ++j)
-        {
-            for (auto it = lst.begin(); it != lst.end(); ++it)
-                if (ptr->m_Solutions[i][j].Dist[*it] != 0)
-                {
-                    it = lst.erase(it);
-                    if (it == lst.end())
-                        break;
-                }
-            if (lst.empty())
-                break;
-        }
-        if (lst.empty())
-            continue;
-
-        ptr->m_Probability += ptr->m_Result[i];
-
-        auto totalBlanks = 0;
-        auto p = 0;
-        for (auto id : lst)
-        {
-            if (id > ptr->Sets1.size())
-            {
-                totalBlanks += m_BlockSets[id - ptr->Sets1.size()].size() - ptr->Sets1[id - ptr->Sets1.size()];
-                continue;
-            }
-
-            while (p < ptr->m_Halves.size() && id > ptr->m_Halves[p])
-                ++p;
-            if (p < ptr->m_Halves.size() && id == ptr->m_Halves[p])
-            {
-                totalBlanks += ptr->Sets1[id];
-                ++p;
-            }
-            else
-            {
-                totalBlanks += m_BlockSets[id].size();
-            }
-        }
-
-        ptr->m_Expectation += ptr->m_Result[i] * totalBlanks;
-    }
-
     return *ptr;
 }
 
