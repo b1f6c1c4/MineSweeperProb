@@ -4,18 +4,19 @@
 #include "Solver.h"
 #include "GameMgr.h"
 
-class GameMgr;
-class Drainer;
+class DLL_API GameMgr;
+class DLL_API Drainer;
 
 typedef std::vector<BlockStatus> MicroSituation;
 
-class MacroSituation
+class
+    DLL_API MacroSituation
 {
 public:
     ~MacroSituation();
 
-    friend bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
-    friend bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
+    friend DLL_API bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
+    friend DLL_API bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 
     friend class Drainer;
 private:
@@ -39,10 +40,11 @@ private:
     size_t Hash();
 };
 
-bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
-bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
+DLL_API bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
+DLL_API bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 
-class Drainer
+class
+    DLL_API Drainer
 {
 public:
     explicit Drainer(const GameMgr &mgr);

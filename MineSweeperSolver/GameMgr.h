@@ -15,8 +15,6 @@ struct
     bool IsMine;
 };
 
-struct GameStatus;
-
 class
     DLL_API GameMgr
 {
@@ -85,5 +83,5 @@ private:
     int FrontierDist(Block blk) const;
 };
 
-void Largest(BlockSet &bests, std::function<int(Block)> fun);
-void Largest(BlockSet &bests, std::function<double(Block)> fun);
+DLL_API void Largest(BlockSet &bests, std::function<int(Block)> fun);
+DLL_API void Largest(BlockSet &bests, std::function<double(Block)> fun);

@@ -119,7 +119,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
         for (auto blk : m_Mgr.m_BlocksR[m_Blocks[i]])
-            switch (m_Mgr.m_Solver->m_Manager[blk])
+            switch (m_Mgr.m_Solver->GetBlockStatus(blk))
             {
             case BlockStatus::Unknown:
                 m_BlocksR[i].push_back(m_BlocksLookup[blk]);
@@ -229,7 +229,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
         probs.resize(m_Blocks.size(), -1);
         for (auto i = 0; i < m_Blocks.size(); ++i)
         {
-            if (ma->m_Degrees[i] >= 0 || ma->m_Solver->m_Manager[i] != BlockStatus::Unknown)
+            if (ma->m_Degrees[i] >= 0 || ma->m_Solver->GetBlockStatus(i) != BlockStatus::Unknown)
                 continue;
             double prob = 0;
             for (auto kvp : ma->m_Transfer[i])
@@ -246,7 +246,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     }
 }
 
-bool operator==(const MacroSituation &lhs, const MacroSituation &rhs)
+DLL_API bool operator==(const MacroSituation &lhs, const MacroSituation &rhs)
 {
     if (lhs.m_Hash != rhs.m_Hash)
         return false;
@@ -257,7 +257,7 @@ bool operator==(const MacroSituation &lhs, const MacroSituation &rhs)
     return true;
 }
 
-bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs)
+DLL_API bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs)
 {
     return !(lhs == rhs);
 }
@@ -311,7 +311,7 @@ void Drainer::Update()
     for (auto i = 0; i < m_Blocks.size(); ++i)
         m_Prob[m_Blocks[i]] = m_RootMacro->m_Probs[i];
     for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
-        switch (m_Mgr.m_Solver->m_Manager[i])
+        switch (m_Mgr.m_Solver->GetBlockStatus(i))
         {
         case BlockStatus::Unknown:
             ASSERT(m_Prob[i] >= 0 && m_Prob[i] <= 1);
@@ -351,7 +351,7 @@ MacroSituation *Drainer::GetOrAddMacroSituation(MacroSituation *&macro)
 
 void Drainer::GenerateMicros()
 {
-    m_Micros.reserve(static_cast<size_t>(m_Mgr.m_Solver->m_TotalStates));
+    m_Micros.reserve(static_cast<size_t>(m_Mgr.m_Solver->GetTotalStates()));
 
     auto &sets = m_Mgr.m_Solver->m_BlockSets;
     std::vector<BlockSet> indexes;
@@ -456,7 +456,7 @@ void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet &bests)
     if (!m_Mgr.BasicStrategy.PruningEnabled)
         return;
 #define LARGEST(exp) Largest(bests, std::function<double(Block)>([this, macro](Block blk) { return exp; } ))
-    if (macro->m_Solver->m_TotalStates <= m_Mgr.BasicStrategy.ExhaustCriterion)
+    if (macro->m_Solver->GetTotalStates() <= m_Mgr.BasicStrategy.ExhaustCriterion)
         return;
     for (auto heu : m_Mgr.BasicStrategy.PruningDecisionTree)
         switch (heu)
@@ -490,7 +490,7 @@ void Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)
 
     BlockSet bests;
     for (auto i = 0; i < macro->m_Degrees.size(); ++i)
-        if (macro->m_Degrees[i] == -1 && macro->m_Solver->m_Manager[i] == BlockStatus::Unknown)
+        if (macro->m_Degrees[i] == -1 && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Unknown)
             bests.push_back(i);
 
     HeuristicPruning(macro, bests);
@@ -540,7 +540,7 @@ MacroSituation *Drainer::SolveMicro(MicroSituation &micro, MacroSituation *macro
 
         for (auto i = 0; i < macro->m_Degrees.size(); ++i)
         {
-            if (macro->m_Degrees[i] >= 0 || macro->m_Solver->m_Manager[i] != BlockStatus::Blank)
+            if (macro->m_Degrees[i] >= 0 || macro->m_Solver->GetBlockStatus(i) != BlockStatus::Blank)
                 continue;
             OpenBlock(micro, macro, i);
             if (macro->m_ToOpen == 0)

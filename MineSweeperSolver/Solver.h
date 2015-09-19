@@ -4,14 +4,14 @@
 #include <map>
 #include <functional>
 
-enum class BlockStatus
+enum class DLL_API BlockStatus
 {
     Unknown = -127,
     Mine = -1,
     Blank = -2
 };
 
-enum class SolvingState
+enum class DLL_API SolvingState
 {
     Stale = 0x0,
     Reduce = 0x1,
@@ -64,15 +64,16 @@ typedef size_t Container;
 #define SB(lval, shift) (lval) |= MASK((shift))
 #define CB(lval, shift) (lval) &= ~MASK((shift))
 
-class GameMgr;
-class Solution;
-class DistCondQParameters;
+class DLL_API GameMgr;
+class DLL_API Solution;
+class DLL_API DistCondQParameters;
 
 class
     DLL_API Solver
 {
 public:
     explicit Solver(size_t count);
+    Solver(size_t count, int mines);
     Solver(const Solver &other);
     ~Solver();
 
@@ -83,6 +84,7 @@ public:
     double GetProbability(Block block) const;
     const double *GetProbabilities() const;
     double GetTotalStates() const;
+    const DistCondQParameters &GetDistInfo(const BlockSet &set, Block blk, int &min);
 
     void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
@@ -143,6 +145,8 @@ private:
     void Add(std::vector<double> &from, const std::vector<double> &cases);
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 
+    DistCondQParameters PackParameters(const BlockSet &set, Block blk, int &min) const;
+
     void GetHalves(DistCondQParameters &par) const;
     void GetSolutions(DistCondQParameters &par) const;
 
@@ -157,11 +161,10 @@ private:
 #endif
 };
 
-class DistCondQParameters
+class
+    DLL_API DistCondQParameters
 {
 public:
-    friend class Solver;
-private:
     DistCondQParameters(DistCondQParameters &&other);
     DistCondQParameters(Block set2ID, int length);
 
@@ -180,16 +183,17 @@ private:
     double m_Probability, m_Expectation, m_UpperBound;
     double m_TotalStates;
 
-    friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-    friend bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-    friend bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+    friend DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+    friend DLL_API bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+    friend DLL_API bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 };
 
-bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+DLL_API bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+DLL_API bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 
-class Solution
+class
+    DLL_API Solution
 {
 public:
     friend class Solver;

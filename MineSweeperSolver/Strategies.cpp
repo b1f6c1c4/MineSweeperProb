@@ -40,7 +40,7 @@ static void WriteBits(std::basic_string<unsigned char> &buf, const T &val, int &
     }
 }
 
-Strategy DLL_API ReadStrategy(std::string str)
+DLL_API Strategy ReadStrategy(std::string str)
 {
     auto buf = base64_decode(str);
     Strategy st;
@@ -81,7 +81,7 @@ Strategy DLL_API ReadStrategy(std::string str)
     return st;
 }
 
-std::string DLL_API WriteStrategy(const Strategy &st)
+DLL_API std::string WriteStrategy(const Strategy &st)
 {
     std::basic_string<unsigned char> buf;
     auto cur = 0;

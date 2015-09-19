@@ -6,13 +6,11 @@
 
 GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
 {
-    m_Solver = new Solver(width * height);
+    m_Solver = new Solver(width * height, totalMines);
 
     m_Blocks.reserve(width * height);
     m_BlocksR.reserve(width * height);
 
-    BlockSet lst;
-    lst.reserve(width * height);
     for (auto i = 0; i < width; ++i)
         for (auto j = 0; j < height; ++j)
         {
@@ -32,9 +30,7 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
                         if (j + dj >= 0 && j + dj < height)
                             if (di != 0 || dj != 0)
                                 blkR.push_back(GetIndex(i + di, j + dj));
-            lst.push_back(blk.Index);
         }
-    m_Solver->AddRestrain(lst, totalMines);
 
     m_AllBits = log2(Binomial(width * height, totalMines));
 }
@@ -49,13 +45,11 @@ GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalM
     READ(m_Started);
     READ(m_ToOpen);
 
-    m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+    m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
 
     m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
     m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
 
-    auto lst = BlockSet();
-    lst.reserve(m_TotalWidth * m_TotalHeight);
     for (auto i = 0; i < m_TotalWidth; ++i)
         for (auto j = 0; j < m_TotalHeight; ++j)
         {
@@ -75,9 +69,7 @@ GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalM
                         if (j + dj >= 0 && j + dj < m_TotalHeight)
                             if (di != 0 || dj != 0)
                                 blkR.push_back(GetIndex(i + di, j + dj));
-            lst.push_back(blk.Index);
         }
-    m_Solver->AddRestrain(lst, m_TotalMines);
 
     if (m_Settled)
     {
@@ -217,7 +209,7 @@ void GameMgr::OpenBlock(int x, int y)
     OpenBlock(GetIndex(x, y));
 }
 
-void Largest(BlockSet &bests, std::function<int(int)> fun)
+DLL_API void Largest(BlockSet &bests, std::function<int(int)> fun)
 {
     if (bests.size() <= 1)
         return;
@@ -237,7 +229,7 @@ void Largest(BlockSet &bests, std::function<int(int)> fun)
     }
     newBests.swap(bests);
 }
-void Largest(BlockSet &bests, std::function<double(int)> fun)
+DLL_API void Largest(BlockSet &bests, std::function<double(int)> fun)
 {
     if (bests.size() <= 1)
         return;
@@ -346,13 +338,13 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             LARGEST(-m_Solver->GetProbability(blk));
             break;
         case HeuristicMethod::MaxZeroProb:
-            LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk));
+            LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         case HeuristicMethod::MaxZerosProb:
-            LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk));
+            LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         case HeuristicMethod::MaxZerosExp:
-            LARGEST(m_Solver->ZerosECondQ(m_BlocksR[blk], blk));
+            LARGEST(m_Solver->ZerosECondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         case HeuristicMethod::MaxQuantityExp:
             LARGEST(m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
@@ -361,7 +353,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             LARGEST(-FrontierDist(blk));
             break;
         case HeuristicMethod::MaxUpperBound:
-            LARGEST(m_Solver->UpperBoundCondQ(m_BlocksR[blk], blk));
+            LARGEST(m_Solver->UpperBoundCondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         default:
             break;

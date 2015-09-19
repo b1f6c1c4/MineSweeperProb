@@ -20,6 +20,18 @@ Solver::Solver(size_t count) : CanOpenForSure(0), m_State(SolvingState::Stale), 
     m_Matrix.emplace_back();
 }
 
+Solver::Solver(size_t count, int mines) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(Binomial(count, mines)), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0)
+{
+    m_BlockSets.emplace_back(count);
+    auto &lst = m_BlockSets.back();
+    for (auto i = 0; i < count; ++i)
+        lst[i] = i;
+    m_SetIDs.resize(count, 0);
+    m_Matrix.emplace_back();
+    m_Matrix.back().push_back(1);
+    m_MatrixAugment.push_back(mines);
+}
+
 Solver::Solver(const Solver &other) : CanOpenForSure(other.CanOpenForSure), m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_MatrixAugment(other.m_MatrixAugment), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0) { }
 
 Solver::~Solver()
@@ -52,6 +64,11 @@ const double *Solver::GetProbabilities() const
 double Solver::GetTotalStates() const
 {
     return m_TotalStates;
+}
+
+const DistCondQParameters &Solver::GetDistInfo(const BlockSet &set, Block blk, int &min)
+{
+    return UCondQ(PackParameters(set, blk, min));
 }
 
 void Solver::AddRestrain(Block blk, bool isMine)
@@ -238,58 +255,31 @@ void Solver::Solve(SolvingState maxDepth, bool shortcut)
 
 double Solver::ZeroCondQ(const BlockSet &set, Block blk)
 {
-    DistCondQParameters par(m_SetIDs[blk], 0);
-    int dMines;
-    GetIntersectionCounts(set, par.Sets1, dMines);
-    par.Hash();
-    for (auto b : par.Sets1)
-        par.Length += b;
-    return ZCondQ(std::move(par)).m_Result.front();
+    int min;
+    return ZCondQ(PackParameters(set, blk, min)).m_Result.front();
 }
 
 double Solver::ZerosCondQ(const BlockSet &set, Block blk)
 {
-    DistCondQParameters par(m_SetIDs[blk], 0);
-    int dMines;
-    GetIntersectionCounts(set, par.Sets1, dMines);
-    par.Hash();
-    for (auto b : par.Sets1)
-        par.Length += b;
-    return UCondQ(std::move(par)).m_Probability;
+    int min;
+    return UCondQ(PackParameters(set, blk, min)).m_Probability;
 }
 
 double Solver::ZerosECondQ(const BlockSet& set, Block blk)
 {
-    DistCondQParameters par(m_SetIDs[blk], 0);
-    int dMines;
-    GetIntersectionCounts(set, par.Sets1, dMines);
-    par.Hash();
-    for (auto b : par.Sets1)
-        par.Length += b;
-    return UCondQ(std::move(par)).m_Expectation;
+    int min;
+    return UCondQ(PackParameters(set, blk, min)).m_Expectation;
 }
 
 double Solver::UpperBoundCondQ(const BlockSet& set, Block blk)
 {
-    DistCondQParameters par(m_SetIDs[blk], 0);
-    int dMines;
-    GetIntersectionCounts(set, par.Sets1, dMines);
-    par.Hash();
-    for (auto b : par.Sets1)
-        par.Length += b;
-    return UCondQ(std::move(par)).m_UpperBound;
+    int min;
+    return UCondQ(PackParameters(set, blk, min)).m_UpperBound;
 }
 
 const std::vector<double> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
 {
-    DistCondQParameters par(m_SetIDs[blk], 0);
-    int dMines;
-    GetIntersectionCounts(set, par.Sets1, dMines);
-    par.Hash();
-    for (auto b : par.Sets1)
-        par.Length += b;
-    min = dMines;
-    return DistCondQ(std::move(par)).m_Result;
+    return DistCondQ(PackParameters(set, blk, min)).m_Result;
 }
 
 double Solver::QuantityCondQ(const BlockSet &set, Block blk)
@@ -972,6 +962,18 @@ void Solver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1
     }
 }
 
+DistCondQParameters Solver::PackParameters(const BlockSet& set, Block blk, int& min) const
+{
+    DistCondQParameters par(m_SetIDs[blk], 0);
+    int dMines;
+    GetIntersectionCounts(set, par.Sets1, dMines);
+    par.Hash();
+    for (auto b : par.Sets1)
+        par.Length += b;
+    min = dMines;
+    return par;
+}
+
 void Solver::GetHalves(DistCondQParameters& par) const
 {
     par.m_Halves.clear();
@@ -985,12 +987,13 @@ void Solver::GetSolutions(DistCondQParameters& par) const
 {
     par.m_States.clear();
     par.m_States.resize(par.Length + 1, 0);
+    par.m_Solutions.clear();
     par.m_Solutions.resize(par.Length + 1);
 
     std::vector<int> stack, lb, ub;
     for (auto &solution : m_Solutions)
     {
-        if (m_BlockSets[par.Set2ID].size() == solution.Dist[par.Set2ID])
+        if (par.Set2ID > 0 && m_BlockSets[par.Set2ID].size() == solution.Dist[par.Set2ID])
             continue;
 
         lb.clear(), ub.clear();
@@ -1029,11 +1032,13 @@ void Solver::GetSolutions(DistCondQParameters& par) const
                                 val += dist[i];
                         }
                     }
-                    ASSERT(st > 0);
-                    par.m_States[val] += st;
-                    par.m_Solutions[val].emplace_back();
-                    par.m_Solutions[val].back().Dist.swap(dist);
-                    par.m_Solutions[val].back().States = st;
+                    if (st > 0)
+                    {
+                        par.m_States[val] += st;
+                        par.m_Solutions[val].emplace_back();
+                        par.m_Solutions[val].back().Dist.swap(dist);
+                        par.m_Solutions[val].back().States = st;
+                    }
 
                     if (par.m_Halves.empty())
                         break;
@@ -1183,6 +1188,8 @@ const DistCondQParameters& Solver::UCondQ(DistCondQParameters&& par)
         for (auto j = ptr->Sets1.size(); j < ptr->Sets1.size() + ptr->m_Halves.size(); ++j)
         {
             auto size = m_BlockSets[j - ptr->Sets1.size()].size() - ptr->Sets1[j - ptr->Sets1.size()];
+            if (j == ptr->Sets1.size() + ptr->Set2ID)
+                --size;
 
             if (zero[j] == 1)
                 totalBlanks += size;
@@ -1197,14 +1204,15 @@ const DistCondQParameters& Solver::UCondQ(DistCondQParameters&& par)
             continue;
         }
 
-        double bound = 1;
+        auto bound = upper.front();
         for (auto u : upper)
             if (u < bound)
                 bound = u;
-        ptr->m_UpperBound += ptr->m_Result[i] * bound;
+
+        ptr->m_UpperBound += bound;
     }
 
-    ptr->m_UpperBound = 1 - ptr->m_UpperBound;
+    ptr->m_UpperBound = 1 - ptr->m_UpperBound / ptr->m_TotalStates;
     return *ptr;
 }
 
@@ -1267,7 +1275,7 @@ size_t DistCondQParameters::Hash()
     return m_Hash = ::Hash(Sets1) << 5 ^ Set2ID;
 }
 
-bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
+DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
 {
     if (lhs.m_Hash != rhs.m_Hash)
         return false;
@@ -1278,12 +1286,12 @@ bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
     return true;
 }
 
-bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
+DLL_API bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
 {
     return !(lhs == rhs);
 }
 
-bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
+DLL_API bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
 {
     if (lhs.m_Hash < rhs.m_Hash)
         return true;
