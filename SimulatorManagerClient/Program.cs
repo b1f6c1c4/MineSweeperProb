@@ -29,23 +29,25 @@ namespace SimulatorManagerClient
             {
                 var data = udp.Receive(ref m_IP);
                 var str = Encoding.UTF8.GetString(data);
-                Console.WriteLine(str);
+                Console.WriteLine($"{m_IP.Address}:{m_IP.Port} {m_IP.AddressFamily} : {str}");
                 var ret = "unknown command";
                 switch (str)
                 {
                     case "exit":
                         return;
+                    case "version":
+                        ret = $"dll:{File.GetLastWriteTime("MineSweeperSolver.dll"):yyyy-MM-ddTHH:mm:sszzzz} " +
+                              $"exe:{File.GetLastWriteTime("MineSweeperSimulator.exe"):yyyy-MM-ddTHH:mm:sszzzz} " +
+                              $"client:{File.GetLastWriteTime("SimulatorManagerClient.exe"):yyyy-MM-ddTHH:mm:sszzzz}";
+                        break;
                     case "state":
-                        ret = proc != null ? "still running" : "not yet started";
+                        ret = proc != null ? $"still running id:{proc.Id} exited:{proc.HasExited}" : "not yet started";
                         break;
                     case "start":
                         try
                         {
                             proc = Process.Start("MineSweeperSimulator.exe");
-                            if (proc != null)
-                                ret = "id:" + proc.Id;
-                            else
-                                ret = "failed";
+                            ret = proc != null ? $"id:{proc.Id} exited:{proc.HasExited}" : "failed";
                         }
                         catch (Exception e)
                         {
@@ -216,6 +218,15 @@ namespace SimulatorManagerClient
                 Console.WriteLine($"Connecting {m_IP.Address}:{m_IP.Port}");
                 tcp.Connect(m_IP);
                 Console.WriteLine($"Connected {m_IP.Address}:{m_IP.Port}");
+                if (File.Exists(filename))
+                    try
+                    {
+                        File.Delete(filename);
+                    }
+                    catch (Exception)
+                    {
+                        // ignored
+                    }
                 using (var stream = tcp.GetStream())
                 using (var file = File.OpenWrite(filename))
                     while (true)
@@ -242,6 +253,8 @@ namespace SimulatorManagerClient
                 selfIP = new IPEndPoint(ip, 27015);
                 break;
             }
+
+            Console.WriteLine(selfIP.Address.ToString());
 
             var udp = new UdpClient(27017);
             while (true)
