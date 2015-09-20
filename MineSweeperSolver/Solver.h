@@ -26,7 +26,6 @@ public:
     const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
     double QuantityCondQ(const BlockSet &set, Block blk);
 
-    friend class BasicDrainer;
     friend class Drainer;
 private:
     std::multimap<size_t, DistCondQParameters *> m_DistCondQCache;
@@ -41,7 +40,7 @@ private:
     DistCondQParameters PackParameters(const BlockSet &set, Block blk, int &min) const;
 
     void GetHalves(DistCondQParameters &par) const;
-    void GetSolutions(DistCondQParameters &par) const;
+    void EnumerateSolutions(DistCondQParameters &par) const;
 
     DistCondQParameters *TryGetCache(DistCondQParameters &&par, std::function<bool(const DistCondQParameters &)> pre);
     const DistCondQParameters &ZCondQ(DistCondQParameters &&par);

@@ -64,7 +64,8 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     solver->m_MatrixAugment = m_Mgr.m_Solver->m_MatrixAugment;
 
     GenerateMicros(solver->m_BlockSets, m_Mgr.m_Solver->m_TotalStates, m_Mgr.m_Solver->m_Solutions);
-    Drain(solver, m_Mgr.m_ToOpen);
+    GenerateRoot(solver, m_Mgr.m_ToOpen);
+    Drain();
 }
 
 Drainer::~Drainer()

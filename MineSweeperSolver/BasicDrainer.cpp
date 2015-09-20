@@ -157,21 +157,8 @@ double BasicDrainer::GetBestProb() const
     return m_RootMacro->m_BestProb;
 }
 
-#ifdef USE_BASIC_SOLVER
-void BasicDrainer::Drain(BasicSolver *solver, int toOpen)
-#else
-void BasicDrainer::Drain(Solver *solver, int toOpen)
-#endif
+void BasicDrainer::Drain()
 {
-    {
-        auto macro = new MacroSituation();
-        macro->m_Degrees.resize(m_BlocksR.size(), -1);
-        macro->m_ToOpen = toOpen;
-        macro->m_Solver = solver;
-        macro->Hash();
-        m_RootMacro = GetOrAddMacroSituation(macro);
-    }
-
     for (auto &micro : m_Micros)
         SolveMicro(micro, m_RootMacro);
 
@@ -306,18 +293,6 @@ void BasicDrainer::GenerateMicros(const std::vector<BlockSet> &sets, size_t tota
                     for (auto i = 0; i < stack.size(); ++i)
                         for (auto kvp : ddic[i]->at(stack[i]))
                             lst[kvp.first] = kvp.second;
-#ifdef _DEBUG
-                    for (auto row = 0; row < m_Mgr.m_Solver->m_MatrixAugment.size(); ++row)
-                    {
-                        auto v = 0;
-                        for (auto col = 0; col < m_Mgr.m_Solver->m_BlockSets.size(); ++col)
-                            if (NZ(m_Mgr.m_Solver->m_Matrix[CNT(col)][row], SHF(col)))
-                                for (auto blk : m_Mgr.m_Solver->m_BlockSets[col])
-                                    if (lst[m_BlocksLookup[blk]] == BlockStatus::Mine)
-                                        ++v;
-                        ASSERT(m_Mgr.m_Solver->m_MatrixAugment[row] == v);
-                    }
-#endif
 
                     ++stack.back();
                 }
@@ -338,6 +313,20 @@ void BasicDrainer::GenerateMicros(const std::vector<BlockSet> &sets, size_t tota
                 ++stack.back();
             }
     }
+}
+
+#ifdef USE_BASIC_SOLVER
+void BasicDrainer::GenerateRoot(BasicSolver *solver, int toOpen)
+#else
+void BasicDrainer::GenerateRoot(Solver *solver, int toOpen)
+#endif
+{
+    auto macro = new MacroSituation();
+    macro->m_Degrees.resize(m_BlocksR.size(), -1);
+    macro->m_ToOpen = toOpen;
+    macro->m_Solver = solver;
+    macro->Hash();
+    m_RootMacro = GetOrAddMacroSituation(macro);
 }
 
 void BasicDrainer::SolveMicro(MicroSituation &micro, MacroSituation *macro)
@@ -413,7 +402,7 @@ void BasicDrainer::OpenBlock(MicroSituation &micro, MacroSituation *macro, Block
     if (macro->m_Degrees[blk] >= 0)
         return;
     ASSERT(micro[blk] == BlockStatus::Blank);
-    if (macro->m_Solver->GetBlockStatus(blk) == BlockStatus::Blank)
+    if (macro->m_Solver->GetBlockStatus(blk) == BlockStatus::Blank && macro->m_Degrees[blk] != -127)
         --macro->m_Solver->CanOpenForSure;
     macro->m_Solver->AddRestrain(blk, false);
     auto degree = 0;

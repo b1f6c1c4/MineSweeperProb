@@ -118,7 +118,7 @@ void Solver::GetHalves(DistCondQParameters& par) const
             par.m_Halves.push_back(i);
 }
 
-void Solver::GetSolutions(DistCondQParameters& par) const
+void Solver::EnumerateSolutions(DistCondQParameters& par) const
 {
     par.m_States.clear();
     par.m_States.resize(par.Length + 1, 0);
@@ -261,7 +261,7 @@ const DistCondQParameters &Solver::DistCondQ(DistCondQParameters &&par)
         return *ptr;
 
     GetHalves(*ptr);
-    GetSolutions(*ptr);
+    EnumerateSolutions(*ptr);
     return *ptr;
 }
 
@@ -273,7 +273,7 @@ const DistCondQParameters& Solver::UCondQ(DistCondQParameters&& par)
         return *ptr;
 
     GetHalves(*ptr);
-    GetSolutions(*ptr);
+    EnumerateSolutions(*ptr);
 
     ptr->m_Probability = 0;
     ptr->m_Expectation = 0;

@@ -59,10 +59,11 @@ protected:
     MacroSituation *m_RootMacro;
 
     void GenerateMicros(const std::vector<BlockSet> &sets, size_t totalStates, const std::vector<Solution> &solutions);
+    void Drain();
 #ifdef USE_BASIC_SOLVER
-    void Drain(BasicSolver *solver, int toOpen);
+    void GenerateRoot(BasicSolver *solver, int toOpen);
 #else
-    void Drain(Solver *solver, int toOpen);
+    void GenerateRoot(Solver *solver, int toOpen);
 #endif
     virtual void HeuristicPruning(MacroSituation *macro, BlockSet &bests) = 0;
 

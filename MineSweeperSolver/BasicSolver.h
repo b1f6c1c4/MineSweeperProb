@@ -80,12 +80,13 @@ public:
     double GetProbability(Block block) const;
     const double *GetProbabilities() const;
     double GetTotalStates() const;
+    const std::vector<BlockSet> &GetBlockSets() const;
+    const std::vector<Solution> &GetSolutions() const;
 
     void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
     virtual bool Solve(SolvingState maxDepth, bool shortcut);
 
-    friend class BasicDrainer;
     friend class Drainer;
 protected:
     SolvingState m_State;

@@ -64,6 +64,16 @@ double BasicSolver::GetTotalStates() const
     return m_TotalStates;
 }
 
+const std::vector<BlockSet> &BasicSolver::GetBlockSets() const
+{
+    return m_BlockSets;
+}
+
+const std::vector<Solution>& BasicSolver::GetSolutions() const
+{
+    return m_Solutions;
+}
+
 void BasicSolver::AddRestrain(Block blk, bool isMine)
 {
     if (m_Manager[blk] == BlockStatus::Unknown)
