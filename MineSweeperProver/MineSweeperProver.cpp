@@ -12,6 +12,9 @@
 #include "../MineSweeperSolver/Solver.h"
 #include <unordered_set>
 #include <iostream>
+#include "../MineSweeperSolver/BasicDrainer.h"
+#include <thread>
+#include <mutex>
 
 size_t MemoryLimit;
 
@@ -31,19 +34,19 @@ int GetIndex(int x, int y)
     return x * Height + y;
 }
 
-struct MacroSituation;
+struct Macro;
 struct Choice
 {
     explicit Choice(int blk) : m_UpperBound(NAN), Block(blk) { }
     double m_UpperBound;
     int Block;
-    std::unordered_map<MacroSituation *, double> Next;
+    std::unordered_map<Macro *, double> Next;
 };
 
-struct MacroSituation
+struct Macro
 {
-    MacroSituation() : m_Depth(0), m_Solver(nullptr), m_UpperBound(NAN) { }
-    MacroSituation(const MacroSituation &other) : m_Depth(other.m_Depth + 1), m_Degrees(other.m_Degrees), m_Solver(nullptr), m_UpperBound(NAN)
+    Macro() : m_Depth(0), m_Solver(nullptr), m_UpperBound(NAN) { }
+    Macro(const Macro &other) : m_Depth(other.m_Depth + 1), m_Degrees(other.m_Degrees), m_Solver(nullptr), m_UpperBound(NAN)
     {
         if (other.m_Solver != nullptr)
             m_Solver = new Solver(*other.m_Solver);
@@ -60,7 +63,7 @@ struct MacroSituation
 
 struct Hash
 {
-    size_t operator() (MacroSituation * const &macro) const
+    size_t operator() (Macro * const &macro) const
     {
         size_t h = 5381;
         for (auto v : macro->m_Degrees)
@@ -68,20 +71,22 @@ struct Hash
         return h;
     }
 };
-bool operator==(const MacroSituation &lhs, const MacroSituation &rhs)
+bool operator==(const Macro &lhs, const Macro &rhs)
 {
     return lhs.m_Degrees == rhs.m_Degrees;
 }
-bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs)
+bool operator!=(const Macro &lhs, const Macro &rhs)
 {
     return !(lhs == rhs);
 }
 
-std::deque<MacroSituation *> WorkingQueue;
-std::vector<std::unordered_set<MacroSituation *, Hash>> Situations;
+std::mutex WorkingQueueMutex;
+std::deque<Macro *> WorkingQueue;
+std::mutex SituationsMutex;
+std::vector<std::unordered_set<Macro *, Hash>> Situations;
 std::vector<size_t> Queued;
 
-void OpenBlock(MacroSituation *macro, Block blk, bool forceNoMine = false)
+void OpenBlock(Macro *macro, Block blk, bool forceNoMine = false)
 {
     if (macro->m_Degrees[blk] != CLOSED)
         return;
@@ -95,21 +100,28 @@ void OpenBlock(MacroSituation *macro, Block blk, bool forceNoMine = false)
         if (info.m_States[i] == 0)
             continue;
 
-        auto child = new MacroSituation(*macro);
+        auto child = new Macro(*macro);
         child->m_Degrees[blk] = min + i;
         if (child->m_Depth >= Situations.size())
         {
             Situations.emplace_back();
             Queued.push_back(0);
         }
-        auto res = Situations[child->m_Depth].insert(child);
+
+        std::unordered_set<Macro*, Hash>::_Pairib res;
+        {
+            std::unique_lock<std::mutex> lock(SituationsMutex);
+
+            res = Situations[child->m_Depth].insert(child);
+            if (res.second)
+                ++Queued[child->m_Depth];
+        }
         if (res.second)
         {
             if (child->m_Solver->GetBlockStatus(blk) == BlockStatus::Blank)
                 --child->m_Solver->CanOpenForSure;
             child->m_Solver->AddRestrain(blk, false);
             child->m_Solver->AddRestrain(m_BlocksR[blk], min + i);
-            ++Queued[child->m_Depth];
         }
         else
         {
@@ -121,11 +133,16 @@ void OpenBlock(MacroSituation *macro, Block blk, bool forceNoMine = false)
         else
             macro->m_Choices.back().Next.insert(std::make_pair(child, info.m_Result[i]
                 * (1 - macro->m_Solver->GetProbability(blk))));
-        WorkingQueue.push_back(child);
+
+        {
+            std::unique_lock<std::mutex> lock(WorkingQueueMutex);
+
+            WorkingQueue.push_back(child);
+        }
     }
 }
 
-void GetUpperBound(MacroSituation *macro, int maxDepth)
+void GetUpperBound(Macro *macro, int maxDepth)
 {
 #ifndef _DEBUG
     if (macro->m_Solver != nullptr)
@@ -135,8 +152,8 @@ void GetUpperBound(MacroSituation *macro, int maxDepth)
     }
 #endif
 
-    if (macro->m_Depth == maxDepth)
-        return;
+    //if (macro->m_Depth == maxDepth)
+    //    return;
 
     if (macro->m_Choices.empty())
         return;
@@ -164,8 +181,125 @@ void GetUpperBound(MacroSituation *macro, int maxDepth)
     std::vector<Choice>().swap(macro->m_Choices);
 }
 
+class SimpleDrainer : public BasicDrainer
+{
+public:
+    explicit SimpleDrainer(const Macro &macro) : BasicDrainer()
+    {
+        this->m_BlocksR = ::m_BlocksR;
+        GenerateMicros(macro.m_Solver->GetBlockSets(), macro.m_Solver->GetTotalStates(), macro.m_Solver->GetSolutions());
+        GenerateRoot(new Solver(*macro.m_Solver), Width * Height - Mines - macro.m_Depth);
+        Drain();
+    }
+protected:
+    void HeuristicPruning(MacroSituation *macro, BlockSet &bests) override
+    {
+    }
+};
+
+std::mutex PrunMutex;
+auto prun = false;
+auto maxDepth = 0;
+
+void Process()
+{
+    BlockSet preferred;
+    while (true)
+    {
+        if (!prun && !IsMemoryEnough())
+        {
+            std::unique_lock<std::mutex> lock(PrunMutex);
+
+            if (!prun)
+            {
+                std::cout << "(P)";
+                prun = true;
+            }
+        }
+        Macro *macro = nullptr;
+        {
+            std::unique_lock<std::mutex> lock(WorkingQueueMutex);
+
+            if (!WorkingQueue.empty())
+            {
+                macro = WorkingQueue.front();
+                WorkingQueue.pop_front();
+            }
+        }
+        if (macro == nullptr)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds{ 1 });
+            {
+                std::unique_lock<std::mutex> lock(WorkingQueueMutex);
+
+                if (WorkingQueue.empty())
+                    break;
+            }
+        }
+        //if (prun && macro->m_Depth > maxDepth)
+        //{
+        //    delete macro;
+        //    continue;
+        //}
+        --Queued[macro->m_Depth];
+        macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, false);
+        if (macro->m_Solver->GetTotalStates() == 1.0)
+        {
+            macro->m_UpperBound = 1;
+        }
+        else if (macro->m_Solver->CanOpenForSure > 0)
+        {
+            macro->m_UpperBound = 1;
+            if (!prun)
+                for (auto i = 0; i < Width * Height; ++i)
+                    if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
+                    {
+                        OpenBlock(macro, i);
+                        break;
+                    }
+        }
+        else
+        {
+            for (auto i = 0; i < Width * Height; ++i)
+                if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Unknown)
+                    macro->m_BestChoices.push_back(i);
+
+#define LARGEST(exp) Largest(macro->m_BestChoices, std::function<double(Block)>([macro](Block blk) { return exp; } ))
+            LARGEST(macro->m_Solver->UpperBoundCondQ(m_BlocksR[blk], blk)*(1 - macro->m_Solver->GetProbability(macro->m_BestChoices.front())));
+            int min;
+            macro->m_UpperBound = macro->m_Solver->GetDistInfo(m_BlocksR[macro->m_BestChoices.front()], macro->m_BestChoices.front(), min).m_UpperBound * (1 - macro->m_Solver->GetProbability(macro->m_BestChoices.front()));
+
+            if (!prun)
+#ifndef SEMI
+                for (auto i = 0; i < Width * Height; ++i)
+                    if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Unknown)
+                        OpenBlock(macro, i, macro->m_Depth == 0);
+#else
+                for (auto b : macro->m_BestChoices)
+                    OpenBlock(macro, b);
+#endif
+        }
+#ifndef _DEBUG
+        delete macro->m_Solver;
+        macro->m_Solver = nullptr;
+#endif
+        if (Queued[macro->m_Depth] == 0)
+        {
+            std::unique_lock<std::mutex> lock(SituationsMutex);
+
+            maxDepth = macro->m_Depth;
+            std::cout << " cleared " << std::endl;
+            std::cout << "Layer " << maxDepth << " (" << WorkingQueue.size() << ") ...";
+        }
+    }
+}
+
 int main()
 {
+    int thrs;
+    std::cout << "Threads";
+    std::cin >> thrs;
+
     std::cout << "Width Height Mines: ";
     std::cin >> Width >> Height >> Mines;
 
@@ -193,72 +327,30 @@ int main()
                                 blkR.push_back(GetIndex(i + di, j + dj));
         }
 
-    auto root = new MacroSituation;
+    auto root = new Macro;
     root->m_Degrees.resize(Width*Height, CLOSED);
     root->m_Solver = new Solver(Width * Height, Mines);
     root->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, false);
+
     Situations[0].insert(root);
     OpenBlock(root, 0, true);
     //WorkingQueue.push_back(root);
 
+    //std::cout << "Draining..." << std::endl;
+    //SimpleDrainer dr(*root);
+    //std::cout << dr.GetBestProb() * (Width * Height) / (Width * Height - Mines) << std::endl;
+    //system("pause");
+
     std::cout << "Forking..." << std::endl;
 
-    auto maxDepth = 0;
-    BlockSet preferred;
-    auto prun = false;
-    while (!WorkingQueue.empty())
-    {
-        if (!prun && !IsMemoryEnough())
-        {
-            std::cout << "Pruning..." << std::endl;
-            prun = true;
-        }
+    std::cout << "Layer " << maxDepth << " (" << WorkingQueue.size() << ") ...";
 
-        auto macro = WorkingQueue.front();
-        WorkingQueue.pop_front();
-        if (prun && macro->m_Depth > maxDepth)
-        {
-            delete macro;
-            continue;
-        }
-        --Queued[macro->m_Depth];
-        macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, false);
-        if (macro->m_Solver->CanOpenForSure > 0)
-        {
-            macro->m_UpperBound = 1;
-            if (!prun && macro->m_Solver->GetTotalStates() > 1)
-                for (auto i = 0; i < Width * Height; ++i)
-                    if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-                    {
-                        OpenBlock(macro, i);
-                        break;
-                    }
-        }
-        else
-        {
-            for (auto i = 0; i < Width * Height; ++i)
-                if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Unknown)
-                    macro->m_BestChoices.push_back(i);
-
-#define LARGEST(exp) Largest(macro->m_BestChoices, std::function<double(Block)>([macro](Block blk) { return exp; } ))
-            LARGEST(macro->m_Solver->UpperBoundCondQ(m_BlocksR[blk], blk)*(1 - macro->m_Solver->GetProbability(macro->m_BestChoices.front())));
-            int min;
-            macro->m_UpperBound = macro->m_Solver->GetDistInfo(m_BlocksR[macro->m_BestChoices.front()], macro->m_BestChoices.front(), min).m_UpperBound * (1 - macro->m_Solver->GetProbability(macro->m_BestChoices.front()));
-
-            if (!prun)
-                for (auto b : macro->m_BestChoices)
-                    OpenBlock(macro, b);
-        }
-#ifndef _DEBUG
-        delete macro->m_Solver;
-        macro->m_Solver = nullptr;
-#endif
-        if (Queued[macro->m_Depth] == 0)
-        {
-            std::cout << "Layer " << macro->m_Depth << " cleared. Next Layer will be " << WorkingQueue.size() << std::endl;
-            maxDepth = macro->m_Depth;
-        }
-    }
+    std::vector<std::thread> thr;
+    thr.reserve(thrs);
+    for (auto i = 0; i < thrs; ++i)
+        thr.emplace_back(&Process);
+    for (auto &th : thr)
+        th.join();
 
     for (auto i = maxDepth + 1; i < Situations.size(); ++i)
         Situations[i].clear();
