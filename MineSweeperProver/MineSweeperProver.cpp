@@ -34,10 +34,10 @@ int GetIndex(int x, int y)
 struct MacroSituation;
 struct Choice
 {
-    explicit Choice(int blk) : Block(blk), m_UpperBound(NAN) { }
+    explicit Choice(int blk) : m_UpperBound(NAN), Block(blk) { }
+    double m_UpperBound;
     int Block;
     std::unordered_map<MacroSituation *, double> Next;
-    double m_UpperBound;
 };
 
 struct MacroSituation
@@ -105,9 +105,9 @@ void OpenBlock(MacroSituation *macro, Block blk, bool forceNoMine = false)
         auto res = Situations[child->m_Depth].insert(child);
         if (res.second)
         {
-            child->m_Solver->AddRestrain(blk, false);
             if (child->m_Solver->GetBlockStatus(blk) == BlockStatus::Blank)
                 --child->m_Solver->CanOpenForSure;
+            child->m_Solver->AddRestrain(blk, false);
             child->m_Solver->AddRestrain(m_BlocksR[blk], min + i);
             ++Queued[child->m_Depth];
         }
@@ -127,13 +127,18 @@ void OpenBlock(MacroSituation *macro, Block blk, bool forceNoMine = false)
 
 void GetUpperBound(MacroSituation *macro, int maxDepth)
 {
+#ifndef _DEBUG
     if (macro->m_Solver != nullptr)
     {
         delete macro->m_Solver;
         macro->m_Solver = nullptr;
     }
+#endif
 
     if (macro->m_Depth == maxDepth)
+        return;
+
+    if (macro->m_Choices.empty())
         return;
 
     double upper = 0;
@@ -222,12 +227,12 @@ int main()
         {
             macro->m_UpperBound = 1;
             if (!prun && macro->m_Solver->GetTotalStates() > 1)
-            for (auto i = 0; i < Width * Height; ++i)
-                if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-                {
-                    OpenBlock(macro, i);
-                    break;
-                }
+                for (auto i = 0; i < Width * Height; ++i)
+                    if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
+                    {
+                        OpenBlock(macro, i);
+                        break;
+                    }
         }
         else
         {
@@ -244,8 +249,10 @@ int main()
                 for (auto b : macro->m_BestChoices)
                     OpenBlock(macro, b);
         }
+#ifndef _DEBUG
         delete macro->m_Solver;
         macro->m_Solver = nullptr;
+#endif
         if (Queued[macro->m_Depth] == 0)
         {
             std::cout << "Layer " << macro->m_Depth << " cleared. Next Layer will be " << WorkingQueue.size() << std::endl;

@@ -102,6 +102,7 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
             {
                 m_Manager[blk] = BlockStatus::Blank;
                 ++CanOpenForSure;
+                m_State = SolvingState::Stale;
             }
         for (auto blk : set)
             if (m_SetIDs[blk] >= 0)
@@ -116,7 +117,10 @@ void Solver::AddRestrain(const BlockSet &set, int mines)
         {
             for (auto blk : set)
                 if (m_Manager[blk] == BlockStatus::Unknown)
+                {
                     m_Manager[blk] = BlockStatus::Mine;
+                    m_State = SolvingState::Stale;
+                }
             for (auto blk : set)
                 if (m_SetIDs[blk] >= 0)
                     ReduceBlockSet(m_SetIDs[blk]);
