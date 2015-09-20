@@ -42,6 +42,12 @@
     <ClInclude Include="base64.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="BasicSolver.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="BasicDrainer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -69,6 +75,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="base64.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BasicSolver.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="BasicDrainer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

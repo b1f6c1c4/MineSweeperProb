@@ -157,6 +157,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="base64.h" />
+    <ClInclude Include="BasicDrainer.h" />
+    <ClInclude Include="BasicSolver.h" />
     <ClInclude Include="BinomialHelper.h" />
     <ClInclude Include="Drainer.h" />
     <ClInclude Include="GameMgr.h" />
@@ -168,6 +170,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="base64.cpp" />
+    <ClCompile Include="BasicDrainer.cpp" />
+    <ClCompile Include="BasicSolver.cpp" />
     <ClCompile Include="BinomialHelper.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>

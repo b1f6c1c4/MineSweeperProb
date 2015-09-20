@@ -15,6 +15,8 @@ struct
     bool IsMine;
 };
 
+class DLL_API Drainer;
+
 class
     DLL_API GameMgr
 {
