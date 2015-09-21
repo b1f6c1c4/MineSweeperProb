@@ -24,20 +24,25 @@ volatile size_t *rest;
 volatile size_t *succeed, *succeedT;
 volatile size_t *total, *totalT;
 
-bool ProcessID(int id)
+bool ProcessID(const Strategy &st)
 {
     GameMgr mgr(30, 16, 99);
-    mgr.BasicStrategy = cert[id];
+    mgr.BasicStrategy = st;
     mgr.Automatic();
     return mgr.GetSucceed();
 }
 
-void Process(int id, bool (*fun)(int))
+void Process(int id, bool (*fun)(const Strategy &))
 {
+    auto numTasksX = numTasks;
+    auto denseX = new size_t[numTasksX];
+    memcpy(denseX, dense, sizeof(size_t) * numTasks);
+    auto certX = new Strategy[numTasksX];
+    memcpy(certX, cert, sizeof(Strategy) * numTasks);
     for (;; ++id)
     {
-        id %= numTasks;
-        auto d = dense[id];
+        id %= numTasksX;
+        auto d = denseX[id];
         while (d-- > 0)
         {
             {
@@ -52,7 +57,7 @@ void Process(int id, bool (*fun)(int))
                 --rest[id];
             }
 
-            auto res = fun(id);
+            auto res = fun(certX[id]);
 
             {
                 std::unique_lock<std::mutex> lock(mtx);
