@@ -200,7 +200,9 @@ private:
 
             GetApplication()->InvokeLambdaInMainThread([this]() {this->Update(); });
 
-            m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic, true);
+            m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap, false);
+            if (m_Mgr->GetSolver().CanOpenForSure == 0)
+                m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic, true);
 
             auto flag = false;
             auto cnt = m_Mgr->GetBestBlockCount();
