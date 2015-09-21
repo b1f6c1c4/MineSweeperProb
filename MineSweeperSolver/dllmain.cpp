@@ -40,10 +40,10 @@ struct
     const Block *PreferredBlocks;
 };
 
-extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines)
+extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines, const char *strategy)
 {
     auto mgr = new GameMgr(width, height, totalMines);
-    mgr->BasicStrategy = ReadStrategy("FL-PSEQZ");
+    mgr->BasicStrategy = ReadStrategy(std::string(strategy));
     return mgr;
 }
 
@@ -51,7 +51,6 @@ extern "C" DLL_API GameMgr *CreateGameMgrFromFile(const wchar_t *filename)
 {
     std::ifstream sr(filename, std::ios::binary | std::ios::_Nocreate);
     auto mgr = new GameMgr(sr);
-    mgr->BasicStrategy = ReadStrategy("FL-PSEQZ");
     sr.close();
     return mgr;
 }

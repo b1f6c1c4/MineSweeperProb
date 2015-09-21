@@ -13,6 +13,7 @@ namespace MineSweeper
         private readonly int m_Width;
         private readonly int m_Height;
         private int m_Mines;
+        private readonly string m_Strategy;
 
         private readonly float m_ScaleFactor;
 
@@ -21,15 +22,16 @@ namespace MineSweeper
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
-        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth, mgr.TotalHeight, mgr.TotalMines, mgr) { }
+        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth, mgr.TotalHeight, mgr.TotalMines, null, mgr) { }
 
-        public MineSweeper(int width, int height, int mines, GameMgr mgr = null)
+        public MineSweeper(int width, int height, int mines, string strategy = null, GameMgr mgr = null)
         {
             m_Width = width;
             m_Height = height;
             m_Mines = mines;
             m_Mgr = mgr;
             m_InitWithMgr = mgr != null;
+            m_Strategy = strategy;
 
             var screen = Screen.FromControl(this);
             var f = Math.Min(
@@ -157,7 +159,9 @@ namespace MineSweeper
                 var mode = (m_Mgr?.Mode ?? SolvingMode.ZeroProb) & SolvingMode.ZeroProb;
                 if (m_Mgr?.Mode.HasFlag(SolvingMode.Drained) ?? false)
                     mode |= SolvingMode.ZeroProb;
-                m_Mgr = new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode };
+                m_Mgr = m_Strategy == null
+                            ? new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode }
+                            : new GameMgr(m_Width, m_Height, m_Mines, m_Strategy) { Mode = mode };
             }
             else
                 m_Mgr = mgr;

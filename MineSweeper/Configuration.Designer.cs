@@ -41,6 +41,8 @@
             this.label2 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.btnStart = new System.Windows.Forms.Button();
+            this.label4 = new System.Windows.Forms.Label();
+            this.txtStrategy = new System.Windows.Forms.TextBox();
             this.tableLayoutPanel1.SuspendLayout();
             this.tableLayoutPanel2.SuspendLayout();
             this.SuspendLayout();
@@ -53,7 +55,7 @@
             this.txtWidth.MaxLength = 4;
             this.txtWidth.Multiline = true;
             this.txtWidth.Name = "txtWidth";
-            this.txtWidth.Size = new System.Drawing.Size(64, 28);
+            this.txtWidth.Size = new System.Drawing.Size(39, 28);
             this.txtWidth.TabIndex = 4;
             this.txtWidth.Validating += new System.ComponentModel.CancelEventHandler(this.TextBox_Validating);
             // 
@@ -137,35 +139,39 @@
             // 
             // tableLayoutPanel2
             // 
-            this.tableLayoutPanel2.ColumnCount = 6;
+            this.tableLayoutPanel2.ColumnCount = 8;
             this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 50F));
-            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 33.33334F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 20F));
             this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 50F));
-            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 20F));
             this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 50F));
-            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 33.33333F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 20F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 50F));
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 40F));
+            this.tableLayoutPanel2.Controls.Add(this.txtStrategy, 7, 0);
+            this.tableLayoutPanel2.Controls.Add(this.label4, 6, 0);
             this.tableLayoutPanel2.Controls.Add(this.txtMines, 5, 0);
             this.tableLayoutPanel2.Controls.Add(this.label3, 4, 0);
             this.tableLayoutPanel2.Controls.Add(this.txtHeight, 3, 0);
             this.tableLayoutPanel2.Controls.Add(this.label2, 2, 0);
             this.tableLayoutPanel2.Controls.Add(this.label1, 0, 0);
             this.tableLayoutPanel2.Controls.Add(this.txtWidth, 1, 0);
-            this.tableLayoutPanel2.Location = new System.Drawing.Point(100, 12);
+            this.tableLayoutPanel2.Location = new System.Drawing.Point(80, 12);
             this.tableLayoutPanel2.Name = "tableLayoutPanel2";
             this.tableLayoutPanel2.RowCount = 1;
             this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanel2.Size = new System.Drawing.Size(361, 34);
+            this.tableLayoutPanel2.Size = new System.Drawing.Size(429, 34);
             this.tableLayoutPanel2.TabIndex = 2;
             // 
             // txtMines
             // 
             this.txtMines.Dock = System.Windows.Forms.DockStyle.Fill;
             this.txtMines.Font = new System.Drawing.Font("微软雅黑", 14F);
-            this.txtMines.Location = new System.Drawing.Point(293, 3);
+            this.txtMines.Location = new System.Drawing.Point(243, 3);
             this.txtMines.MaxLength = 4;
             this.txtMines.Multiline = true;
             this.txtMines.Name = "txtMines";
-            this.txtMines.Size = new System.Drawing.Size(65, 28);
+            this.txtMines.Size = new System.Drawing.Size(39, 28);
             this.txtMines.TabIndex = 6;
             this.txtMines.Validating += new System.ComponentModel.CancelEventHandler(this.TextBox_Validating);
             // 
@@ -173,7 +179,7 @@
             // 
             this.label3.AutoSize = true;
             this.label3.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.label3.Location = new System.Drawing.Point(243, 0);
+            this.label3.Location = new System.Drawing.Point(193, 0);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(44, 34);
             this.label3.TabIndex = 3;
@@ -184,11 +190,11 @@
             // 
             this.txtHeight.Dock = System.Windows.Forms.DockStyle.Fill;
             this.txtHeight.Font = new System.Drawing.Font("微软雅黑", 14F);
-            this.txtHeight.Location = new System.Drawing.Point(173, 3);
+            this.txtHeight.Location = new System.Drawing.Point(148, 3);
             this.txtHeight.MaxLength = 4;
             this.txtHeight.Multiline = true;
             this.txtHeight.Name = "txtHeight";
-            this.txtHeight.Size = new System.Drawing.Size(64, 28);
+            this.txtHeight.Size = new System.Drawing.Size(39, 28);
             this.txtHeight.TabIndex = 5;
             this.txtHeight.Validating += new System.ComponentModel.CancelEventHandler(this.TextBox_Validating);
             // 
@@ -196,7 +202,7 @@
             // 
             this.label2.AutoSize = true;
             this.label2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.label2.Location = new System.Drawing.Point(123, 0);
+            this.label2.Location = new System.Drawing.Point(98, 0);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(44, 34);
             this.label2.TabIndex = 1;
@@ -217,18 +223,41 @@
             // btnStart
             // 
             this.btnStart.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.btnStart.Location = new System.Drawing.Point(100, 59);
+            this.btnStart.Location = new System.Drawing.Point(80, 59);
             this.btnStart.Name = "btnStart";
-            this.btnStart.Size = new System.Drawing.Size(361, 115);
+            this.btnStart.Size = new System.Drawing.Size(429, 115);
             this.btnStart.TabIndex = 7;
             this.btnStart.Text = "启动";
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);
             // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.label4.Location = new System.Drawing.Point(288, 0);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(44, 34);
+            this.label4.TabIndex = 7;
+            this.label4.Text = "策略：";
+            this.label4.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            // 
+            // txtStrategy
+            // 
+            this.txtStrategy.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtStrategy.Font = new System.Drawing.Font("微软雅黑", 14F);
+            this.txtStrategy.Location = new System.Drawing.Point(338, 3);
+            this.txtStrategy.MaxLength = 7;
+            this.txtStrategy.Multiline = true;
+            this.txtStrategy.Name = "txtStrategy";
+            this.txtStrategy.Size = new System.Drawing.Size(88, 28);
+            this.txtStrategy.TabIndex = 8;
+            this.txtStrategy.Text = "PSEQZ";
+            // 
             // Configuration
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.ClientSize = new System.Drawing.Size(473, 186);
+            this.ClientSize = new System.Drawing.Size(521, 186);
             this.Controls.Add(this.btnStart);
             this.Controls.Add(this.tableLayoutPanel2);
             this.Controls.Add(this.tableLayoutPanel1);
@@ -264,5 +293,7 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Button btnStart;
+        private System.Windows.Forms.TextBox txtStrategy;
+        private System.Windows.Forms.Label label4;
     }
 }

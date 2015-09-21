@@ -77,7 +77,8 @@ namespace MineSweeper
             var frm = new MineSweeper(
                 Convert.ToInt32(txtWidth.Text),
                 Convert.ToInt32(txtHeight.Text),
-                Convert.ToInt32(txtMines.Text));
+                Convert.ToInt32(txtMines.Text),
+                "FL-" + txtStrategy.Text);
             frm.Show();
             Hide();
         }

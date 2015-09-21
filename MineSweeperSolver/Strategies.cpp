@@ -34,11 +34,17 @@ DLL_API Strategy ReadStrategy(std::string str)
         ss >> ch;
         if (ch != '[')
             throw;
+        st.InitialPositionSpecified = true;
         ss >> st.Index;
         ss >> ch;
         if (ch != ']')
             throw;
         ss >> ch;
+    }
+    else
+    {
+        st.InitialPositionSpecified = false;
+        st.Index = 480;
     }
     if (ch != '-')
         throw;
@@ -100,17 +106,18 @@ DLL_API Strategy ReadStrategy(std::string str)
         default:
             break;
         }
-        if (!ss.eof())
-            ss >> ch;
-        else
+        ss >> ch;
+        if (ss.eof())
             ch = '-';
     }
 
     st.ExhaustEnabled = false;
+    st.ExhaustCriterion = 0;
+    st.PruningCriterion = 0;
+    ss >> ch;
     if (ss.eof())
         return st;
 
-    ss >> ch;
     if (ch != 'D')
         throw;
 
@@ -118,10 +125,10 @@ DLL_API Strategy ReadStrategy(std::string str)
     ss >> st.ExhaustCriterion;
 
     st.PruningEnabled = false;
+    ss >> ch;
     if (ss.eof())
         return st;
 
-    ss >> ch;
     if (ch != '-')
         throw;
     ss >> ch;
@@ -135,9 +142,9 @@ DLL_API Strategy ReadStrategy(std::string str)
     if (ch != '-')
         throw;
 
+    ss >> ch;
     while (!ss.eof())
     {
-        ss >> ch;
         switch (ch)
         {
         case 'P':
@@ -164,6 +171,7 @@ DLL_API Strategy ReadStrategy(std::string str)
         default:
             break;
         }
+        ss >> ch;
     }
 
     return st;

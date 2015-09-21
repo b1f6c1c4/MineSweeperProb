@@ -38,6 +38,7 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
 GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val));
+    READ(BasicStrategy);
     READ(m_TotalWidth);
     READ(m_TotalHeight);
     READ(m_TotalMines);
@@ -509,6 +510,7 @@ void GameMgr::EnableDrainer()
 void GameMgr::Save(std::ostream &sw) const
 {
 #define WRITE(val) sw.write(reinterpret_cast<const char *>(&(val)), sizeof(val));
+    WRITE(BasicStrategy);
     WRITE(m_TotalWidth);
     WRITE(m_TotalHeight);
     WRITE(m_TotalMines);

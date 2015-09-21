@@ -271,13 +271,13 @@ namespace MineSweeper
         /// </summary>
         private Thread m_Backgrounding;
 
-        public GameMgr(int width, int height, int totalMines)
+        public GameMgr(int width, int height, int totalMines, string strategy = "FL-PSEQZ")
         {
             TotalWidth = width;
             TotalHeight = height;
             TotalMines = totalMines;
             CacheBinomials(width * height, totalMines);
-            m_NativeObject = CreateGameMgr(width, height, totalMines);
+            m_NativeObject = CreateGameMgr(width, height, totalMines, strategy);
 
             m_Blocks = new List<Block>();
             for (var i = 0; i < width; i++)
@@ -439,8 +439,8 @@ namespace MineSweeper
         [DllImport("MineSweeperSolver.dll")]
         private static extern void CacheBinomials(int n, int m);
 
-        [DllImport("MineSweeperSolver.dll")]
-        private static extern IntPtr CreateGameMgr(int width, int height, int totalMines);
+        [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Ansi)]
+        private static extern IntPtr CreateGameMgr(int width, int height, int totalMines, string strategy);
 
         [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr CreateGameMgrFromFile(string filename);
@@ -476,7 +476,7 @@ namespace MineSweeper
         private static extern bool Automatic(IntPtr mgr);
 
         [DllImport("MineSweeperSolver.dll")]
-        private static extern bool EnableDrainer(IntPtr mgr); 
+        private static extern bool EnableDrainer(IntPtr mgr);
 
          [DllImport("MineSweeperSolver.dll")]
         private static extern bool OpenOptimalBlocks(IntPtr mgr);
