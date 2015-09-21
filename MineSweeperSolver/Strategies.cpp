@@ -1,108 +1,273 @@
 #include "Strategies.h"
-#include "base64.h"
-
-#define MASK(shift) (1 << (shift))
-#define MASKL(lng) (MASK((lng)) - 1)
-#define MASKH(lng) (~(MASK(8 - (lng)) - 1))
-
-template <class T>
-static T ReadBits(std::basic_string<unsigned char> buf, int &cur, int length)
-{
-    auto buff = new unsigned char[max((length + 7) / 8, sizeof(T))];
-    ZeroMemory(buff, max((length + 7) / 8, sizeof(T)));
-    auto curb = 0;
-
-    while (curb < length)
-    {
-        auto to = min(min(length - curb, 8 - curb % 8), 8 - cur % 8);
-        buff[curb / 8] |= ((buf[cur / 8] & MASKH(8 - cur % 8)) >> cur % 8 & MASKL(to)) << curb % 8;
-        curb += to, cur += to;
-    }
-
-    auto res = *reinterpret_cast<T*>(buff);
-    delete[] buff;
-    return res;
-}
-
-template <class T>
-static void WriteBits(std::basic_string<unsigned char> &buf, const T &val, int &cur, int length)
-{
-    auto buff = reinterpret_cast<const unsigned char *>(&val);
-    auto curb = 0;
-
-    while (curb < length)
-    {
-        if (cur / 8 == buf.size())
-            buf.push_back(0);
-        auto to = min(min(length - curb, 8 - cur % 8), 8 - curb % 8);
-        buf[cur / 8] |= ((buff[curb / 8] & MASKH(8 - curb % 8)) >> curb % 8 & MASKL(to)) << cur % 8;
-        curb += to, cur += to;
-    }
-}
+#include <sstream>
 
 DLL_API Strategy ReadStrategy(std::string str)
 {
-    auto buf = base64_decode(str);
+    std::stringstream ss(str);
+
     Strategy st;
-    auto cur = 0;
-
-#define R(field, type, length) field = ReadBits<type>(buf, cur, length)
-
-    R(st.Index, int, 9);
-    st.InitialPositionSpecified = st.Index != 480;
-
-    R(st.Logic, LogicMethod, 2);
-    R(st.HeuristicEnabled, bool, 1);
-
-    size_t sz;
-    R(sz, size_t, 3);
-    st.DecisionTree.reserve(sz);
-    for (auto i = 0; i < sz; i++)
-        st.DecisionTree.push_back(ReadBits<HeuristicMethod>(buf, cur, 3));
-
-    R(st.ExhaustCriterion, int, 9);
-    R(st.PruningCriterion, int, 12);
-    if (st.ExhaustCriterion != 0)
+    char ch;
+    ss >> ch;
+    switch (ch)
     {
-        st.ExhaustEnabled = true;
-        st.PruningEnabled = st.PruningCriterion != st.ExhaustCriterion;
+    case 'N':
+        st.Logic = LogicMethod::None;
+        break;
+    case 'S':
+        st.Logic = LogicMethod::Single;
+        break;
+    case 'D':
+        st.Logic = LogicMethod::Double;
+        break;
+    case 'F':
+        st.Logic = LogicMethod::Full;
+        break;
+    default:
+        throw;
     }
-    else
+    ss >> ch;
+    if (ch != 'L')
+        throw;
+    ss >> ch;
+    if (ch == '@')
     {
-        st.ExhaustEnabled = false;
-        st.PruningEnabled = false;
+        ss >> ch;
+        if (ch != '[')
+            throw;
+        ss >> st.Index;
+        ss >> ch;
+        if (ch != ']')
+            throw;
+        ss >> ch;
+    }
+    if (ch != '-')
+        throw;
+
+    st.HeuristicEnabled = true;
+    ss >> ch;
+    if (ch == 'N')
+    {
+        ss >> ch;
+        if (ch != 'H')
+            throw;
+    }
+    else if (ch == 'P')
+    {
+        if (!ss.eof())
+        {
+            ss >> ch;
+            if (ch == 'u')
+            {
+                ss >> ch;
+                if (ch != 'r')
+                    throw;
+                ss >> ch;
+                if (ch != 'e')
+                    throw;
+                st.HeuristicEnabled = false;
+            }
+        }
+        else
+            ch = '-';
+        if (st.HeuristicEnabled)
+            st.DecisionTree.push_back(HeuristicMethod::MinMineProb);
+    }
+    while (ch != '-')
+    {
+        switch (ch)
+        {
+        case 'P':
+            st.DecisionTree.push_back(HeuristicMethod::MinMineProb);
+            break;
+        case 'Z':
+            st.DecisionTree.push_back(HeuristicMethod::MaxZeroProb);
+            break;
+        case 'S':
+            st.DecisionTree.push_back(HeuristicMethod::MaxZerosProb);
+            break;
+        case 'E':
+            st.DecisionTree.push_back(HeuristicMethod::MaxZerosExp);
+            break;
+        case 'Q':
+            st.DecisionTree.push_back(HeuristicMethod::MaxQuantityExp);
+            break;
+        case 'F':
+            st.DecisionTree.push_back(HeuristicMethod::MinFrontierDist);
+            break;
+        case 'U':
+            st.DecisionTree.push_back(HeuristicMethod::MaxUpperBound);
+            break;
+        default:
+            break;
+        }
+        if (!ss.eof())
+            ss >> ch;
+        else
+            ch = '-';
     }
 
-    R(sz, size_t, 3);
-    st.PruningDecisionTree.reserve(sz);
-    for (auto i = 0; i < sz; i++)
-        st.PruningDecisionTree.push_back(ReadBits<HeuristicMethod>(buf, cur, 3));
+    st.ExhaustEnabled = false;
+    if (ss.eof())
+        return st;
+
+    ss >> ch;
+    if (ch != 'D')
+        throw;
+
+    st.ExhaustEnabled = true;
+    ss >> st.ExhaustCriterion;
+
+    st.PruningEnabled = false;
+    if (ss.eof())
+        return st;
+
+    ss >> ch;
+    if (ch != '-')
+        throw;
+    ss >> ch;
+    if (ch != 'P')
+        throw;
+
+    st.PruningEnabled = true;
+    ss >> st.PruningCriterion;
+
+    ss >> ch;
+    if (ch != '-')
+        throw;
+
+    while (!ss.eof())
+    {
+        ss >> ch;
+        switch (ch)
+        {
+        case 'P':
+            st.DecisionTree.push_back(HeuristicMethod::MinMineProb);
+            break;
+        case 'Z':
+            st.DecisionTree.push_back(HeuristicMethod::MaxZeroProb);
+            break;
+        case 'S':
+            st.DecisionTree.push_back(HeuristicMethod::MaxZerosProb);
+            break;
+        case 'E':
+            st.DecisionTree.push_back(HeuristicMethod::MaxZerosExp);
+            break;
+        case 'Q':
+            st.DecisionTree.push_back(HeuristicMethod::MaxQuantityExp);
+            break;
+        case 'F':
+            st.DecisionTree.push_back(HeuristicMethod::MinFrontierDist);
+            break;
+        case 'U':
+            st.DecisionTree.push_back(HeuristicMethod::MaxUpperBound);
+            break;
+        default:
+            break;
+        }
+    }
 
     return st;
 }
 
 DLL_API std::string WriteStrategy(const Strategy &st)
 {
-    std::basic_string<unsigned char> buf;
-    auto cur = 0;
-
-#define W(field, type, length) WriteBits<type>(buf, field, cur, length)
+    std::stringstream ss;
     
-    W(st.InitialPositionSpecified ? st.Index : 480, int, 9);
+    switch (st.Logic)
+    {
+    case LogicMethod::None:
+        ss << "NL";
+        break;
+    case LogicMethod::Single:
+        ss << "SL";
+        break;
+    case LogicMethod::Double:
+        ss << "DL";
+        break;
+    case LogicMethod::Full:
+        ss << "FL";
+        break;
+    default:
+        ss << "XL";
+        break;
+    }
 
-    W(st.Logic, LogicMethod, 2);
-    W(st.HeuristicEnabled, bool, 1);
+    if (st.InitialPositionSpecified)
+        ss << "@[" << st.Index << "]";
 
-    W(st.DecisionTree.size(), size_t, 3);
-    for (auto m : st.DecisionTree)
-        WriteBits<HeuristicMethod>(buf, m, cur, 3);
+    ss << "-";
 
-    W(st.ExhaustEnabled ? st.ExhaustCriterion : 0, int, 9);
-    W(st.PruningEnabled ? st.PruningCriterion : (st.ExhaustEnabled ? st.ExhaustCriterion : 0), int, 12);
+    if (st.HeuristicEnabled)
+        if (st.DecisionTree.empty())
+            ss << "NH";
+        else
+            for (auto m : st.DecisionTree)
+                switch (m)
+                {
+                case HeuristicMethod::None: break;
+                case HeuristicMethod::MinMineProb: 
+                    ss << "P";
+                    break;
+                case HeuristicMethod::MaxZeroProb:
+                    ss << "Z";
+                    break;
+                case HeuristicMethod::MaxZerosProb:
+                    ss << "S";
+                    break;
+                case HeuristicMethod::MaxZerosExp:
+                    ss << "E";
+                    break;
+                case HeuristicMethod::MaxQuantityExp:
+                    ss << "Q";
+                    break;
+                case HeuristicMethod::MinFrontierDist:
+                    ss << "F";
+                    break;
+                case HeuristicMethod::MaxUpperBound:
+                    ss << "U";
+                    break;
+                default:
+                    ss << "X";
+                    break;
+                }
 
-    W(st.PruningDecisionTree.size(), size_t, 3);
-    for (auto m : st.PruningDecisionTree)
-        WriteBits<HeuristicMethod>(buf, m, cur, 3);
+    if (st.ExhaustEnabled)
+    {
+        ss << "-D" << st.ExhaustCriterion;
+        if (st.PruningEnabled)
+        {
+            ss << "-P" << st.PruningCriterion << "-";
+            for (auto m : st.PruningDecisionTree)
+                switch (m)
+                {
+                case HeuristicMethod::None: break;
+                case HeuristicMethod::MinMineProb:
+                    ss << "P";
+                    break;
+                case HeuristicMethod::MaxZeroProb:
+                    ss << "Z";
+                    break;
+                case HeuristicMethod::MaxZerosProb:
+                    ss << "S";
+                    break;
+                case HeuristicMethod::MaxZerosExp:
+                    ss << "E";
+                    break;
+                case HeuristicMethod::MaxQuantityExp:
+                    ss << "Q";
+                    break;
+                case HeuristicMethod::MinFrontierDist:
+                    ss << "F";
+                    break;
+                case HeuristicMethod::MaxUpperBound:
+                    ss << "U";
+                    break;
+                default:
+                    ss << "X";
+                    break;
+                }
+        }
+    }
 
-    return base64_encode(buf);
+    return ss.str();
 }

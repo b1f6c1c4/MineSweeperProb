@@ -4,6 +4,9 @@
 #include "../MineSweeperSolver/GameMgr.h"
 #include "../MineSweeperSolver/BinomialHelper.h"
 #include <thread>
+#include <string>
+
+std::string StrategyStr = "FL-PSEQZ";
 
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int CmdShow)
 {
@@ -151,7 +154,7 @@ public:
                 m_Mgr = nullptr;
             }
             m_Mgr = new GameMgr(30, 16, 99);
-            m_Mgr->BasicStrategy = ReadStrategy("4O+McoEAAQA=");
+            m_Mgr->BasicStrategy = ReadStrategy(StrategyStr);
             this->Update();
             break;
         case 0x43:
@@ -178,7 +181,7 @@ private:
                 if (!m_Manual)
                 {
                     m_Mgr = new GameMgr(30, 16, 99);
-                    m_Mgr->BasicStrategy = ReadStrategy("4O+McoEAAQA=");
+                    m_Mgr->BasicStrategy = ReadStrategy(StrategyStr);
                     GetApplication()->InvokeLambdaInMainThreadAndWait([this]() { this->Update(); });
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds{ 100 });

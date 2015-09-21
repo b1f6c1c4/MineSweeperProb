@@ -39,9 +39,6 @@
     <ClInclude Include="Strategies.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="base64.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="BasicSolver.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -72,9 +69,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Strategies.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="base64.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="BasicSolver.cpp">

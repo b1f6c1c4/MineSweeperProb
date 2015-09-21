@@ -43,7 +43,7 @@ struct
 extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines)
 {
     auto mgr = new GameMgr(width, height, totalMines);
-    mgr->BasicStrategy = ReadStrategy("4J8DAAAA");
+    mgr->BasicStrategy = ReadStrategy("FL-PSEQZ");
     return mgr;
 }
 
@@ -51,7 +51,7 @@ extern "C" DLL_API GameMgr *CreateGameMgrFromFile(const wchar_t *filename)
 {
     std::ifstream sr(filename, std::ios::binary | std::ios::_Nocreate);
     auto mgr = new GameMgr(sr);
-    mgr->BasicStrategy = ReadStrategy("4J8DAAAA");
+    mgr->BasicStrategy = ReadStrategy("FL-PSEQZ");
     sr.close();
     return mgr;
 }
