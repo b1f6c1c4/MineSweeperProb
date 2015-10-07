@@ -34,13 +34,13 @@ private:
     LARGE_INTEGER m_StartTime;
 };
 
-double ProcessID(const Strategy &strategy)
+std::pair<double,bool> ProcessID(const Strategy &strategy)
 {
     GameMgr mgr(30, 16, 99);
     mgr.BasicStrategy = strategy;
     PerformanceTimer t;
     mgr.Automatic();
-    return t.Elapsed();
+    return std::make_pair(t.Elapsed(),mgr.GetSucceed());
 }
 
 int main()
@@ -55,6 +55,8 @@ int main()
         std::string str;
         int r;
         fin >> str >> r;
+        if (str.length() == 0)
+            continue;
         std::cout << str << " " << r << std::endl;
         auto strategy = ReadStrategy(str);
         while (r-- > 0)
@@ -63,7 +65,7 @@ int main()
             fout << str << " ";
             fout.flags(std::ios::scientific);
             fout.precision(std::numeric_limits<double>::digits10 + 1);
-            fout << result << std::endl;
+            fout << result.second << " " << result.first << std::endl;
         }
         fout.flush();
     }
