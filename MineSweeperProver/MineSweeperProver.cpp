@@ -15,8 +15,10 @@
 #include "../MineSweeperSolver/BasicDrainer.h"
 #include <thread>
 #include <mutex>
+#include <queue>
 
 size_t MemoryLimit;
+double MinInfluence;
 
 bool IsMemoryEnough()
 {
@@ -45,8 +47,8 @@ struct Choice
 
 struct Macro
 {
-    Macro() : m_Depth(0), m_Solver(nullptr), m_UpperBound(NAN) { }
-    Macro(const Macro &other) : m_Depth(other.m_Depth + 1), m_Degrees(other.m_Degrees), m_Solver(nullptr), m_UpperBound(NAN)
+    Macro() : m_Depth(0), m_Solver(nullptr), m_UpperBound(NAN), m_Influence(0) { }
+    Macro(const Macro &other) : m_Depth(other.m_Depth + 1), m_Degrees(other.m_Degrees), m_Solver(nullptr), m_UpperBound(NAN), m_Influence(other.m_Influence)
     {
         if (other.m_Solver != nullptr)
             m_Solver = new Solver(*other.m_Solver);
@@ -59,7 +61,24 @@ struct Macro
     std::vector<Choice> m_Choices;
     double m_UpperBound;
     BlockSet m_BestChoices;
+    double m_Influence;
 };
+bool operator<(const Macro &lhs, const Macro &rhs)
+{
+    return lhs.m_Influence < rhs.m_Influence;
+}
+bool operator>(const Macro &lhs, const Macro &rhs)
+{
+    return rhs.m_Influence < lhs.m_Influence;
+}
+bool operator<=(const Macro &lhs, const Macro &rhs)
+{
+    return !(lhs.m_Influence > rhs.m_Influence);
+}
+bool operator>=(const Macro &lhs, const Macro &rhs)
+{
+    return !(lhs.m_Influence < rhs.m_Influence);
+}
 
 struct Hash
 {
@@ -81,7 +100,7 @@ bool operator!=(const Macro &lhs, const Macro &rhs)
 }
 
 std::mutex WorkingQueueMutex;
-std::deque<Macro *> WorkingQueue;
+std::priority_queue<Macro *> WorkingQueue;
 std::mutex SituationsMutex;
 std::vector<std::unordered_set<Macro *, Hash>> Situations;
 std::vector<size_t> Queued;
@@ -100,17 +119,24 @@ void OpenBlock(Macro *macro, Block blk, bool forceNoMine = false)
         if (info.m_States[i] == 0)
             continue;
 
+        double prob;
+        if (forceNoMine)
+            prob = info.m_Result[i];
+        else
+            prob = info.m_Result[i] * (1 - macro->m_Solver->GetProbability(blk));
+
         auto child = new Macro(*macro);
         child->m_Degrees[blk] = min + i;
-        if (child->m_Depth >= Situations.size())
-        {
-            Situations.emplace_back();
-            Queued.push_back(0);
-        }
 
         std::unordered_set<Macro*, Hash>::_Pairib res;
         {
             std::unique_lock<std::mutex> lock(SituationsMutex);
+
+            if (child->m_Depth >= Situations.size())
+            {
+                Situations.emplace_back();
+                Queued.push_back(0);
+            }
 
             res = Situations[child->m_Depth].insert(child);
             if (res.second)
@@ -128,21 +154,18 @@ void OpenBlock(Macro *macro, Block blk, bool forceNoMine = false)
             delete child;
             child = *res.first;
         }
-        if (forceNoMine)
-            macro->m_Choices.back().Next.insert(std::make_pair(child, info.m_Result[i]));
-        else
-            macro->m_Choices.back().Next.insert(std::make_pair(child, info.m_Result[i]
-                * (1 - macro->m_Solver->GetProbability(blk))));
+        macro->m_Choices.back().Next.insert(std::make_pair(child, prob));
+        child->m_Influence = res.second ? macro->m_Influence * prob  : max(child->m_Influence, macro->m_Influence * prob);
 
         {
             std::unique_lock<std::mutex> lock(WorkingQueueMutex);
 
-            WorkingQueue.push_back(child);
+            WorkingQueue.push(child);
         }
     }
 }
 
-void GetUpperBound(Macro *macro, int maxDepth)
+void GetUpperBound(Macro *macro)
 {
 #ifndef _DEBUG
     if (macro->m_Solver != nullptr)
@@ -151,9 +174,6 @@ void GetUpperBound(Macro *macro, int maxDepth)
         macro->m_Solver = nullptr;
     }
 #endif
-
-    //if (macro->m_Depth == maxDepth)
-    //    return;
 
     if (macro->m_Choices.empty())
         return;
@@ -164,7 +184,7 @@ void GetUpperBound(Macro *macro, int maxDepth)
         double b = 0;
         for (auto &kvp : choice.Next)
         {
-            GetUpperBound(kvp.first, maxDepth);
+            GetUpperBound(kvp.first);
             b += kvp.first->m_UpperBound * kvp.second;
         }
         if (b > upper)
@@ -199,7 +219,6 @@ protected:
 
 std::mutex PrunMutex;
 auto prun = false;
-auto maxDepth = 0;
 
 void Process()
 {
@@ -222,8 +241,8 @@ void Process()
 
             if (!WorkingQueue.empty())
             {
-                macro = WorkingQueue.front();
-                WorkingQueue.pop_front();
+                macro = WorkingQueue.top();
+                WorkingQueue.pop();
             }
         }
         if (macro == nullptr)
@@ -236,12 +255,11 @@ void Process()
                     break;
             }
         }
-        //if (prun && macro->m_Depth > maxDepth)
-        //{
-        //    delete macro;
-        //    continue;
-        //}
-        --Queued[macro->m_Depth];
+        {
+            std::unique_lock<std::mutex> lock(WorkingQueueMutex);
+
+            --Queued[macro->m_Depth];
+        }
         macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, false);
         if (macro->m_Solver->GetTotalStates() == 1.0)
         {
@@ -269,7 +287,7 @@ void Process()
             int min;
             macro->m_UpperBound = macro->m_Solver->GetDistInfo(m_BlocksR[macro->m_BestChoices.front()], macro->m_BestChoices.front(), min).m_UpperBound * (1 - macro->m_Solver->GetProbability(macro->m_BestChoices.front()));
 
-            if (!prun)
+            if (!prun && macro->m_Influence > MinInfluence)
 #ifndef SEMI
                 for (auto i = 0; i < Width * Height; ++i)
                     if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Unknown)
@@ -283,34 +301,36 @@ void Process()
         delete macro->m_Solver;
         macro->m_Solver = nullptr;
 #endif
-        if (Queued[macro->m_Depth] == 0)
-        {
-            std::unique_lock<std::mutex> lock(SituationsMutex);
-
-            maxDepth = macro->m_Depth;
-            std::cout << " cleared " << std::endl;
-            std::cout << "Layer " << maxDepth << " (" << WorkingQueue.size() << ") ...";
-        }
     }
 }
 
 int main()
 {
     int thrs;
-    std::cout << "Threads";
+#ifndef NDEBUG
+    thrs = 4;
+    Width = 8, Height = 8, Mines = 10;
+    MemoryLimit = 2048 << 20;
+    MinInfluence = 0.01;
+#else
+    std::cout << "Threads: ";
     std::cin >> thrs;
 
     std::cout << "Width Height Mines: ";
     std::cin >> Width >> Height >> Mines;
 
+    std::cout << "Max Memory Usage (MB): ";
+    std::cin >> MemoryLimit;
+    MemoryLimit <<= 20;
+
+    std::cout << "MinInfluence: ";
+    std::cin >> MinInfluence;
+#endif
+
     CacheBinomials(Width * Height, Mines);
 
     Situations.resize(10);
     Queued.resize(10);
-
-    std::cout << "Max Memory Usage (MB): ";
-    std::cin >> MemoryLimit;
-    MemoryLimit <<= 20;
 
     m_BlocksR.reserve(Width * Height);
     for (auto i = 0; i < Width; ++i)
@@ -333,8 +353,9 @@ int main()
     root->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, false);
 
     Situations[0].insert(root);
+    root->m_Influence = 1;
     OpenBlock(root, 0, true);
-    //WorkingQueue.push_back(root);
+    //WorkingQueue.push(root);
 
     //std::cout << "Draining..." << std::endl;
     //SimpleDrainer dr(*root);
@@ -343,8 +364,6 @@ int main()
 
     std::cout << "Forking..." << std::endl;
 
-    std::cout << "Layer " << maxDepth << " (" << WorkingQueue.size() << ") ...";
-
     std::vector<std::thread> thr;
     thr.reserve(thrs);
     for (auto i = 0; i < thrs; ++i)
@@ -352,21 +371,18 @@ int main()
     for (auto &th : thr)
         th.join();
 
-    for (auto i = maxDepth + 1; i < Situations.size(); ++i)
-        Situations[i].clear();
-
     std::cout << "Merging..." << std::endl;
     
-    GetUpperBound(root, maxDepth);
+    GetUpperBound(root);
 
     std::cout << root->m_UpperBound << std::endl;
     system("pause");
 
-    std::cout << "Clening..." << std::endl;
+    //std::cout << "Clening..." << std::endl;
 
-    for (auto layer : Situations)
-        for (auto macro : layer)
-            delete macro;
+    //for (auto layer : Situations)
+    //    for (auto macro : layer)
+    //        delete macro;
 
     return 0;
 }
