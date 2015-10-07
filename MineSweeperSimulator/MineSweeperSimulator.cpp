@@ -12,6 +12,8 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
+int Width, Height, Mines;
+
 std::mutex mtx;
 std::vector<std::thread> m_Threads;
 
@@ -26,7 +28,7 @@ volatile size_t *total, *totalT;
 
 bool ProcessID(const Strategy &st)
 {
-    GameMgr mgr(30, 16, 99);
+    GameMgr mgr(Width, Height, Mines);
     mgr.BasicStrategy = st;
     mgr.Automatic();
     return mgr.GetSucceed();
@@ -168,9 +170,22 @@ void Clear()
     }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
-    CacheBinomials(30 * 16, 99);
+    if (argc < 4)
+        Width = 30, Height = 16, Mines = 99;
+    else
+    {
+        std::istringstream s1(argv[1]);
+        s1 >> Width;
+        std::istringstream s2(argv[2]);
+        s2 >> Height;
+        std::istringstream s3(argv[3]);
+        s3 >> Mines;
+        std::cout << Width << "*" << Height << "=" << Mines << std::endl;
+    }
+
+    CacheBinomials(Width * Height, Mines);
 
     numTasks = 0;
     restT = 0;
