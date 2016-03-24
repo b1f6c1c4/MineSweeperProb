@@ -24,3 +24,4 @@ SimulatorsManager/obj/
 /x64/
 /.vs/
 /ipch/
+*.opendb

@@ -4,7 +4,7 @@
 #include "Drainer.h"
 #include <iostream>
 
-GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, bool allowWrongGuess) : m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
     m_Solver = new Solver(width * height, totalMines);
 
@@ -35,9 +35,10 @@ GameMgr::GameMgr(int width, int height, int totalMines) : m_TotalWidth(width), m
     m_AllBits = log2(Binomial(width * height, totalMines));
 }
 
-GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val));
+    READ(m_AllowWrongGuess);
     READ(BasicStrategy);
     READ(m_TotalWidth);
     READ(m_TotalHeight);
@@ -45,6 +46,7 @@ GameMgr::GameMgr(std::istream &sr) : m_TotalWidth(0), m_TotalHeight(0), m_TotalM
     READ(m_Settled);
     READ(m_Started);
     READ(m_ToOpen);
+    READ(m_WrongGuesses);
 
     m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
 
@@ -510,6 +512,7 @@ void GameMgr::EnableDrainer()
 void GameMgr::Save(std::ostream &sw) const
 {
 #define WRITE(val) sw.write(reinterpret_cast<const char *>(&(val)), sizeof(val));
+    WRITE(m_AllowWrongGuess);
     WRITE(BasicStrategy);
     WRITE(m_TotalWidth);
     WRITE(m_TotalHeight);
@@ -517,6 +520,7 @@ void GameMgr::Save(std::ostream &sw) const
     WRITE(m_Settled);
     WRITE(m_Started);
     WRITE(m_ToOpen);
+    WRITE(m_WrongGuesses);
     if (m_Settled)
         for (auto &blk : m_Blocks)
         {
@@ -568,10 +572,17 @@ void GameMgr::OpenBlock(int id)
     m_Blocks[id].IsOpen = true;
 
     if (m_Blocks[id].IsMine)
-    {
-        m_Started = false;
-        return;
-    }
+        if (m_AllowWrongGuess)
+        {
+            m_WrongGuesses++;
+            m_Solver->AddRestrain(id, true);
+            return;
+        }
+        else
+        {
+            m_Started = false;
+            return;
+        }
 
     if (m_Solver->GetBlockStatus(id) == BlockStatus::Blank)
         --m_Solver->CanOpenForSure;

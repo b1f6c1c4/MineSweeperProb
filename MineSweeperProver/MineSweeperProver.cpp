@@ -268,7 +268,7 @@ void Process()
         else if (macro->m_Solver->CanOpenForSure > 0)
         {
             macro->m_UpperBound = 1;
-            if (!prun)
+            if (!prun && macro->m_Depth <= 2)
                 for (auto i = 0; i < Width * Height; ++i)
                     if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
                     {
@@ -287,7 +287,7 @@ void Process()
             int min;
             macro->m_UpperBound = macro->m_Solver->GetDistInfo(m_BlocksR[macro->m_BestChoices.front()], macro->m_BestChoices.front(), min).m_UpperBound * (1 - macro->m_Solver->GetProbability(macro->m_BestChoices.front()));
 
-            if (!prun && macro->m_Influence > MinInfluence)
+            if (!prun && macro->m_Influence > MinInfluence && macro->m_Depth <= 2)
 #ifndef SEMI
                 for (auto i = 0; i < Width * Height; ++i)
                     if (macro->m_Degrees[i] == CLOSED && macro->m_Solver->GetBlockStatus(i) == BlockStatus::Unknown)
@@ -308,10 +308,10 @@ int main()
 {
     int thrs;
 #ifndef NDEBUG
-    thrs = 4;
+    thrs = 1;
     Width = 8, Height = 8, Mines = 10;
     MemoryLimit = 2048 << 20;
-    MinInfluence = 0.01;
+    MinInfluence = 0;
 #else
     std::cout << "Threads: ";
     std::cin >> thrs;
@@ -354,8 +354,8 @@ int main()
 
     Situations[0].insert(root);
     root->m_Influence = 1;
-    OpenBlock(root, 0, true);
-    //WorkingQueue.push(root);
+    //OpenBlock(root, 0, true);
+    WorkingQueue.push(root); ++Queued[0];
 
     //std::cout << "Draining..." << std::endl;
     //SimpleDrainer dr(*root);

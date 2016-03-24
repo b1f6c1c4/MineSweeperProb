@@ -27,7 +27,7 @@ struct
     int TotalWidth, TotalHeight, TotalBlocks, TotalMines;
     bool Started, Succeed;
     double Bits, AllBits;
-    int ToOpen;
+    int ToOpen, WrongGuesses;
 
     const BlockProperty *BlockProperties;
     const BlockStatus *InferredStatus;
@@ -40,9 +40,9 @@ struct
     const Block *PreferredBlocks;
 };
 
-extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines, const char *strategy)
+extern "C" DLL_API GameMgr *CreateGameMgr(int width, int height, int totalMines, const char *strategy, bool allowWrongGuess)
 {
-    auto mgr = new GameMgr(width, height, totalMines);
+    auto mgr = new GameMgr(width, height, totalMines, allowWrongGuess);
     mgr->BasicStrategy = ReadStrategy(std::string(strategy));
     return mgr;
 }

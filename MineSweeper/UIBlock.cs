@@ -31,14 +31,14 @@ namespace MineSweeper
                 switch (TheMgr.InferredStatuses[TheBlock.Index])
                 {
                     case BlockStatus.Mine:
-                        if (TheMgr.Started)
+                        if (TheMgr.Started & !TheBlock.IsOpen)
                         {
                             color = Color.Black;
                             fColor = Color.White;
                         }
                         else
                             color = Color.Red;
-                        str = "M";
+                        str = TheBlock.IsOpen ? "X" : "M";
                         break;
                     case BlockStatus.Blank:
                         color = Color.White;

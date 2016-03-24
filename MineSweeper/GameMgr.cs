@@ -188,6 +188,11 @@ namespace MineSweeper
         private readonly List<Block> m_Blocks;
 
         /// <summary>
+        ///     允许试错
+        /// </summary>
+        public bool AllowWrongGuess { get; }
+
+        /// <summary>
         ///     宽度
         /// </summary>
         public int TotalWidth { get; }
@@ -217,6 +222,11 @@ namespace MineSweeper
         /// </summary>
         // ReSharper disable once MemberCanBePrivate.Global
         public int ToOpen { get; private set; }
+
+        /// <summary>
+        ///     错误猜测数
+        /// </summary>
+        public int WrongGuesses { get; private set; }
 
         /// <summary>
         ///     推测的状态
@@ -271,13 +281,14 @@ namespace MineSweeper
         /// </summary>
         private Thread m_Backgrounding;
 
-        public GameMgr(int width, int height, int totalMines, string strategy = "FL-PSEQZ")
+        public GameMgr(int width, int height, int totalMines, string strategy = "FL-PSEQZ", bool allowWrongGuess = false)
         {
+            AllowWrongGuess = allowWrongGuess;
             TotalWidth = width;
             TotalHeight = height;
             TotalMines = totalMines;
             CacheBinomials(width * height, totalMines);
-            m_NativeObject = CreateGameMgr(width, height, totalMines, strategy);
+            m_NativeObject = CreateGameMgr(width, height, totalMines, strategy, allowWrongGuess);
 
             m_Blocks = new List<Block>();
             for (var i = 0; i < width; i++)
@@ -440,7 +451,7 @@ namespace MineSweeper
         private static extern void CacheBinomials(int n, int m);
 
         [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Ansi)]
-        private static extern IntPtr CreateGameMgr(int width, int height, int totalMines, string strategy);
+        private static extern IntPtr CreateGameMgr(int width, int height, int totalMines, string strategy, bool allowWrongGuess);
 
         [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr CreateGameMgrFromFile(string filename);
@@ -519,6 +530,7 @@ namespace MineSweeper
             [MarshalAs(UnmanagedType.U8)] public double Bits;
             [MarshalAs(UnmanagedType.U8)] public double AllBits;
             [MarshalAs(UnmanagedType.U4)] public int ToOpen;
+            [MarshalAs(UnmanagedType.U4)] public int WrongGuesses;
 
             [MarshalAs(UnmanagedType.U8)] public IntPtr Blocks;
             [MarshalAs(UnmanagedType.U8)] public IntPtr InferredStatus;
@@ -560,6 +572,7 @@ namespace MineSweeper
                     Started = st.Started;
                     Succeed = st.Succeed;
                     ToOpen = st.ToOpen;
+                    WrongGuesses = st.WrongGuesses;
                     AllBits = st.AllBits;
                     Bits = st.Bits;
                     var pProp = (BlockProperty*)st.Blocks.ToPointer();

@@ -21,7 +21,7 @@ class
     DLL_API GameMgr
 {
 public:
-    GameMgr(int width, int height, int totalMines);
+    GameMgr(int width, int height, int totalMines, bool allowWrongGuess = false);
     explicit GameMgr(std::istream &sr);
     ~GameMgr();
 
@@ -67,11 +67,12 @@ public:
 
     friend class Drainer;
 private:
+    bool m_AllowWrongGuess;
     int m_TotalWidth, m_TotalHeight, m_TotalMines;
     bool m_Settled, m_Started, m_Succeed;
     std::vector<BlockProperty> m_Blocks;
     std::vector<BlockSet> m_BlocksR;
-    int m_ToOpen;
+    int m_ToOpen, m_WrongGuesses;
     Solver *m_Solver;
     double m_AllBits;
     BlockSet m_Best, m_Preferred;

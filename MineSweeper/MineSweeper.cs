@@ -10,6 +10,7 @@ namespace MineSweeper
 {
     public partial class MineSweeper : Form
     {
+        private readonly bool m_AllowWrongGuess;
         private readonly int m_Width;
         private readonly int m_Height;
         private int m_Mines;
@@ -22,10 +23,11 @@ namespace MineSweeper
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
-        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth, mgr.TotalHeight, mgr.TotalMines, null, mgr) { }
+        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth, mgr.TotalHeight, mgr.TotalMines, null, mgr.AllowWrongGuess) { }
 
-        public MineSweeper(int width, int height, int mines, string strategy = null, GameMgr mgr = null)
+        public MineSweeper(int width, int height, int mines, string strategy = null, bool allowWrongGuess = false, GameMgr mgr = null)
         {
+            m_AllowWrongGuess = allowWrongGuess;
             m_Width = width;
             m_Height = height;
             m_Mines = mines;
@@ -160,8 +162,11 @@ namespace MineSweeper
                 if (m_Mgr?.Mode.HasFlag(SolvingMode.Drained) ?? false)
                     mode |= SolvingMode.ZeroProb;
                 m_Mgr = m_Strategy == null
-                            ? new GameMgr(m_Width, m_Height, m_Mines) { Mode = mode }
-                            : new GameMgr(m_Width, m_Height, m_Mines, m_Strategy) { Mode = mode };
+                            ? new GameMgr(m_Width, m_Height, m_Mines, allowWrongGuess: m_AllowWrongGuess)
+                                  {
+                                      Mode = mode
+                                  }
+                            : new GameMgr(m_Width, m_Height, m_Mines, m_Strategy, m_AllowWrongGuess) { Mode = mode };
             }
             else
                 m_Mgr = mgr;

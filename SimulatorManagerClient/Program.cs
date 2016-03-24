@@ -44,15 +44,18 @@ namespace SimulatorManagerClient
                         ret = proc != null ? $"still running id:{proc.Id} exited:{proc.HasExited}" : "not yet started";
                         break;
                     case "start":
-                        try
-                        {
-                            proc = Process.Start("MineSweeperSimulator.exe");
-                            ret = proc != null ? $"id:{proc.Id} exited:{proc.HasExited}" : "failed";
-                        }
-                        catch (Exception e)
-                        {
-                            ret = e.ToString();
-                        }
+                        if (proc != null)
+                            ret = "still running";
+                        else
+                            try
+                            {
+                                proc = Process.Start("MineSweeperSimulator.exe");
+                                ret = proc != null ? $"id:{proc.Id} exited:{proc.HasExited}" : "failed";
+                            }
+                            catch (Exception e)
+                            {
+                                ret = e.ToString();
+                            }
                         break;
                     case "terminate":
                         if (proc != null)
@@ -194,6 +197,24 @@ namespace SimulatorManagerClient
                         m_AutoSave = false;
                         m_AutoSaveInterval = 60000;
                         ret = $"auto: {m_AutoSave} {m_AutoSaveInterval}";
+                        break;
+                    default:
+                        if (str.StartsWith("start ", StringComparison.Ordinal))
+                        {
+                            if (proc != null)
+                                ret = "still running";
+                            else
+                                try
+                                {
+                                    var sp = str.Split(new[] { ' ' }, 2);
+                                    proc = Process.Start("MineSweeperSimulator.exe", sp[1]);
+                                    ret = proc != null ? $"id:{proc.Id} exited:{proc.HasExited}" : "failed";
+                                }
+                                catch (Exception e)
+                                {
+                                    ret = e.ToString();
+                                }
+                        }
                         break;
                 }
                 var retData = Encoding.UTF8.GetBytes(ret);
