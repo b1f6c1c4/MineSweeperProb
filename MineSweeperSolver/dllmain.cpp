@@ -91,6 +91,7 @@ extern "C" DLL_API GameStatus *GetGameStatus(GameMgr *mgr)
     ST(Bits);
     ST(AllBits);
     ST(ToOpen);
+    ST(WrongGuesses);
     ST(BlockProperties);
     ST(BestBlockCount);
     ST(BestBlocks);

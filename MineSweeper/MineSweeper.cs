@@ -114,6 +114,9 @@ namespace MineSweeper
                 else
                     sb.Append($" {m_Mgr.AllBits:F2}b");
 
+                if (m_AllowWrongGuess)
+                    sb.Append($" WG{m_Mgr.WrongGuesses}");
+
                 if (m_CurrentBlock != null)
                 {
                     if (m_Mgr.Mode.HasFlag(SolvingMode.Probability) &&
@@ -138,7 +141,6 @@ namespace MineSweeper
                         m_Mgr.DrainProbabilities != null)
                         sb.Append($" D{m_Mgr.DrainProbabilities[m_CurrentBlock.Index]:P2}");
                 }
-
 
                 if (!m_Mgr.Started)
                     sb.Append(m_Mgr.Succeed ? " Succeed" : " Failed");

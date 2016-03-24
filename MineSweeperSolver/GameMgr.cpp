@@ -143,6 +143,11 @@ int GameMgr::GetToOpen() const
     return m_ToOpen;
 }
 
+int GameMgr::GetWrongGuesses() const
+{
+    return m_WrongGuesses;
+}
+
 bool GameMgr::GetStarted() const
 {
     return m_Started;

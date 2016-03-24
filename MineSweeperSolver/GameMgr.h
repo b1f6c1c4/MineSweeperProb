@@ -35,6 +35,7 @@ public:
     int GetTotalHeight() const;
     int GetTotalMines() const;
     int GetToOpen() const;
+    int GetWrongGuesses() const;
     bool GetStarted() const;
     bool GetSucceed() const;
     double GetBits() const;
