@@ -12,7 +12,7 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
-int Width, Height, Mines;
+int Width, Height;
 
 std::mutex mtx;
 std::vector<std::thread> m_Threads;
@@ -20,21 +20,22 @@ std::vector<std::thread> m_Threads;
 int numTasks;
 std::string *certD;
 Strategy *cert;
+int *numMines;
 size_t *dense;
+std::vector<size_t> *guesses, *guessesT;
 volatile size_t restT, totalTT;
 volatile size_t *rest;
-volatile size_t *succeed, *succeedT;
 volatile size_t *total, *totalT;
 
-bool ProcessID(const Strategy &st)
+int ProcessID(int mines, const Strategy &st)
 {
-    GameMgr mgr(Width, Height, Mines);
+    GameMgr mgr(Width, Height, mines, true);
     mgr.BasicStrategy = st;
     mgr.Automatic();
-    return mgr.GetSucceed();
+    return mgr.GetWrongGuesses();
 }
 
-void Process(int id, bool (*fun)(const Strategy &))
+void Process(int id, int (*fun)(int, const Strategy &))
 {
     auto numTasksX = numTasks;
     auto denseX = new size_t[numTasksX];
@@ -59,12 +60,13 @@ void Process(int id, bool (*fun)(const Strategy &))
                 --rest[id];
             }
 
-            auto res = fun(certX[id]);
+            auto res = fun(numMines[id], certX[id]);
 
             {
                 std::unique_lock<std::mutex> lock(mtx);
-                if (res)
-                    ++succeed[id];
+                if (guesses[id].size() <= res)
+                    guesses[id].resize(res + 1, 0);
+                ++guesses[id][res];
                 ++total[id];
             }
         }
@@ -81,25 +83,25 @@ bool Launch(std::istringstream &sin)
 #undef max
     auto min = std::numeric_limits<size_t>().max();
     totalTT = restT = 0;
+    numMines = new int[numTasks];
     dense = new size_t[numTasks];
     certD = new std::string[numTasks];
     cert = new Strategy[numTasks];
     rest = new size_t[numTasks];
-    succeed = new size_t[numTasks];
+    guesses = new std::vector<size_t>[numTasks];
+    guessesT = new std::vector<size_t>[numTasks];
     total = new size_t[numTasks];
-    succeedT = new size_t[numTasks];
     totalT = new size_t[numTasks];
     for (auto i = 0; i < numTasks; ++i)
     {
         int r;
-        sin >> certD[i] >> r;
+        sin >> certD[i] >> numMines[i] >> r;
         dense[i] = r;
         if (dense[i] < min)
             min = dense[i];
         cert[i] = ReadStrategy(certD[i]);
         rest[i] = r;
         restT += r;
-        succeedT[i] = succeed[i] = 0;
         totalT[i] = total[i] = 0;
     }
 
@@ -131,11 +133,17 @@ size_t Save(std::ostringstream *sout)
             if (total[i] == 0)
                 continue;
 
-            fout << certD[i] << " " << succeed[i] << " " << total[i] << std::endl;
-            succeedT[i] += succeed[i];
+            if (guessesT[i].size() < guesses[i].size())
+                guessesT[i].resize(guesses[i].size());
+            for (auto j = 0; j < guesses[i].size(); ++j)
+            {
+                if (guesses[i][j] > 0)
+                    fout << numMines[i] << " " << certD[i] << " " << j << " " << guesses[i][j] << std::endl;
+                guessesT[i][j] += guesses[i][j];
+            }
             totalT[i] += total[i];
             totalTT += total[i];
-            succeed[i] = 0;
+            guesses[i].clear();
             total[i] = 0;
         }
         rT = restT;
@@ -149,7 +157,7 @@ size_t Save(std::ostringstream *sout)
     {
         if (i > 0)
             *sout << ",";
-        *sout << "{\"" << certD[i] << "\"," << succeedT[i] << "," << totalT[i] << "}";
+        *sout << "{\"" << certD[i] << "\"," << numMines[i] << "," << rest[i] << "," << totalT[i] << "}";
     }
     *sout << "}";
     return rT;
@@ -163,9 +171,9 @@ void Clear()
         delete[] certD;
         delete[] cert;
         delete[] rest;
-        delete[] succeed;
+        delete[] guesses;
         delete[] total;
-        delete[] succeedT;
+        delete[] guessesT;
         delete[] totalT;
     }
 }
@@ -173,7 +181,7 @@ void Clear()
 int main(int argc, char *argv[])
 {
     if (argc < 4)
-        Width = 30, Height = 16, Mines = 99;
+        Width = 30, Height = 16;
     else
     {
         std::istringstream s1(argv[1]);
@@ -181,11 +189,10 @@ int main(int argc, char *argv[])
         std::istringstream s2(argv[2]);
         s2 >> Height;
         std::istringstream s3(argv[3]);
-        s3 >> Mines;
-        std::cout << Width << "*" << Height << "=" << Mines << std::endl;
+        std::cout << Width << "*" << Height << std::endl;
     }
 
-    CacheBinomials(Width * Height, Mines);
+    CacheBinomials(Width * Height, Width * Height / 2 + 1);
 
     numTasks = 0;
     restT = 0;
@@ -228,6 +235,7 @@ int main(int argc, char *argv[])
 
 #define BUFF_LENGTH 2048
     char recvBuff[BUFF_LENGTH];
+    std::string recx;
     while (true)
     {
         if (listen(theSocket, SOMAXCONN) == SOCKET_ERROR)
@@ -257,23 +265,29 @@ int main(int argc, char *argv[])
         {
             std::cout << "    Wait for command: ";
 
-            auto ret = recv(client, recvBuff, BUFF_LENGTH, 0);
-            if (ret == 0)
+            recx.clear();
+            while (true)
             {
-                std::cout << std::endl;
-                break;
-            }
-            if (ret < 0)
-            {
-                Save(nullptr);
-                closesocket(theSocket);
-                WSACleanup();
-                return 1;
+                auto ret = recv(client, recvBuff, BUFF_LENGTH, 0);
+                if (ret == 0)
+                {
+                    std::cout << std::endl;
+                    break;
+                }
+                if (ret < 0)
+                {
+                    Save(nullptr);
+                    closesocket(theSocket);
+                    WSACleanup();
+                    return 1;
+                }
+
+                recx.append(recvBuff, ret);
+                if (ret < BUFF_LENGTH)
+                    break;
             }
 
-            recvBuff[ret] = '\0';
-
-            std::cout << recvBuff << std::endl;
+            std::cout << recx << std::endl;
 
 #define SEND \
             do \
@@ -291,7 +305,7 @@ int main(int argc, char *argv[])
             } while (false)
 
 
-            std::istringstream sin(recvBuff);
+            std::istringstream sin(recx);
 
             std::string action;
             sin >> action;
@@ -313,10 +327,7 @@ int main(int argc, char *argv[])
                 else
                 {
                     auto rT = Save(&sout);
-                    if (rT != 0)
-                        sout << " Resume " << rT << " tests";
-                    else
-                        sout << " Finished";
+                    sout << " Resume " << rT << "/" << totalTT << " tests";
                 }
                 SEND;
                 continue;
