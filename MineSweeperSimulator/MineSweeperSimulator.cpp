@@ -175,6 +175,16 @@ void Clear()
         delete[] total;
         delete[] guessesT;
         delete[] totalT;
+
+        dense = nullptr;
+        certD = nullptr;
+        cert = nullptr;
+        rest = nullptr;
+        guesses = nullptr;
+        total = nullptr;
+        guessesT = nullptr;
+        totalT = nullptr;
+        numTasks = 0;
     }
 }
 
@@ -265,10 +275,11 @@ int main(int argc, char *argv[])
         {
             std::cout << "    Wait for command: ";
 
+            int ret;
             recx.clear();
             while (true)
             {
-                auto ret = recv(client, recvBuff, BUFF_LENGTH, 0);
+                ret = recv(client, recvBuff, BUFF_LENGTH, 0);
                 if (ret == 0)
                 {
                     std::cout << std::endl;
@@ -286,6 +297,8 @@ int main(int argc, char *argv[])
                 if (ret < BUFF_LENGTH)
                     break;
             }
+            if (ret == 0)
+                break;
 
             std::cout << recx << std::endl;
 
