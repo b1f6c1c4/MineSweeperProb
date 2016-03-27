@@ -17,6 +17,7 @@ MineSweeperDemo/x64/
 MineSweeperProver/x64/
 MineSweeperSimulator/x64/
 MineSweeperSpeed/x64/
+ResultParser/x64/
 SimulatorManagerClient/bin/
 SimulatorManagerClient/obj/
 SimulatorsManager/bin/
