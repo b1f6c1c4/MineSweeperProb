@@ -299,14 +299,14 @@ namespace SimulatorManagerClient
                         Console.WriteLine($"Connected {selfIP.Address}:{selfIP.Port}");
                         using (var stream = tcp.GetStream())
                         {
+                            var sc = new StreamChuck(stream);
                             var data = Encoding.ASCII.GetBytes("save");
-                            stream.Write(data, 0, data.Length);
-                            Console.Write($"Wrote {data.Length} ...");
-                            stream.Flush();
+                            sc.PutPackage(data);
+                            Console.Write($"Put {data.Length} ...");
 
-                            buff = new byte[4096];
-                            lng = stream.Read(buff, 0, 4096);
-                            Console.WriteLine($" Read {lng}");
+                            buff = sc.GetPackage();
+                            lng = buff.Length;
+                            Console.WriteLine($" Got {lng}");
                         }
                     }
                 }

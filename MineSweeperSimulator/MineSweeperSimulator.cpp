@@ -9,6 +9,7 @@
 #include "../MineSweeperSolver/Strategies.h"
 #include <WinSock2.h>
 #include <ws2tcpip.h>
+#include "StreamChuck.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
@@ -191,7 +192,7 @@ void Clear()
 int main(int argc, char *argv[])
 {
     if (argc < 4)
-        Width = 30, Height = 16;
+        Width = 30 , Height = 16;
     else
     {
         std::istringstream s1(argv[1]);
@@ -213,10 +214,10 @@ int main(int argc, char *argv[])
 
     addrinfo *result = nullptr, hints;
     ZeroMemory(&hints, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_INET ;
+    hints.ai_socktype = SOCK_STREAM ;
     hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE;
+    hints.ai_flags = AI_PASSIVE ;
     if (getaddrinfo(nullptr, "27015", &hints, &result) != 0)
     {
         WSACleanup();
@@ -243,8 +244,6 @@ int main(int argc, char *argv[])
 
     freeaddrinfo(result);
 
-#define BUFF_LENGTH 2048
-    char recvBuff[BUFF_LENGTH];
     std::string recx;
     while (true)
     {
@@ -275,30 +274,14 @@ int main(int argc, char *argv[])
         {
             std::cout << "    Wait for command: ";
 
-            int ret;
             recx.clear();
-            while (true)
-            {
-                ret = recv(client, recvBuff, BUFF_LENGTH, 0);
-                if (ret == 0)
-                {
-                    std::cout << std::endl;
-                    break;
-                }
-                if (ret < 0)
-                {
-                    Save(nullptr);
-                    closesocket(theSocket);
-                    WSACleanup();
-                    return 1;
-                }
 
-                recx.append(recvBuff, ret);
-                if (ret < BUFF_LENGTH)
-                    break;
-            }
-            if (ret == 0)
+            char *recvBuff;
+            int len;
+            if (!GetPackage(client, recvBuff, len))
                 break;
+
+            recx.append(recvBuff, len);
 
             std::cout << recx << std::endl;
 
@@ -306,7 +289,7 @@ int main(int argc, char *argv[])
             do \
             { \
                 auto str = sout.str(); \
-                if (send(client, str.c_str(), str.length(), 0) == SOCKET_ERROR) \
+                if (!PutPackage(client, str.c_str(), str.length())) \
                 { \
                     std::cout << WSAGetLastError() << std::endl; \
                     Save(nullptr); \
@@ -393,7 +376,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-    
+
     system("pause");
     return 0;
 }

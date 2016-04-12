@@ -14,6 +14,7 @@ using System.Windows.Forms;
 using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using SimulatorManagerClient;
 
 namespace SimulatorsManager
 {
@@ -41,7 +42,7 @@ namespace SimulatorsManager
             dataGridView1.AutoGenerateColumns = false;
             dataGridView1.DataSource = m_Binding;
             m_Binding.DataSource = m_Simulators;
-            UpdateSimulators();
+            //UpdateSimulators();
             dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             m_Udp = new UdpClient(27016);
             IPAddress ipW = null, ipL = null;
@@ -49,17 +50,16 @@ namespace SimulatorsManager
                 var ip in
                     Dns.GetHostEntry(Dns.GetHostName())
                        .AddressList.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork))
-                if (ip.ToString().StartsWith("43.", StringComparison.Ordinal))
-                    ipW = ip;
-                else
+                if (ip.ToString().StartsWith("192.168.", StringComparison.Ordinal))
+                    //ipW = ip;
                     ipL = ip;
             if (ipL == null)
             {
                 MessageBox.Show("ipL == null");
                 throw new Exception();
             }
-            if (ipW == null)
-                ipW = IPAddress.Parse(ipL.ToString());
+            //if (ipW == null)
+            //    ipW = IPAddress.Parse(ipL.ToString());
 
             m_FileTranser = 0;
             m_Tcp = new TcpListener(ipL, 27016);
@@ -77,8 +77,8 @@ namespace SimulatorsManager
                               };
             m_UdpThread.Start();
 
-            m_HttpServer = new SimpleHttpServer(ipW, 27015);
-            m_HttpServer.OnHttpRequest += OnHttpRequest;
+            //m_HttpServer = new SimpleHttpServer(ipW, 27015);
+            //m_HttpServer.OnHttpRequest += OnHttpRequest;
         }
 
         private HttpResponse OnHttpRequest(HttpRequest request)
@@ -128,23 +128,23 @@ namespace SimulatorsManager
                 if (request.Uri.EndsWith("/jquery-2.1.4.min.js", StringComparison.Ordinal))
                     return
                         new HttpResponse
-                        {
-                            ResponseCode = 200,
-                            Header =
+                            {
+                                ResponseCode = 200,
+                                Header =
                                     new Dictionary<string, string>
                                         {
                                             { "Content-Type", "application/x-javascript" }
                                         },
-                            ResponseStream =
+                                ResponseStream =
                                     Assembly.GetExecutingAssembly()
                                             .GetManifestResourceStream("SimulatorsManager.wwwroot.jquery-2.1.4.min.js")
-                        };
+                            };
                 if (request.Uri.EndsWith("/favicon.ico", StringComparison.Ordinal))
                     return
                         new HttpResponse
-                        {
-                            ResponseCode = 404,
-                        };
+                            {
+                                ResponseCode = 404
+                            };
                 throw new HttpException(404);
             }
             if (request.Method == "POST")
@@ -444,7 +444,7 @@ namespace SimulatorsManager
 
             var cmd = textBox1.Text;
             if (ProcessCommand(cmd))
-            textBox1.Clear();
+                textBox1.Clear();
         }
 
         private bool ProcessCommand(string cmd)
@@ -516,6 +516,7 @@ namespace SimulatorsManager
     internal class Simulator
     {
         public delegate void UpdatedEventHandler();
+
         public event UpdatedEventHandler Updated;
 
         // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -544,23 +545,20 @@ namespace SimulatorsManager
         {
             try
             {
-                var buff = new byte[4096];
-                int count;
+                byte[] buff;
                 using (var tcp = new TcpClient())
                 {
                     tcp.Connect(new IPEndPoint(IPAddress.Parse(IP), 27015));
                     using (var stream = tcp.GetStream())
                     {
-                        var data = Encoding.UTF8.GetBytes(command);
-                        stream.Write(data, 0, data.Length);
-                        stream.Flush();
-
-                        count = stream.Read(buff, 0, 4096);
+                        var sc = new StreamChuck(stream);
+                        sc.PutPackage(Encoding.UTF8.GetBytes(command));
+                        buff = sc.GetPackage();
                     }
                     tcp.Close();
                 }
                 Returns =
-                    $"27015@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{Encoding.ASCII.GetString(buff, 0, count)}";
+                    $"27015@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{Encoding.UTF8.GetString(buff)}";
             }
             catch (SocketException e)
             {

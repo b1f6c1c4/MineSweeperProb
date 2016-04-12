@@ -92,6 +92,12 @@
   <ItemGroup>
     <EmbeddedResource Include="wwwroot\jquery-2.1.4.min.js" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SimulatorManagerClient\SimulatorManagerClient.csproj">
+      <Project>{ff2a5e9b-bbfe-410e-b026-e010e008f186}</Project>
+      <Name>SimulatorManagerClient</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
