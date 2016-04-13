@@ -23,7 +23,7 @@ namespace SimulatorsManager
 
             //SetProcessDPIAware();
 
-            Application.Run(new Form1());
+            Application.Run(new frmMain());
         }
     }
 }

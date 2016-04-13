@@ -9,7 +9,7 @@ using Headers = System.Collections.Generic.Dictionary<string, string>;
 
 namespace SimulatorsManager
 {
-    class SimpleHttpServer
+    internal class SimpleHttpServer
     {
         private static readonly Dictionary<int, string> ResponseCodes
             = new Dictionary<int, string>
@@ -68,10 +68,10 @@ namespace SimulatorsManager
         {
             m_Listener = new TcpListener(ip, port);
             m_ListenerThread = new Thread(MainProcess)
-            {
-                IsBackground = true,
-                Name = "HttpThread"
-            };
+                                   {
+                                       IsBackground = true,
+                                       Name = "HttpThread"
+                                   };
             m_ListenerThread.Start();
         }
 
@@ -101,15 +101,17 @@ namespace SimulatorsManager
                             throw new HttpException(501);
                         response = OnHttpRequest(request);
                     }
+                    catch (HttpException e)
+                    {
+                        response = new HttpResponse { ResponseCode = e.ResponseCode };
+                    }
                     catch (Exception)
                     {
                         response = new HttpResponse { ResponseCode = 500 };
                     }
 
                     using (response)
-                    {
                         WriteResponse(stream, response);
-                    }
 
                     stream.Close();
                 }
@@ -121,7 +123,7 @@ namespace SimulatorsManager
             }
         }
 
-        private HttpRequest ParseRequest(Stream stream)
+        private static HttpRequest ParseRequest(Stream stream)
         {
             var request = new HttpRequest
                               {
@@ -199,7 +201,7 @@ namespace SimulatorsManager
             HeaderValue
         }
 
-        private string Parse(Stream stream, ParsingState st)
+        private static string Parse(Stream stream, ParsingState st)
         {
             switch (st)
             {
@@ -209,7 +211,8 @@ namespace SimulatorsManager
                         while (true)
                         {
                             var ch = stream.ReadByte();
-                            if (ch < 0 || ch > 255)
+                            if (ch < 0 ||
+                                ch > 255)
                                 throw new HttpException(400);
                             if (ch == ' ')
                                 break;
@@ -236,7 +239,8 @@ namespace SimulatorsManager
                         while (true)
                         {
                             var ch = stream.ReadByte();
-                            if (ch < 0 || ch > 255)
+                            if (ch < 0 ||
+                                ch > 255)
                                 throw new HttpException(400);
                             if (ch == '\r')
                             {
@@ -257,7 +261,8 @@ namespace SimulatorsManager
                         while (true)
                         {
                             var ch = stream.ReadByte();
-                            if (ch < 0 || ch > 255)
+                            if (ch < 0 ||
+                                ch > 255)
                                 throw new HttpException(400);
                             if (ch == ':')
                                 break;
@@ -280,7 +285,8 @@ namespace SimulatorsManager
                         while (true)
                         {
                             var ch = stream.ReadByte();
-                            if (ch < 0 || ch > 255)
+                            if (ch < 0 ||
+                                ch > 255)
                                 throw new HttpException(400);
                             if (ch == ' ' &&
                                 sb.Length == 0)
@@ -322,9 +328,6 @@ namespace SimulatorsManager
     {
         public int ResponseCode { get; }
 
-        public HttpException(int code)
-        {
-            ResponseCode = code;
-        }
+        public HttpException(int code) { ResponseCode = code; }
     }
 }

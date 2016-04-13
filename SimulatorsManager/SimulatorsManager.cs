@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -6,47 +6,37 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using SimulatorManagerClient;
 
 namespace SimulatorsManager
 {
-    public partial class Form1 : Form
+    public class SimulatorsManager
     {
-        private const string AccessKey = "e574f92981814dfa9cbb17206d18f7fd";
-        private const string Secret = "4f78d93ad02942c9b9dcdafd17f9f0c2";
-
+        public readonly BindingSource Binding = new BindingSource();
         private readonly List<Simulator> m_Simulators = new List<Simulator>();
-        private readonly BindingSource m_Binding = new BindingSource();
-
         private readonly UdpClient m_Udp;
         private readonly TcpListener m_Tcp;
         private int m_FileTranser;
+
         // ReSharper disable PrivateFieldCanBeConvertedToLocalVariable
         private readonly Thread m_TcpThread;
         private readonly Thread m_UdpThread;
         private readonly SimpleHttpServer m_HttpServer;
         // ReSharper restore PrivateFieldCanBeConvertedToLocalVariable
 
-        public Form1()
+        public SimulatorsManager()
         {
-            InitializeComponent();
+            Binding.DataSource = m_Simulators;
 
-            dataGridView1.AutoGenerateColumns = false;
-            dataGridView1.DataSource = m_Binding;
-            m_Binding.DataSource = m_Simulators;
-            dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             m_Udp = new UdpClient(27016);
 
             if (!File.Exists("config.txt"))
-                throw new ApplicationException("æ²¡æœ‰æ‰¾åˆ°é…ç½®æ–‡ä»¶config.txt");
+                throw new ApplicationException("Ã»ÓÐÕÒµ½ÅäÖÃÎÄ¼þconfig.txt");
             IPAddress ipManager, ipHttp;
             int portHttp;
             using (var config = new StreamReader("config.txt", Encoding.UTF8))
@@ -54,7 +44,7 @@ namespace SimulatorsManager
                 // ReSharper disable PossibleNullReferenceException
                 var str = config.ReadLine().Split(new[] { ',' }, 3);
                 if (str.Length != 3)
-                    throw new ApplicationException("é…ç½®æ–‡ä»¶è¯­æ³•é”™è¯¯");
+                    throw new ApplicationException("ÅäÖÃÎÄ¼þÓï·¨´íÎó");
 
                 ipManager = IPAddress.Parse(str[0].Trim());
                 ipHttp = IPAddress.Parse(str[1].Trim());
@@ -64,15 +54,14 @@ namespace SimulatorsManager
                 {
                     var s = config.ReadLine().Split(new[] { ',' }, 4);
 
-                    var simu = new Simulator
-                                   {
-                                       Checked = bool.Parse(s[0].Trim()),
-                                       ID = s[1].Trim(),
-                                       IP = s[2].Trim(),
-                                       State = s.Length >= 4 ? s[3].Trim() : null
-                                   };
-                    simu.Updated += () => m_Binding.ResetItem(m_Simulators.IndexOf(simu));
-                    m_Binding.Insert(0, simu);
+                    AddSimulator(
+                                 new Simulator
+                                     {
+                                         Checked = bool.Parse(s[0].Trim()),
+                                         ID = s[1].Trim(),
+                                         IP = s[2].Trim(),
+                                         State = s.Length >= 4 ? s[3].Trim() : null
+                                     });
                 }
                 // ReSharper restore PossibleNullReferenceException
             }
@@ -139,7 +128,7 @@ namespace SimulatorsManager
                                         },
                                 ResponseStream =
                                     Assembly.GetExecutingAssembly()
-                                            .GetManifestResourceStream("SimulatorsManager.wwwroot.default.html")
+                                            .GetManifestResourceStream("wwwroot.default.html")
                             };
                 if (request.Uri.EndsWith("/jquery-2.1.4.min.js", StringComparison.Ordinal))
                     return
@@ -153,13 +142,7 @@ namespace SimulatorsManager
                                         },
                                 ResponseStream =
                                     Assembly.GetExecutingAssembly()
-                                            .GetManifestResourceStream("SimulatorsManager.wwwroot.jquery-2.1.4.min.js")
-                            };
-                if (request.Uri.EndsWith("/favicon.ico", StringComparison.Ordinal))
-                    return
-                        new HttpResponse
-                            {
-                                ResponseCode = 404
+                                            .GetManifestResourceStream("wwwroot.jquery-2.1.4.min.js")
                             };
                 throw new HttpException(404);
             }
@@ -179,7 +162,7 @@ namespace SimulatorsManager
                     var json = JObject.Parse(Encoding.UTF8.GetString(buff, 0, sz));
                     var id = m_Simulators.FindIndex(s => s.ID == (string)json["ID"]);
                     m_Simulators[id].Checked = (bool)json["Checked"];
-                    dataGridView1.UpdateCellValue(0, id);
+                    m_Simulators[id].OnUpdate();
                     return GenerateHttpResponse(JsonConvert.SerializeObject(m_Simulators));
                 }
                 if (request.Uri.EndsWith("/command", StringComparison.Ordinal))
@@ -311,7 +294,7 @@ namespace SimulatorsManager
                     var id = m_Simulators.FindIndex(s => s.IP == ip.Address.ToString());
                     m_Simulators[id].Returns =
                         $"{ip.Port}@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{Encoding.UTF8.GetString(data)}";
-                    m_Binding.ResetItem(id);
+                    m_Simulators[id].OnUpdate();
                 }
                 catch (Exception)
                 {
@@ -320,119 +303,13 @@ namespace SimulatorsManager
             // ReSharper disable once FunctionNeverReturns
         }
 
-        private static XmlDocument SendAction(string action, IDictionary<string, string> dic)
+        private void AddSimulator(Simulator simu)
         {
-            var sb = new StringBuilder();
-            var postData = new Dictionary<string, string>
-                               {
-                                   { "Action", action },
-                                   { "AWSAccessKeyId", AccessKey },
-                                   {
-                                       "Timestamp",
-                                       //DateTime.Now.ToUniversalTime()
-                                       new DateTime(2015, 09, 07, 12, 29, 42)
-                                       .ToString("yyyy-MM-ddTHH:mm:ss000Z")
-                                   },
-                                   { "Region", "Beijing" },
-                                   { "SignatureMethod", "HmacSHA256" },
-                                   { "SignatureVersion", "2" }
-                               };
-
-            if (dic != null)
-                foreach (var kvp in dic)
-                    postData.Add(kvp.Key, kvp.Value);
-
-            var ks = postData.Keys.ToList();
-            ks.Sort(StringComparer.Ordinal);
-            foreach (var k in ks)
-            {
-                sb.Append(UrlEncode(k));
-                sb.Append("=");
-                sb.Append(UrlEncode(postData[k]));
-                sb.Append("&");
-            }
-            if (ks.Any())
-                sb.Remove(sb.Length - 1, 1);
-
-            var hmacsha256 = new HMACSHA256(Encoding.ASCII.GetBytes(Secret));
-            var sign = hmacsha256.ComputeHash(Encoding.ASCII.GetBytes("POST\nmosapi.meituan.com\n/mcs/v1\n" + sb));
-            sb.AppendFormat(
-                            "&{0}={1}",
-                            "Signature",
-                            Convert.ToBase64String(sign));
-
-            var data = Encoding.UTF8.GetBytes(sb.ToString());
-
-            var req = WebRequest.CreateHttp("https://mosapi.meituan.com/mcs/v1");
-            req.KeepAlive = false;
-            req.Method = "POST";
-            //req.ContentType = "application/x-form-urlencoded";
-            req.ContentLength = data.Length;
-            req.Accept = "application/xml";
-            using (var stream = req.GetRequestStream())
-                stream.Write(data, 0, data.Length);
-
-            try
-            {
-                using (var res = req.GetResponse())
-                using (var stream = res.GetResponseStream())
-                {
-                    if (stream == null)
-                        throw new Exception();
-
-                    using (var sr = new StreamReader(stream))
-                    {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(sr.ReadToEnd());
-                        return xml;
-                    }
-                }
-            }
-            catch (WebException e)
-            {
-                using (var stream = e.Response.GetResponseStream())
-                {
-                    if (stream == null)
-                        throw new Exception();
-
-                    using (var sr = new StreamReader(stream))
-                    {
-                        var xml = new XmlDocument();
-                        xml.LoadXml(sr.ReadToEnd());
-                        return xml;
-                    }
-                }
-            }
+            simu.Updated += () => Binding.ResetItem(m_Simulators.IndexOf(simu));
+            Binding.Insert(0, simu);
         }
 
-        private static string UrlEncode(string s)
-        {
-            var sb = new StringBuilder();
-            foreach (var c in s)
-                if (char.IsDigit(c) ||
-                    char.IsLetter(c) ||
-                    c == '-' ||
-                    c == '_' ||
-                    c == '.' ||
-                    c == '~')
-                    sb.Append(c);
-                else
-                    foreach (var b in Encoding.UTF8.GetBytes(new string(c, 1)))
-                        sb.AppendFormat("%{0:X2}", b);
-            return sb.ToString();
-        }
-
-        private void textBox1_KeyUp(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode != Keys.Enter)
-                return;
-
-            var cmd = textBox1.Text;
-            if (ProcessCommand(cmd))
-                textBox1.Clear();
-        }
-
-        private bool ProcessCommand(string cmd)
+        public bool ProcessCommand(string cmd)
         {
             var sp = cmd.Split(new[] { ':' }, 2, StringSplitOptions.None);
             switch (sp[0])
@@ -445,12 +322,7 @@ namespace SimulatorsManager
                         if (!m_Simulators[i].Checked)
                             continue;
                         var i1 = i;
-                        Task.Run(
-                                 () =>
-                                 {
-                                     m_Simulators[i1].Tcp(sp[1]);
-                                     dataGridView1.UpdateCellValue(4, i1);
-                                 });
+                        Task.Run(() => m_Simulators[i1].Tcp(sp[1]));
                     }
                     break;
                 case "dll":
@@ -474,16 +346,15 @@ namespace SimulatorsManager
                         simulator.Udp(m_Udp, "upload");
                     break;
                 case "fake":
-                    var simu = new Simulator
-                                   {
-                                       Checked = true,
-                                       ID = "",
-                                       IP = "127.0.0.1",
-                                       State = "fake",
-                                       Returns = ""
-                                   };
-                    simu.Updated += () => m_Binding.ResetItem(m_Simulators.IndexOf(simu));
-                    m_Binding.Add(simu);
+                    AddSimulator(
+                                 new Simulator
+                                     {
+                                         Checked = true,
+                                         ID = "",
+                                         IP = "127.0.0.1",
+                                         State = "fake",
+                                         Returns = ""
+                                     });
                     break;
                 default:
                     foreach (var simulator in m_Simulators.Where(simulator => simulator.Checked))
@@ -491,62 +362,6 @@ namespace SimulatorsManager
                     break;
             }
             return true;
-        }
-    }
-
-
-    internal class Simulator
-    {
-        public delegate void UpdatedEventHandler();
-
-        public event UpdatedEventHandler Updated;
-
-        // ReSharper disable UnusedAutoPropertyAccessor.Global
-        public bool Checked { get; set; }
-        public string ID { get; set; }
-        public string IP { get; set; }
-        public string State { get; set; }
-        public string Returns { get; set; }
-        // ReSharper restore UnusedAutoPropertyAccessor.Global
-
-        public void Udp(UdpClient udp, string command)
-        {
-            try
-            {
-                var data = Encoding.ASCII.GetBytes(command);
-                udp.Send(data, data.Length, new IPEndPoint(IPAddress.Parse(IP), 27016));
-            }
-            catch (SocketException e)
-            {
-                Returns = $"localhost@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{e}";
-                Updated?.Invoke();
-            }
-        }
-
-        public void Tcp(string command)
-        {
-            try
-            {
-                byte[] buff;
-                using (var tcp = new TcpClient())
-                {
-                    tcp.Connect(new IPEndPoint(IPAddress.Parse(IP), 27015));
-                    using (var stream = tcp.GetStream())
-                    {
-                        var sc = new StreamChuck(stream);
-                        sc.PutPackage(Encoding.UTF8.GetBytes(command));
-                        buff = sc.GetPackage();
-                    }
-                    tcp.Close();
-                }
-                Returns =
-                    $"27015@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{Encoding.UTF8.GetString(buff)}";
-            }
-            catch (SocketException e)
-            {
-                Returns = $"localhost@{DateTime.Now:HH:mm:ss.ff}:{Environment.NewLine}{e}";
-            }
-            Updated?.Invoke();
         }
     }
 }
