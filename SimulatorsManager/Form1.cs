@@ -42,27 +42,43 @@ namespace SimulatorsManager
             dataGridView1.AutoGenerateColumns = false;
             dataGridView1.DataSource = m_Binding;
             m_Binding.DataSource = m_Simulators;
-            //UpdateSimulators();
             dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             m_Udp = new UdpClient(27016);
-            IPAddress ipW = null, ipL = null;
-            foreach (
-                var ip in
-                    Dns.GetHostEntry(Dns.GetHostName())
-                       .AddressList.Where(ip => ip.AddressFamily == AddressFamily.InterNetwork))
-                if (ip.ToString().StartsWith("192.168.", StringComparison.Ordinal))
-                    //ipW = ip;
-                    ipL = ip;
-            if (ipL == null)
+
+            if (!File.Exists("config.txt"))
+                throw new ApplicationException("没有找到配置文件config.txt");
+            IPAddress ipManager, ipHttp;
+            int portHttp;
+            using (var config = new StreamReader("config.txt", Encoding.UTF8))
             {
-                MessageBox.Show("ipL == null");
-                throw new Exception();
+                // ReSharper disable PossibleNullReferenceException
+                var str = config.ReadLine().Split(new[] { ',' }, 3);
+                if (str.Length != 3)
+                    throw new ApplicationException("配置文件语法错误");
+
+                ipManager = IPAddress.Parse(str[0].Trim());
+                ipHttp = IPAddress.Parse(str[1].Trim());
+                portHttp = int.Parse(str[2].Trim());
+
+                while (!config.EndOfStream)
+                {
+                    var s = config.ReadLine().Split(new[] { ',' }, 4);
+
+                    var simu = new Simulator
+                                   {
+                                       Checked = bool.Parse(s[0].Trim()),
+                                       ID = s[1].Trim(),
+                                       IP = s[2].Trim(),
+                                       State = s.Length >= 4 ? s[3].Trim() : null
+                                   };
+                    simu.Updated += () => m_Binding.ResetItem(m_Simulators.IndexOf(simu));
+                    m_Binding.Insert(0, simu);
+                }
+                // ReSharper restore PossibleNullReferenceException
             }
-            //if (ipW == null)
-            //    ipW = IPAddress.Parse(ipL.ToString());
 
             m_FileTranser = 0;
-            m_Tcp = new TcpListener(ipL, 27016);
+            m_Tcp = new TcpListener(ipManager, 27016);
             m_TcpThread = new Thread(TcpProcess)
                               {
                                   IsBackground = true,
@@ -77,8 +93,8 @@ namespace SimulatorsManager
                               };
             m_UdpThread.Start();
 
-            //m_HttpServer = new SimpleHttpServer(ipW, 27015);
-            //m_HttpServer.OnHttpRequest += OnHttpRequest;
+            m_HttpServer = new SimpleHttpServer(ipHttp, portHttp);
+            m_HttpServer.OnHttpRequest += OnHttpRequest;
         }
 
         private HttpResponse OnHttpRequest(HttpRequest request)
@@ -304,37 +320,6 @@ namespace SimulatorsManager
             // ReSharper disable once FunctionNeverReturns
         }
 
-        private void UpdateSimulators()
-        {
-            m_Binding.Clear();
-            var xml = SendAction("DescribeInstances", null);
-            if (xml.DocumentElement == null)
-                throw new Exception();
-            if (xml.DocumentElement["InstanceSet"] == null)
-                throw new Exception();
-            foreach (XmlElement element in xml.DocumentElement["InstanceSet"])
-            {
-                if (element["cpu"] == null)
-                    throw new Exception();
-                if (element["instanceName"] == null)
-                    throw new Exception();
-                if (element["status"] == null)
-                    throw new Exception();
-                if (element["ipAddresses"] == null)
-                    throw new Exception();
-                var simu = new Simulator
-                               {
-                                   ID = element["instanceName"].InnerText,
-                                   Checked = true,
-                                   State = element["status"].InnerText,
-                                   IP = element["ipAddresses"].InnerText,
-                                   Returns = string.Empty
-                               };
-                simu.Updated += () => m_Binding.ResetItem(m_Simulators.IndexOf(simu));
-                m_Binding.Insert(0, simu);
-            }
-        }
-
         private static XmlDocument SendAction(string action, IDictionary<string, string> dic)
         {
             var sb = new StringBuilder();
@@ -467,9 +452,6 @@ namespace SimulatorsManager
                                      dataGridView1.UpdateCellValue(4, i1);
                                  });
                     }
-                    break;
-                case "update":
-                    UpdateSimulators();
                     break;
                 case "dll":
                     m_FileTranser = 0;

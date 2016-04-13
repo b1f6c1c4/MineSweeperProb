@@ -52,8 +52,8 @@
             this.dataGridView1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dataGridView1.Location = new System.Drawing.Point(0, 0);
             this.dataGridView1.Name = "dataGridView1";
-            this.dataGridView1.RowTemplate.Height = 30;
-            this.dataGridView1.Size = new System.Drawing.Size(1137, 667);
+            this.dataGridView1.RowTemplate.Height = 45;
+            this.dataGridView1.Size = new System.Drawing.Size(779, 475);
             this.dataGridView1.TabIndex = 1;
             // 
             // Check
@@ -100,16 +100,16 @@
             // textBox1
             // 
             this.textBox1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.textBox1.Location = new System.Drawing.Point(0, 639);
+            this.textBox1.Location = new System.Drawing.Point(0, 447);
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(1137, 28);
+            this.textBox1.Size = new System.Drawing.Size(779, 28);
             this.textBox1.TabIndex = 0;
             this.textBox1.KeyUp += new System.Windows.Forms.KeyEventHandler(this.textBox1_KeyUp);
             // 
             // Form1
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.ClientSize = new System.Drawing.Size(1137, 667);
+            this.ClientSize = new System.Drawing.Size(779, 475);
             this.Controls.Add(this.textBox1);
             this.Controls.Add(this.dataGridView1);
             this.Name = "Form1";
