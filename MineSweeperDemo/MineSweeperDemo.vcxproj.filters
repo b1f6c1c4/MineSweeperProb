@@ -15,40 +15,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="GacUI.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="GacUIReflection.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="GacUIWindows.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Vlpp.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="VlppWorkflow.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="GacUI.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="GacUIReflection.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="GacUIWindows.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Vlpp.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="VlppWorkflow.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

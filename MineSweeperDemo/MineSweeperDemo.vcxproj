@@ -41,7 +41,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -63,6 +65,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>None</DebugInformationFormat>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -71,23 +74,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="GacUI.cpp" />
-    <ClCompile Include="GacUIReflection.cpp" />
-    <ClCompile Include="GacUIWindows.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Vlpp.cpp" />
-    <ClCompile Include="VlppWorkflow.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="GacUI.h" />
-    <ClInclude Include="GacUIReflection.h" />
-    <ClInclude Include="GacUIWindows.h" />
-    <ClInclude Include="Vlpp.h" />
-    <ClInclude Include="VlppWorkflow.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MineSweeperSolver\MineSweeperSolver.vcxproj">
       <Project>{b0bb7dc3-f3cd-456a-ae21-2d32d7338b59}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Tools\Gaclib\GacUIDemo\GacUIStaticLibrary\GacUIStaticLibrary.vcxproj">
+      <Project>{6698c71d-0d4e-4031-846a-8698f9c9d658}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

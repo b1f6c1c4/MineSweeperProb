@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MineSweeper", "MineSweeper\MineSweeper.csproj", "{273ABFA6-1A14-4BF2-92BF-3810911BB917}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -26,6 +26,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MineSweeperProver", "MineSw
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ResultParser", "ResultParser\ResultParser.vcxproj", "{9B298B3A-125E-4881-8E46-1DFF8EAB8E1E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GacUIStaticLibrary", "..\..\Tools\Gaclib\GacUIDemo\GacUIStaticLibrary\GacUIStaticLibrary.vcxproj", "{6698C71D-0D4E-4031-846A-8698F9C9D658}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -313,6 +315,34 @@ Global
 		{9B298B3A-125E-4881-8E46-1DFF8EAB8E1E}.ReleaseSimu|x64.Build.0 = Release|x64
 		{9B298B3A-125E-4881-8E46-1DFF8EAB8E1E}.ReleaseSimu|x86.ActiveCfg = Release|Win32
 		{9B298B3A-125E-4881-8E46-1DFF8EAB8E1E}.ReleaseSimu|x86.Build.0 = Release|Win32
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.Debug|x64.ActiveCfg = Debug|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.Debug|x86.ActiveCfg = Debug|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugDemo|Any CPU.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugDemo|Any CPU.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugDemo|x64.ActiveCfg = Debug|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugDemo|x64.Build.0 = Debug|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugDemo|x86.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugDemo|x86.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugSimu|Any CPU.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugSimu|Any CPU.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugSimu|x64.ActiveCfg = Debug|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugSimu|x86.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.DebugSimu|x86.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.Release|Any CPU.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.Release|x64.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.Release|x86.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseDemo|Any CPU.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseDemo|Any CPU.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseDemo|x64.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseDemo|x64.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseDemo|x86.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseDemo|x86.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseSimu|Any CPU.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseSimu|Any CPU.Build.0 = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseSimu|x64.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseSimu|x86.ActiveCfg = Release|x64
+		{6698C71D-0D4E-4031-846A-8698F9C9D658}.ReleaseSimu|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
