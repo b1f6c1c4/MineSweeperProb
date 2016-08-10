@@ -1,13 +1,13 @@
 #include "BinomialHelper.h"
 #include <vector>
+#include "boost/thread/shared_mutex.hpp"
+#include "boost/thread/lock_types.hpp"
 
+static boost::shared_mutex mtx;
 static std::vector<std::vector<double>> BinomialCoeff;
 
-DLL_API void CacheBinomials(int n, int m)
+extern "C" DLL_API void CacheBinomials(int n, int m)
 {
-    if (BinomialCoeff.empty())
-        BinomialCoeff.emplace_back(1, double(1));
-
     ++n , ++m;
     if (n < 0)
         return;
@@ -18,34 +18,66 @@ DLL_API void CacheBinomials(int n, int m)
     if (m > n / 2)
         m = n / 2;
 
-    if (BinomialCoeff.back().size() * 2 < m)
-        for (auto i = 0; i < BinomialCoeff.size(); ++i)
+    {
+        boost::shared_lock<boost::shared_mutex> lock(mtx);
+        boost::unique_lock<boost::shared_mutex> writeLock(mtx, boost::defer_lock);
+
+#define UPGRADE \
+    do { \
+        if (lock.owns_lock()) \
+        { \
+            lock.unlock(); \
+            lock.release(); \
+            writeLock.lock(); \
+        } \
+    } while (false)
+
+        if (BinomialCoeff.empty())
         {
-            auto &lst = BinomialCoeff[i];
-            lst.reserve(min((i + 1) / 2, m + 1));
-            for (auto j = lst.size(); j <= (i - 1) / 2 && j < m; ++j)
+            UPGRADE;
+            if (BinomialCoeff.empty())
+                BinomialCoeff.emplace_back(1, double(1));
+        }
+
+        if (BinomialCoeff.back().size() * 2 < m)
+        {
+            UPGRADE;
+            for (auto i = 0; i < BinomialCoeff.size(); ++i)
             {
-                lst.emplace_back(BinomialCoeff[i - 1][j - 1]);
-                lst.back() += j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j];
+                auto &lst = BinomialCoeff[i];
+                lst.reserve(min((i + 1) / 2, m + 1));
+                for (auto j = lst.size(); j <= (i - 1) / 2 && j < m; ++j)
+                {
+                    lst.emplace_back(BinomialCoeff[i - 1][j - 1]);
+                    lst.back() += j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j];
+                }
             }
         }
-    BinomialCoeff.reserve(n);
-    for (auto i = BinomialCoeff.size(); i < n; ++i)
-    {
-        BinomialCoeff.emplace_back();
-        auto &lst = BinomialCoeff.back();
-        lst.reserve(min((i - 1) / 2 + 1, m));
-        lst.push_back(1 + BinomialCoeff[i - 1][0]);
-        for (auto j = 1; j <= (i - 1) / 2 && j < m; ++j)
+
+        if (BinomialCoeff.size() < n)
         {
-            lst.emplace_back(BinomialCoeff[i - 1][j - 1]);
-            lst.back() += j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j];
+            UPGRADE;
+            BinomialCoeff.reserve(n);
+            for (auto i = BinomialCoeff.size(); i < n; ++i)
+            {
+                BinomialCoeff.emplace_back();
+                auto &lst = BinomialCoeff.back();
+                lst.reserve(min((i - 1) / 2 + 1, m));
+                lst.push_back(1 + BinomialCoeff[i - 1][0]);
+                for (auto j = 1; j <= (i - 1) / 2 && j < m; ++j)
+                {
+                    lst.emplace_back(BinomialCoeff[i - 1][j - 1]);
+                    lst.back() += j == (i - 1) / 2 && i % 2 == 1 ? BinomialCoeff[i - 1][j - 1] : BinomialCoeff[i - 1][j];
+                }
+            }
         }
     }
 }
 
 DLL_API double Binomial(int n, int m)
 {
+    boost::shared_lock<boost::shared_mutex> lock(mtx, boost::defer_lock);
+
     if (n < 0)
         return double(0);
     if (m > n ||
@@ -57,5 +89,6 @@ DLL_API double Binomial(int n, int m)
 
     auto mm = m <= n / 2 ? m : n - m;
 
+    lock.lock();
     return BinomialCoeff[n - 1][mm - 1];
 }
