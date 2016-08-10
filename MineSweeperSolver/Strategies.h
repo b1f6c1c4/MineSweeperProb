@@ -28,7 +28,7 @@ struct Strategy
     int Index;
 
     LogicMethod Logic;
-    
+
     bool HeuristicEnabled;
     std::vector<HeuristicMethod> DecisionTree;
 

@@ -8,7 +8,7 @@ Solver::Solver(size_t count) : BasicSolver(count) {}
 
 Solver::Solver(size_t count, int mines) : BasicSolver(count, mines) {}
 
-Solver::Solver(const Solver& other) : BasicSolver(other) {}
+Solver::Solver(const Solver &other) : BasicSolver(other) {}
 
 Solver::~Solver()
 {
@@ -42,13 +42,13 @@ double Solver::ZerosCondQ(const BlockSet &set, Block blk)
     return UCondQ(PackParameters(set, blk, min)).m_Probability;
 }
 
-double Solver::ZerosECondQ(const BlockSet& set, Block blk)
+double Solver::ZerosECondQ(const BlockSet &set, Block blk)
 {
     int min;
     return UCondQ(PackParameters(set, blk, min)).m_Expectation;
 }
 
-double Solver::UpperBoundCondQ(const BlockSet& set, Block blk)
+double Solver::UpperBoundCondQ(const BlockSet &set, Block blk)
 {
     int min;
     return UCondQ(PackParameters(set, blk, min)).m_UpperBound;
@@ -97,7 +97,7 @@ void Solver::Add(std::vector<double> &from, const std::vector<double> &cases)
     dicN.swap(from);
 }
 
-DistCondQParameters Solver::PackParameters(const BlockSet& set, Block blk, int& min) const
+DistCondQParameters Solver::PackParameters(const BlockSet &set, Block blk, int &min) const
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
     int dMines;
@@ -109,7 +109,7 @@ DistCondQParameters Solver::PackParameters(const BlockSet& set, Block blk, int& 
     return par;
 }
 
-void Solver::GetHalves(DistCondQParameters& par) const
+void Solver::GetHalves(DistCondQParameters &par) const
 {
     par.m_Halves.clear();
     for (auto i = 0; i < par.Sets1.size(); ++i)
@@ -118,7 +118,7 @@ void Solver::GetHalves(DistCondQParameters& par) const
             par.m_Halves.push_back(i);
 }
 
-void Solver::EnumerateSolutions(DistCondQParameters& par) const
+void Solver::EnumerateSolutions(DistCondQParameters &par) const
 {
     par.m_States.clear();
     par.m_States.resize(par.Length + 1, 0);
@@ -131,7 +131,7 @@ void Solver::EnumerateSolutions(DistCondQParameters& par) const
         if (par.Set2ID > 0 && m_BlockSets[par.Set2ID].size() == solution.Dist[par.Set2ID])
             continue;
 
-        lb.clear(), ub.clear();
+        lb.clear() , ub.clear();
         for (auto id : par.m_Halves)
         {
             lb.push_back(max(static_cast<int>(solution.Dist[id]) - static_cast<int>(m_BlockSets[id].size()) + (id == par.Set2ID ? 1 : 0) + par.Sets1[id], 0));
@@ -207,7 +207,7 @@ void Solver::EnumerateSolutions(DistCondQParameters& par) const
         par.m_Result.push_back(val / par.m_TotalStates);
 }
 
-DistCondQParameters* Solver::TryGetCache(DistCondQParameters&& par, std::function<bool(const DistCondQParameters&)> pre)
+DistCondQParameters *Solver::TryGetCache(DistCondQParameters &&par, std::function<bool(const DistCondQParameters &)> pre)
 {
     DistCondQParameters *ptr = nullptr;
     auto itp = m_DistCondQCache.equal_range(par.m_Hash);
@@ -230,7 +230,10 @@ DistCondQParameters* Solver::TryGetCache(DistCondQParameters&& par, std::functio
 
 const DistCondQParameters &Solver::ZCondQ(DistCondQParameters &&par)
 {
-    auto pre = [](const DistCondQParameters &p) { return !p.m_Result.empty(); };
+    auto pre = [](const DistCondQParameters &p)
+        {
+            return !p.m_Result.empty();
+        };
     auto ptr = TryGetCache(std::move(par), pre);
     if (pre(*ptr))
         return *ptr;
@@ -255,7 +258,10 @@ const DistCondQParameters &Solver::ZCondQ(DistCondQParameters &&par)
 
 const DistCondQParameters &Solver::DistCondQ(DistCondQParameters &&par)
 {
-    auto pre = [](const DistCondQParameters &p) { return p.m_Result.size() == p.Length + 1; };
+    auto pre = [](const DistCondQParameters &p)
+        {
+            return p.m_Result.size() == p.Length + 1;
+        };
     auto ptr = TryGetCache(std::move(par), pre);
     if (pre(*ptr))
         return *ptr;
@@ -265,9 +271,12 @@ const DistCondQParameters &Solver::DistCondQ(DistCondQParameters &&par)
     return *ptr;
 }
 
-const DistCondQParameters& Solver::UCondQ(DistCondQParameters&& par)
+const DistCondQParameters &Solver::UCondQ(DistCondQParameters &&par)
 {
-    auto pre = [](const DistCondQParameters &p) { return !std::isnan(p.m_UpperBound); };
+    auto pre = [](const DistCondQParameters &p)
+        {
+            return !std::isnan(p.m_UpperBound);
+        };
     auto ptr = TryGetCache(std::move(par), pre);
     if (pre(*ptr))
         return *ptr;

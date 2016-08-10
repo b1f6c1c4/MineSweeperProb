@@ -20,7 +20,7 @@ class MineSweeperDemo : public GuiWindow
 public:
     MineSweeperDemo()
         :GuiWindow(GetCurrentTheme()->CreateWindowStyle()),
-        m_Manual(true)
+         m_Manual(true)
     {
         this->GuiControlHost::SetText(L"MineSweeperDemo");
         this->GetContainerComposition()->SetMinSizeLimitation(GuiGraphicsComposition::LimitToElementAndChildren);
@@ -70,7 +70,7 @@ public:
         this->Update();
 
         m_Thread = std::thread(&MineSweeperDemo::Process, this);
-        m_LastX = 0, m_LastY = 0;
+        m_LastX = 0 , m_LastY = 0;
 
         this->ForceCalculateSizeImmediately();
         this->SetClientSize(Size(30 * 37 + 2, 16 * 37 + 2));
@@ -140,7 +140,7 @@ public:
         }
     }
 
-    void KeyUp(const NativeWindowKeyInfo& info) override
+    void KeyUp(const NativeWindowKeyInfo &info) override
     {
         switch (info.code)
         {
@@ -173,7 +173,7 @@ private:
 
     void Process()
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds{ 1000 });
+        std::this_thread::sleep_for(std::chrono::milliseconds{1000});
         while (true)
         {
             if (m_Mgr == nullptr)
@@ -182,23 +182,32 @@ private:
                 {
                     m_Mgr = new GameMgr(30, 16, 99);
                     m_Mgr->BasicStrategy = ReadStrategy(StrategyStr);
-                    GetApplication()->InvokeLambdaInMainThreadAndWait([this]() { this->Update(); });
+                    GetApplication()->InvokeLambdaInMainThreadAndWait([this]()
+                                                                      {
+                                                                          this->Update();
+                                                                      });
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds{ 100 });
+                std::this_thread::sleep_for(std::chrono::milliseconds{100});
                 continue;
             }
 
             if (!m_Mgr->GetStarted())
             {
-                GetApplication()->InvokeLambdaInMainThreadAndWait([this]() { this->Update(); });
+                GetApplication()->InvokeLambdaInMainThreadAndWait([this]()
+                                                                  {
+                                                                      this->Update();
+                                                                  });
                 auto s = m_Mgr->GetSucceed();
                 delete m_Mgr;
                 m_Mgr = nullptr;
-                std::this_thread::sleep_for(std::chrono::milliseconds{ s ? 700 : 1200 });
+                std::this_thread::sleep_for(std::chrono::milliseconds{s ? 700 : 1200});
                 continue;
             }
 
-            GetApplication()->InvokeLambdaInMainThread([this]() {this->Update(); });
+            GetApplication()->InvokeLambdaInMainThread([this]()
+                                                       {
+                                                           this->Update();
+                                                       });
 
             m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap, false);
             if (m_Mgr->GetSolver().CanOpenForSure == 0)
@@ -225,26 +234,27 @@ private:
                 {
                     auto blk = ptr[i];
                     auto &b = m_Mgr->GetBlockProperties()[blk];
-                    auto v = (b.X - m_LastX)*(b.X - m_LastX) + (b.Y - m_LastY)*(b.Y - m_LastY);
+                    auto v = (b.X - m_LastX) * (b.X - m_LastX) + (b.Y - m_LastY) * (b.Y - m_LastY);
                     if (v < bestV)
                     {
                         bestBlk = blk;
                         bestV = v;
                     }
                 }
-                m_LastX = bestBlk / 16, m_LastY = bestBlk % 16;
+                m_LastX = bestBlk / 16 , m_LastY = bestBlk % 16;
                 m_Mgr->OpenBlock(m_LastX, m_LastY);
             }
 
             auto bbb = m_LastX * 16 + m_LastY;
-            GetApplication()->InvokeLambdaInMainThread([this, flag, bbb]() {
-                this->Update();
-                m_Backs[bbb]->SetColor(flag ? Color(255 - 170, 255, 0) : Color(255, 170, 0));
-            });
+            GetApplication()->InvokeLambdaInMainThread([this, flag, bbb]()
+                                                       {
+                                                           this->Update();
+                                                           m_Backs[bbb]->SetColor(flag ? Color(255 - 170, 255, 0) : Color(255, 170, 0));
+                                                       });
             auto ms = 5 * static_cast<int>(sqrt(bestV)) + 1;
             if (!flag)
                 ms *= 3;
-            std::this_thread::sleep_for(std::chrono::milliseconds{ ms });
+            std::this_thread::sleep_for(std::chrono::milliseconds{ms});
         }
     }
 };

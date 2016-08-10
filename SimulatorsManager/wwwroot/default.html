@@ -13,15 +13,16 @@
             font-family: Consolas;
             border-spacing: 0;
         }
-        body {
-            background-color: #efefef;
-        }
+
+        body { background-color: #efefef; }
+
         #cmdWrapper {
             display: inline-block;
             background-color: #c0c0c0;
             margin: 5px;
             padding: 5px;
         }
+
         .cmd {
             display: inline-block;
             float: left;
@@ -33,18 +34,14 @@
             padding: 5px 5px 5px 5px;
             cursor: pointer;
         }
-        #cmdOKWrapper {
-            color: #f5302a;
-        }
-        table {
-            table-layout: fixed;
-        }
-        thead > tr {
-            background-color: #b0b0b0;
-        }
-        tr:nth-child(even) {
-            background-color: #d0d0d0;
-        }
+
+        #cmdOKWrapper { color: #f5302a; }
+
+        table { table-layout: fixed; }
+
+        thead > tr { background-color: #b0b0b0; }
+
+        tr:nth-child(even) { background-color: #d0d0d0; }
     </style>
 </head>
 <body>
@@ -63,7 +60,7 @@
         <br/>
         <div id="apWrapper"><input id="ap" type="text"/><input id="submit" type="button"/></div>
     </div>
-    <div id="cmdOKWrapper">Command Sent, <span style="color:black">ref</span> to get result</div>
+    <div id="cmdOKWrapper">Command Sent, <span style="color: black">ref</span> to get result</div>
     <div style="width: 100%">
         <table>
             <colgroup>
@@ -84,9 +81,9 @@
     </div>
 </form>
 <script type="text/javascript">
-    var updateFrom = function(msg) {
+    var updateFrom = function (msg) {
         if ($('#mainTableBody tr').length === msg.length) {
-            $.each(msg, function(i, item) {
+            $.each(msg, function (i, item) {
                 var tr = $('#mainTableBody tr')[i];
                 $(tr).find('th input:checkbox').prop('checked', item.Checked);
                 $(tr).find('td:eq(0)').text(item.ID);
@@ -94,7 +91,7 @@
             });
         } else {
             $('#mainTableBody tr').remove();
-            $.each(msg, function(i, item) {
+            $.each(msg, function (i, item) {
                 var box = $('<input type="checkbox"/>')
                     .prop('checked', item.Checked)
                     .change(function () {
@@ -115,7 +112,7 @@
             });
         }
     };
-    var updateAjax = function() {
+    var updateAjax = function () {
         $.ajax(
         {
             method: "POST",
@@ -123,12 +120,12 @@
             success: updateFrom
         });
     };
-    var indicateCommandSucceed = function() {
+    var indicateCommandSucceed = function () {
         $('#cmdOKWrapper').css('opacity', 1).animate({
             opacity: 0
         }, 2000);
     }
-    var sendCommand = function(cmd) {
+    var sendCommand = function (cmd) {
         $.ajax(
         {
             method: "POST",

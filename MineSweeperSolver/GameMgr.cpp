@@ -237,6 +237,7 @@ DLL_API void Largest(BlockSet &bests, std::function<int(int)> fun)
     }
     newBests.swap(bests);
 }
+
 DLL_API void Largest(BlockSet &bests, std::function<double(int)> fun)
 {
     if (bests.size() <= 1)
@@ -394,7 +395,7 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
 {
     if (!m_Started)
         return false;
-    
+
     if (m_Solver->CanOpenForSure == 0)
         m_Solver->Solve(maxDepth, true);
     if (m_Solver->CanOpenForSure == 0)
@@ -449,7 +450,7 @@ void GameMgr::Automatic()
     SolvingState st;
     switch (BasicStrategy.Logic)
     {
-    case LogicMethod::None: 
+    case LogicMethod::None:
         st = SolvingState::Stale;
         break;
     case LogicMethod::Single:
@@ -458,7 +459,7 @@ void GameMgr::Automatic()
     case LogicMethod::Double:
         st = SolvingState::Reduce | SolvingState::Overlap;
         break;
-    case LogicMethod::Full: 
+    case LogicMethod::Full:
         st = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
         break;
     default:

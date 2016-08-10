@@ -34,13 +34,13 @@ private:
     LARGE_INTEGER m_StartTime;
 };
 
-std::pair<double,bool> ProcessID(const Strategy &strategy)
+std::pair<double, bool> ProcessID(const Strategy &strategy)
 {
     GameMgr mgr(30, 16, 99);
     mgr.BasicStrategy = strategy;
     PerformanceTimer t;
     mgr.Automatic();
-    return std::make_pair(t.Elapsed(),mgr.GetSucceed());
+    return std::make_pair(t.Elapsed(), mgr.GetSucceed());
 }
 
 int main()

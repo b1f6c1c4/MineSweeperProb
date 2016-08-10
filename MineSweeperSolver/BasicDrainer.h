@@ -42,6 +42,7 @@ private:
 
     MacroSituation(const MacroSituation &other);
 };
+
 bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
 bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 

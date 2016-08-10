@@ -3,6 +3,7 @@
 #include "GameMgr.h"
 
 class DLL_API GameMgr;
+
 class
     DLL_API Drainer : public BasicDrainer
 {

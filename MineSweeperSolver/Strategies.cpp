@@ -180,7 +180,7 @@ DLL_API Strategy ReadStrategy(std::string str)
 DLL_API std::string WriteStrategy(const Strategy &st)
 {
     std::stringstream ss;
-    
+
     switch (st.Logic)
     {
     case LogicMethod::None:
@@ -213,7 +213,7 @@ DLL_API std::string WriteStrategy(const Strategy &st)
                 switch (m)
                 {
                 case HeuristicMethod::None: break;
-                case HeuristicMethod::MinMineProb: 
+                case HeuristicMethod::MinMineProb:
                     ss << "P";
                     break;
                 case HeuristicMethod::MaxZeroProb:

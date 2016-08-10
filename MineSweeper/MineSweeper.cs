@@ -23,9 +23,11 @@ namespace MineSweeper
         private Block m_CurrentBlock;
         private readonly List<UIBlock> m_UIBlocks;
 
-        public MineSweeper(GameMgr mgr) : this(mgr.TotalWidth, mgr.TotalHeight, mgr.TotalMines, null, mgr.AllowWrongGuess) { }
+        public MineSweeper(GameMgr mgr)
+            : this(mgr.TotalWidth, mgr.TotalHeight, mgr.TotalMines, null, mgr.AllowWrongGuess) { }
 
-        public MineSweeper(int width, int height, int mines, string strategy = null, bool allowWrongGuess = false, GameMgr mgr = null)
+        public MineSweeper(int width, int height, int mines, string strategy = null, bool allowWrongGuess = false,
+                           GameMgr mgr = null)
         {
             m_AllowWrongGuess = allowWrongGuess;
             m_Width = width;

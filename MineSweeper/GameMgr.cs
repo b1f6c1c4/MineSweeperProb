@@ -451,7 +451,8 @@ namespace MineSweeper
         private static extern void CacheBinomials(int n, int m);
 
         [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Ansi)]
-        private static extern IntPtr CreateGameMgr(int width, int height, int totalMines, string strategy, bool allowWrongGuess);
+        private static extern IntPtr CreateGameMgr(int width, int height, int totalMines, string strategy,
+                                                   bool allowWrongGuess);
 
         [DllImport("MineSweeperSolver.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr CreateGameMgrFromFile(string filename);
@@ -489,7 +490,7 @@ namespace MineSweeper
         [DllImport("MineSweeperSolver.dll")]
         private static extern bool EnableDrainer(IntPtr mgr);
 
-         [DllImport("MineSweeperSolver.dll")]
+        [DllImport("MineSweeperSolver.dll")]
         private static extern bool OpenOptimalBlocks(IntPtr mgr);
 
         #endregion PInvokes

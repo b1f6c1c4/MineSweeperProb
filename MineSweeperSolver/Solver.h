@@ -79,4 +79,3 @@ public:
 DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 DLL_API bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 DLL_API bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-

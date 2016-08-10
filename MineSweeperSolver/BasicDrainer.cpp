@@ -6,20 +6,39 @@ static void Combinations(int n, int m, std::vector<std::vector<BlockStatus>> &di
     std::vector<BlockStatus> stack;
     stack.reserve(n);
     auto add = [&count, &stack, n, m]()
-    {
-        if (count < m)
         {
-            if (stack.size() < n - 1)
+            if (count < m)
             {
-                auto b = m - count >= n - stack.size();
-                stack.push_back(b ? BlockStatus::Mine : BlockStatus::Blank);
-                if (b)
-                    ++count;
+                if (stack.size() < n - 1)
+                {
+                    auto b = m - count >= n - stack.size();
+                    stack.push_back(b ? BlockStatus::Mine : BlockStatus::Blank);
+                    if (b)
+                        ++count;
+                    return false;
+                }
+                if (stack.empty())
+                    return true;
+                if (stack.back() == BlockStatus::Mine)
+                {
+                    while (!stack.empty() && stack.back() == BlockStatus::Mine)
+                    {
+                        stack.pop_back();
+                        --count;
+                    }
+                    if (stack.empty())
+                        return true;
+                }
+                stack.back() = BlockStatus::Mine;
+                ++count;
                 return false;
             }
-            if (stack.empty())
-                return true;
-            if (stack.back() == BlockStatus::Mine)
+            if (stack.size() < n - 1)
+            {
+                stack.push_back(BlockStatus::Blank);
+                return false;
+            }
+            while (true)
             {
                 while (!stack.empty() && stack.back() == BlockStatus::Mine)
                 {
@@ -28,37 +47,18 @@ static void Combinations(int n, int m, std::vector<std::vector<BlockStatus>> &di
                 }
                 if (stack.empty())
                     return true;
+                if (count < m)
+                {
+                    stack.back() = BlockStatus::Mine;
+                    ++count;
+                    return false;
+                }
+                while (!stack.empty() && stack.back() == BlockStatus::Blank)
+                    stack.pop_back();
+                if (stack.empty())
+                    return true;
             }
-            stack.back() = BlockStatus::Mine;
-            ++count;
-            return false;
-        }
-        if (stack.size() < n - 1)
-        {
-            stack.push_back(BlockStatus::Blank);
-            return false;
-        }
-        while (true)
-        {
-            while (!stack.empty() && stack.back() == BlockStatus::Mine)
-            {
-                stack.pop_back();
-                --count;
-            }
-            if (stack.empty())
-                return true;
-            if (count < m)
-            {
-                stack.back() = BlockStatus::Mine;
-                ++count;
-                return false;
-            }
-            while (!stack.empty() && stack.back() == BlockStatus::Blank)
-                stack.pop_back();
-            if (stack.empty())
-                return true;
-        }
-    };
+        };
     while (true)
     {
         if (stack.size() < n - 1)
@@ -125,7 +125,7 @@ bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs)
     return !(lhs == rhs);
 }
 
-BasicDrainer::~BasicDrainer() 
+BasicDrainer::~BasicDrainer()
 {
     for (auto &kvp : m_Macros)
     {

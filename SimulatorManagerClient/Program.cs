@@ -9,13 +9,13 @@ using System.Threading;
 
 namespace SimulatorManagerClient
 {
-    class Program
+    internal class Program
     {
         private static IPEndPoint m_IP;
         private static bool m_AutoSave;
         private static int m_AutoSaveInterval = 10000;
 
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             Process proc = null;
 
@@ -59,7 +59,6 @@ namespace SimulatorManagerClient
                         break;
                     case "terminate":
                         if (proc != null)
-                        {
                             try
                             {
                                 if (!proc.HasExited)
@@ -71,7 +70,6 @@ namespace SimulatorManagerClient
                             {
                                 ret = e.ToString();
                             }
-                        }
                         else
                             ret = "not yet started";
                         break;
@@ -79,7 +77,6 @@ namespace SimulatorManagerClient
                         if (proc != null)
                             ret = "still running";
                         else
-                        {
                             try
                             {
                                 Download("MineSweeperSolver.dll");
@@ -89,13 +86,11 @@ namespace SimulatorManagerClient
                             {
                                 ret = e.ToString();
                             }
-                        }
                         break;
                     case "update exe":
                         if (proc != null)
                             ret = "still running";
                         else
-                        {
                             try
                             {
                                 Download("MineSweeperSimulator.exe");
@@ -105,13 +100,11 @@ namespace SimulatorManagerClient
                             {
                                 ret = e.ToString();
                             }
-                        }
                         break;
                     case "update client":
                         if (proc != null)
                             ret = "still running";
                         else
-                        {
                             try
                             {
                                 Download("tmp.exe");
@@ -122,7 +115,6 @@ namespace SimulatorManagerClient
                             {
                                 ret = e.ToString();
                             }
-                        }
                         break;
                     case "upload":
                         if (proc != null)
@@ -163,7 +155,6 @@ namespace SimulatorManagerClient
                         if (proc != null)
                             ret = "still running";
                         else
-                        {
                             try
                             {
                                 File.Delete("output.txt");
@@ -173,7 +164,6 @@ namespace SimulatorManagerClient
                             {
                                 ret = e.ToString();
                             }
-                        }
                         break;
                     case "auto":
                         ret = $"auto: {m_AutoSave} {m_AutoSaveInterval}";
@@ -200,7 +190,6 @@ namespace SimulatorManagerClient
                         break;
                     default:
                         if (str.StartsWith("start ", StringComparison.Ordinal))
-                        {
                             if (proc != null)
                                 ret = "still running";
                             else
@@ -214,7 +203,6 @@ namespace SimulatorManagerClient
                                 {
                                     ret = e.ToString();
                                 }
-                        }
                         break;
                 }
                 var retData = Encoding.UTF8.GetBytes(ret);

@@ -37,9 +37,11 @@ int GetIndex(int x, int y)
 }
 
 struct Macro;
+
 struct Choice
 {
     explicit Choice(int blk) : m_UpperBound(NAN), Block(blk) { }
+
     double m_UpperBound;
     int Block;
     std::unordered_map<Macro *, double> Next;
@@ -48,6 +50,7 @@ struct Choice
 struct Macro
 {
     Macro() : m_Depth(0), m_Solver(nullptr), m_UpperBound(NAN), m_Influence(0) { }
+
     Macro(const Macro &other) : m_Depth(other.m_Depth + 1), m_Degrees(other.m_Degrees), m_Solver(nullptr), m_UpperBound(NAN), m_Influence(other.m_Influence)
     {
         if (other.m_Solver != nullptr)
@@ -63,18 +66,22 @@ struct Macro
     BlockSet m_BestChoices;
     double m_Influence;
 };
+
 bool operator<(const Macro &lhs, const Macro &rhs)
 {
     return lhs.m_Influence < rhs.m_Influence;
 }
+
 bool operator>(const Macro &lhs, const Macro &rhs)
 {
     return rhs.m_Influence < lhs.m_Influence;
 }
+
 bool operator<=(const Macro &lhs, const Macro &rhs)
 {
     return !(lhs.m_Influence > rhs.m_Influence);
 }
+
 bool operator>=(const Macro &lhs, const Macro &rhs)
 {
     return !(lhs.m_Influence < rhs.m_Influence);
@@ -82,7 +89,7 @@ bool operator>=(const Macro &lhs, const Macro &rhs)
 
 struct Hash
 {
-    size_t operator() (Macro * const &macro) const
+    size_t operator()(Macro * const &macro) const
     {
         size_t h = 5381;
         for (auto v : macro->m_Degrees)
@@ -90,10 +97,12 @@ struct Hash
         return h;
     }
 };
+
 bool operator==(const Macro &lhs, const Macro &rhs)
 {
     return lhs.m_Degrees == rhs.m_Degrees;
 }
+
 bool operator!=(const Macro &lhs, const Macro &rhs)
 {
     return !(lhs == rhs);
@@ -112,7 +121,7 @@ void OpenBlock(Macro *macro, Block blk, bool forceNoMine = false)
     macro->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, false);
     int min;
     auto &info = macro->m_Solver->GetDistInfo(m_BlocksR[blk], blk, min);
-    
+
     macro->m_Choices.emplace_back(blk);
     for (auto i = 0; i <= info.Length; ++i)
     {
@@ -155,7 +164,7 @@ void OpenBlock(Macro *macro, Block blk, bool forceNoMine = false)
             child = *res.first;
         }
         macro->m_Choices.back().Next.insert(std::make_pair(child, prob));
-        child->m_Influence = res.second ? macro->m_Influence * prob  : max(child->m_Influence, macro->m_Influence * prob);
+        child->m_Influence = res.second ? macro->m_Influence * prob : max(child->m_Influence, macro->m_Influence * prob);
 
         {
             std::unique_lock<std::mutex> lock(WorkingQueueMutex);
@@ -211,10 +220,9 @@ public:
         GenerateRoot(new Solver(*macro.m_Solver), Width * Height - Mines - macro.m_Depth);
         Drain();
     }
+
 protected:
-    void HeuristicPruning(MacroSituation *macro, BlockSet &bests) override
-    {
-    }
+    void HeuristicPruning(MacroSituation *macro, BlockSet &bests) override { }
 };
 
 std::mutex PrunMutex;
@@ -247,7 +255,7 @@ void Process()
         }
         if (macro == nullptr)
         {
-            std::this_thread::sleep_for(std::chrono::seconds{ 1 });
+            std::this_thread::sleep_for(std::chrono::seconds{1});
             {
                 std::unique_lock<std::mutex> lock(WorkingQueueMutex);
 
@@ -348,14 +356,15 @@ int main()
         }
 
     auto root = new Macro;
-    root->m_Degrees.resize(Width*Height, CLOSED);
+    root->m_Degrees.resize(Width * Height, CLOSED);
     root->m_Solver = new Solver(Width * Height, Mines);
     root->m_Solver->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability, false);
 
     Situations[0].insert(root);
     root->m_Influence = 1;
     //OpenBlock(root, 0, true);
-    WorkingQueue.push(root); ++Queued[0];
+    WorkingQueue.push(root);
+    ++Queued[0];
 
     //std::cout << "Draining..." << std::endl;
     //SimpleDrainer dr(*root);
@@ -372,7 +381,7 @@ int main()
         th.join();
 
     std::cout << "Merging..." << std::endl;
-    
+
     GetUpperBound(root);
 
     std::cout << root->m_UpperBound << std::endl;

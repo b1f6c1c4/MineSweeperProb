@@ -68,9 +68,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     Drain();
 }
 
-Drainer::~Drainer()
-{
-}
+Drainer::~Drainer() {}
 
 BlockSet Drainer::GetBestBlocks() const
 {
