@@ -529,7 +529,7 @@ void BasicSolver::SimpleOverlapAll()
     {
         m_Pairs_Temp_Size = sz;
         m_Pairs_Temp = new bool[sz];
-        ZeroMemory(m_Pairs_Temp, sizeof(bool) * m_Pairs_Temp_Size);
+        memset(m_Pairs_Temp, 0, sizeof(bool) * m_Pairs_Temp_Size);
     }
 
     for (auto cnt = 0; cnt < m_Matrix.size(); ++cnt)
@@ -593,7 +593,7 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
         };
     auto ints = [](Iv i1, Iv i2)-> Iv
         {
-            return Iv(max(i1.first, i2.first), min(i1.second, i2.second));
+            return Iv(MAX(i1.first, i2.first), MIN(i1.second, i2.second));
         };
 
     auto ivAC = Iv(m_MatrixAugment[r1], m_MatrixAugment[r1]), ivBC = Iv(m_MatrixAugment[r2], m_MatrixAugment[r2]);

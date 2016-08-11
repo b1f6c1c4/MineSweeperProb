@@ -45,7 +45,7 @@ extern "C" void CacheBinomials(int n, int m)
             for (auto i = 0; i < BinomialCoeff.size(); ++i)
             {
                 auto &lst = BinomialCoeff[i];
-                lst.reserve(min((i + 1) / 2, m + 1));
+                lst.reserve(MIN((i + 1) / 2, m + 1));
                 for (auto j = lst.size(); j <= (i - 1) / 2 && j < m; ++j)
                 {
                     lst.emplace_back(BinomialCoeff[i - 1][j - 1]);
@@ -62,7 +62,7 @@ extern "C" void CacheBinomials(int n, int m)
             {
                 BinomialCoeff.emplace_back();
                 auto &lst = BinomialCoeff.back();
-                lst.reserve(min((i - 1) / 2 + 1, m));
+                lst.reserve(MIN((i - 1) / 2 + 1, m));
                 lst.push_back(1 + BinomialCoeff[i - 1][0]);
                 for (auto j = 1; j <= (i - 1) / 2 && j < m; ++j)
                 {

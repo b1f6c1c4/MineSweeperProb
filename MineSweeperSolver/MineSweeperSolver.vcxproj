@@ -104,7 +104,6 @@
     <ClInclude Include="Solver.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="Strategies.h" />
-    <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicDrainer.cpp" />
@@ -114,7 +113,6 @@
     <ClCompile Include="GameMgr.cpp" />
     <ClCompile Include="random.cpp" />
     <ClCompile Include="Solver.cpp" />
-    <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="Strategies.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

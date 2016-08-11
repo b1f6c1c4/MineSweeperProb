@@ -611,12 +611,12 @@ void GameMgr::OpenBlock(int id)
 int GameMgr::FrontierDist(Block blk) const
 {
     auto &bt = m_Blocks[blk];
-    auto d = max(m_TotalWidth, m_TotalHeight);
+    auto d = MAX(m_TotalWidth, m_TotalHeight);
     for (auto b : m_Blocks)
     {
         if (!b.IsOpen)
             continue;
-        auto v = max(abs(b.X - bt.X), abs(b.Y - bt.Y));
+        auto v = MAX(abs(b.X - bt.X), abs(b.Y - bt.Y));
         if (v < d)
             d = v;
     }

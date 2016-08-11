@@ -134,8 +134,8 @@ void Solver::EnumerateSolutions(DistCondQParameters &par) const
         lb.clear() , ub.clear();
         for (auto id : par.m_Halves)
         {
-            lb.push_back(max(static_cast<int>(solution.Dist[id]) - static_cast<int>(m_BlockSets[id].size()) + (id == par.Set2ID ? 1 : 0) + par.Sets1[id], 0));
-            ub.push_back(min(solution.Dist[id], par.Sets1[id]));
+            lb.push_back(MAX(static_cast<int>(solution.Dist[id]) - static_cast<int>(m_BlockSets[id].size()) + (id == par.Set2ID ? 1 : 0) + par.Sets1[id], 0));
+            ub.push_back(MIN(solution.Dist[id], par.Sets1[id]));
         }
 
         stack.clear();

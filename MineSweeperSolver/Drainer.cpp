@@ -120,12 +120,12 @@ void Drainer::Update()
 int Drainer::FrontierDist(const MacroSituation *macro, Block blk) const
 {
     auto &bt = m_Mgr.m_Blocks[blk];
-    auto d = max(m_Mgr.m_TotalWidth, m_Mgr.m_TotalHeight);
+    auto d = MAX(m_Mgr.m_TotalWidth, m_Mgr.m_TotalHeight);
     for (auto b : m_Mgr.m_Blocks)
     {
         if (macro->m_Degrees[b.Index] < 0)
             continue;
-        auto v = max(abs(b.X - bt.X), abs(b.Y - bt.Y));
+        auto v = MAX(abs(b.X - bt.X), abs(b.Y - bt.Y));
         if (v < d)
             d = v;
     }
