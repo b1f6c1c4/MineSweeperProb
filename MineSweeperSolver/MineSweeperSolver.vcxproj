@@ -113,7 +113,6 @@
     <ClCompile Include="GameMgr.cpp" />
     <ClCompile Include="random.cpp" />
     <ClCompile Include="Solver.cpp" />
-    <ClCompile Include="Strategies.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

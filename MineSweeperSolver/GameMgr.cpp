@@ -4,15 +4,18 @@
 #include "Drainer.h"
 #include <iostream>
 
-GameMgr::GameMgr(int width, int height, int totalMines, bool allowWrongGuess) : m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, const Strategy &strategy, bool allowWrongGuess) : BasicStrategy(strategy), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
-    m_Solver = new Solver(width * height, totalMines);
+    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
+        m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+    else
+        m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
 
-    m_Blocks.reserve(width * height);
-    m_BlocksR.reserve(width * height);
+    m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
+    m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
 
-    for (auto i = 0; i < width; ++i)
-        for (auto j = 0; j < height; ++j)
+    for (auto i = 0; i < m_TotalWidth; ++i)
+        for (auto j = 0; j < m_TotalHeight; ++j)
         {
             m_Blocks.emplace_back();
             m_BlocksR.emplace_back();
@@ -25,14 +28,14 @@ GameMgr::GameMgr(int width, int height, int totalMines, bool allowWrongGuess) : 
             blk.IsMine = false;
             blkR.reserve(8);
             for (auto di = -1; di <= 1; ++di)
-                if (i + di >= 0 && i + di < width)
+                if (i + di >= 0 && i + di < m_TotalWidth)
                     for (auto dj = -1; dj <= 1; ++dj)
-                        if (j + dj >= 0 && j + dj < height)
+                        if (j + dj >= 0 && j + dj < m_TotalHeight)
                             if (di != 0 || dj != 0)
                                 blkR.push_back(GetIndex(i + di, j + dj));
         }
 
-    m_AllBits = log2(Binomial(width * height, totalMines));
+    m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
 GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
@@ -48,7 +51,10 @@ GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), 
     READ(m_ToOpen);
     READ(m_WrongGuesses);
 
-    m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
+    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
+        m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+    else
+        m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
 
     m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
     m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
@@ -450,13 +456,15 @@ void GameMgr::Automatic()
     SolvingState st;
     switch (BasicStrategy.Logic)
     {
-    case LogicMethod::None:
+    case LogicMethod::Passive:
         st = SolvingState::Stale;
         break;
     case LogicMethod::Single:
+    case LogicMethod::SingleExtended:
         st = SolvingState::Reduce;
         break;
     case LogicMethod::Double:
+    case LogicMethod::DoubleExtended:
         st = SolvingState::Reduce | SolvingState::Overlap;
         break;
     case LogicMethod::Full:

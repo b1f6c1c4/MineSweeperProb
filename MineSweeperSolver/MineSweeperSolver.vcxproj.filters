@@ -59,9 +59,6 @@
     <ClCompile Include="Drainer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Strategies.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="BasicSolver.cpp">
       <Filter>源文件</Filter>
     </ClCompile>

@@ -4,10 +4,12 @@
 
 enum class LogicMethod
 {
-    None = 0x00,
+    Passive = 0x00,
     Single = 0x01,
-    Double = 0x02,
-    Full = 0x03
+    SingleExtended = 0x02,
+    Double = 0x03,
+    DoubleExtended = 0x04,
+    Full = 0x05
 };
 
 enum class HeuristicMethod
