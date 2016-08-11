@@ -116,11 +116,14 @@ private:
     std::vector<double> m_Sums_Temp;
     std::vector<double> m_Exp_Temp;
 
+    int m_RestMines;
+
     void DropColumn(int col);
     void DropRow(int row);
     bool ReduceBlockSet(int col);
     bool ReduceRestrainBlank(int row);
     bool ReduceRestrainMine(int row);
+    void InversedReduceRestrainMine(int row);
 
     void MergeSets();
     void ReduceRestrains();

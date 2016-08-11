@@ -9,7 +9,7 @@
 
 #define CONT_WIDTH(lst, cnt) (cnt == lst.size() - 1 && SHF(m_BlockSets.size()) > 0 ? SHF(m_BlockSets.size()) : CONT_SIZE)
 
-BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0)
+BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(-1)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
@@ -19,7 +19,7 @@ BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), m_State(SolvingState
     m_Matrix.emplace_back();
 }
 
-BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(Binomial(count, mines)), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0)
+BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(Binomial(count, mines)), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(mines)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
@@ -31,7 +31,7 @@ BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), m_State(S
     m_MatrixAugment.push_back(mines);
 }
 
-BasicSolver::BasicSolver(const BasicSolver &other) : CanOpenForSure(other.CanOpenForSure), m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_MatrixAugment(other.m_MatrixAugment), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0) { }
+BasicSolver::BasicSolver(const BasicSolver &other) : CanOpenForSure(other.CanOpenForSure), m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_MatrixAugment(other.m_MatrixAugment), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(other.m_RestMines) { }
 
 BasicSolver::~BasicSolver()
 {
@@ -79,6 +79,8 @@ void BasicSolver::AddRestrain(Block blk, bool isMine)
     if (m_Manager[blk] == BlockStatus::Unknown)
     {
         m_Manager[blk] = isMine ? BlockStatus::Mine : BlockStatus::Blank;
+        if (isMine)
+            m_RestMines--;
         if (m_SetIDs[blk] >= 0)
             ReduceBlockSet(m_SetIDs[blk]);
         m_State = SolvingState::Stale;
@@ -121,6 +123,7 @@ void BasicSolver::AddRestrain(const BlockSet &set, int mines)
                 if (m_Manager[blk] == BlockStatus::Unknown)
                 {
                     m_Manager[blk] = BlockStatus::Mine;
+                    m_RestMines--;
                     m_State = SolvingState::Stale;
                 }
             for (auto blk : set)
@@ -426,6 +429,7 @@ bool BasicSolver::ReduceRestrainMine(int row)
                 continue;
             ASSERT(m_Manager[blk] == BlockStatus::Unknown);
             m_Manager[blk] = BlockStatus::Mine;
+            m_RestMines--;
             m_State = SolvingState::Stale;
         }
         DropColumn(col--);
@@ -435,6 +439,32 @@ bool BasicSolver::ReduceRestrainMine(int row)
     sum.pop_back();
     DropRow(row);
     return true;
+}
+
+void BasicSolver::InversedReduceRestrainMine(int row)
+{
+    ASSERT(m_RestMines >= 0);
+    if (m_MatrixAugment[row] != m_RestMines)
+        return;
+
+    for (auto col = 0; col < m_BlockSets.size(); ++col)
+    {
+        if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
+            continue;
+
+        for (auto blk : m_BlockSets[col])
+        {
+            ASSERT(m_Manager[blk] == BlockStatus::Blank || m_SetIDs[blk] == col);
+            m_SetIDs[blk] = -2;
+            if (m_Manager[blk] == BlockStatus::Blank)
+                continue;
+            ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+            m_Manager[blk] = BlockStatus::Blank;
+            ++CanOpenForSure;
+            m_State = SolvingState::Stale;
+        }
+        DropColumn(col--);
+    }
 }
 
 void BasicSolver::MergeSets()
@@ -512,6 +542,10 @@ void BasicSolver::ReduceRestrains()
     for (auto row = 0; row < m_MatrixAugment.size(); ++row)
         if (ReduceRestrainMine(row))
             --row;
+
+    if (m_RestMines >= 0)
+        for (auto row = 0; row < m_MatrixAugment.size(); ++row)
+            InversedReduceRestrainMine(row);
 }
 
 void BasicSolver::SimpleOverlapAll()
@@ -623,6 +657,7 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
                                     continue;
                                 ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                                 m_Manager[blk] = BlockStatus::Mine;
+                                m_RestMines--;
                                 m_State = SolvingState::Stale;
                             }
                         }
@@ -892,6 +927,7 @@ void BasicSolver::ProcessSolutions()
                     continue;
                 ASSERT(m_Manager[blk] == BlockStatus::Unknown);
                 m_Manager[blk] = BlockStatus::Mine;
+                m_RestMines--;
                 m_State &= SolvingState::Overlap | SolvingState::Probability;
             }
 
