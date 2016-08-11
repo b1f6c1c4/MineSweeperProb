@@ -4,10 +4,10 @@
 #include <map>
 #include <functional>
 
-class DLL_API DistCondQParameters;
+class DistCondQParameters;
 
 class
-    DLL_API Solver : public BasicSolver
+    Solver : public BasicSolver
 {
 public:
     explicit Solver(size_t count);
@@ -50,7 +50,7 @@ private:
 };
 
 class
-    DLL_API DistCondQParameters
+    DistCondQParameters
 {
 public:
     DistCondQParameters(DistCondQParameters &&other);
@@ -71,11 +71,11 @@ public:
     double m_Probability, m_Expectation, m_UpperBound;
     double m_TotalStates;
 
-    friend DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-    friend DLL_API bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-    friend DLL_API bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+    friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+    friend bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+    friend bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
 };
 
-DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-DLL_API bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
-DLL_API bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
+bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs);

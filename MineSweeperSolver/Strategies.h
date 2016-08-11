@@ -37,5 +37,5 @@ struct Strategy
     std::vector<HeuristicMethod> PruningDecisionTree;
 };
 
-DLL_API Strategy ReadStrategy(std::string str);
-DLL_API std::string WriteStrategy(const Strategy &st);
+Strategy ReadStrategy(std::string str);
+std::string WriteStrategy(const Strategy &st);

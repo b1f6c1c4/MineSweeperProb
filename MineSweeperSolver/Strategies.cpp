@@ -1,7 +1,7 @@
 #include "Strategies.h"
 #include <sstream>
 
-DLL_API Strategy ReadStrategy(std::string str)
+Strategy ReadStrategy(std::string str)
 {
     std::stringstream ss(str);
 
@@ -177,7 +177,7 @@ DLL_API Strategy ReadStrategy(std::string str)
     return st;
 }
 
-DLL_API std::string WriteStrategy(const Strategy &st)
+std::string WriteStrategy(const Strategy &st)
 {
     std::stringstream ss;
 

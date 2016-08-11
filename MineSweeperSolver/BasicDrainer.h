@@ -6,7 +6,7 @@
 
 #define USE_BASIC_SOLVER
 
-class DLL_API Drainer;
+class Drainer;
 
 typedef std::vector<BlockStatus> MicroSituation;
 
@@ -47,7 +47,7 @@ bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
 bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 
 class
-    DLL_API BasicDrainer
+    BasicDrainer
 {
 public:
     virtual ~BasicDrainer();

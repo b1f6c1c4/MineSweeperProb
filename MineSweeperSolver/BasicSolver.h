@@ -2,14 +2,14 @@
 #include "stdafx.h"
 #include <vector>
 
-enum class DLL_API BlockStatus
+enum class BlockStatus
 {
     Unknown = -127,
     Mine = -1,
     Blank = -2
 };
 
-enum class DLL_API SolvingState
+enum class SolvingState
 {
     Stale = 0x0,
     Reduce = 0x1,
@@ -62,10 +62,10 @@ typedef size_t Container;
 #define SB(lval, shift) (lval) |= MASK((shift))
 #define CB(lval, shift) (lval) &= ~MASK((shift))
 
-struct DLL_API Solution;
+struct Solution;
 
 class
-    DLL_API BasicSolver
+    BasicSolver
 {
 public:
     explicit BasicSolver(size_t count);
@@ -136,7 +136,7 @@ private:
 };
 
 struct
-    DLL_API Solution
+    Solution
 {
     std::vector<int> Dist;
     double States;

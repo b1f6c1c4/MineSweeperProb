@@ -2,10 +2,10 @@
 #include "BasicDrainer.h"
 #include "GameMgr.h"
 
-class DLL_API GameMgr;
+class GameMgr;
 
 class
-    DLL_API Drainer : public BasicDrainer
+    Drainer : public BasicDrainer
 {
 public:
     explicit Drainer(const GameMgr &mgr);

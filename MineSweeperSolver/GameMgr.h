@@ -6,7 +6,7 @@
 #include "Strategies.h"
 
 struct
-    DLL_API BlockProperty
+    BlockProperty
 {
     int Index;
     int X, Y;
@@ -15,10 +15,10 @@ struct
     bool IsMine;
 };
 
-class DLL_API Drainer;
+class Drainer;
 
 class
-    DLL_API GameMgr
+    GameMgr
 {
 public:
     GameMgr(int width, int height, int totalMines, bool allowWrongGuess = false);
@@ -87,5 +87,5 @@ private:
     int FrontierDist(Block blk) const;
 };
 
-DLL_API void Largest(BlockSet &bests, std::function<int(Block)> fun);
-DLL_API void Largest(BlockSet &bests, std::function<double(Block)> fun);
+void Largest(BlockSet &bests, std::function<int(Block)> fun);
+void Largest(BlockSet &bests, std::function<double(Block)> fun);

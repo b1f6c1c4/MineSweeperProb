@@ -217,7 +217,7 @@ void GameMgr::OpenBlock(int x, int y)
     OpenBlock(GetIndex(x, y));
 }
 
-DLL_API void Largest(BlockSet &bests, std::function<int(int)> fun)
+void Largest(BlockSet &bests, std::function<int(int)> fun)
 {
     if (bests.size() <= 1)
         return;
@@ -238,7 +238,7 @@ DLL_API void Largest(BlockSet &bests, std::function<int(int)> fun)
     newBests.swap(bests);
 }
 
-DLL_API void Largest(BlockSet &bests, std::function<double(int)> fun)
+void Largest(BlockSet &bests, std::function<double(int)> fun)
 {
     if (bests.size() <= 1)
         return;

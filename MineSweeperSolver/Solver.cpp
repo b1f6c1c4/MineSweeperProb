@@ -381,7 +381,7 @@ size_t DistCondQParameters::Hash()
     return m_Hash = ::Hash(Sets1) << 5 ^ Set2ID;
 }
 
-DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
+bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
 {
     if (lhs.m_Hash != rhs.m_Hash)
         return false;
@@ -392,12 +392,12 @@ DLL_API bool operator==(const DistCondQParameters &lhs, const DistCondQParameter
     return true;
 }
 
-DLL_API bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
+bool operator!=(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
 {
     return !(lhs == rhs);
 }
 
-DLL_API bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
+bool operator<(const DistCondQParameters &lhs, const DistCondQParameters &rhs)
 {
     if (lhs.m_Hash < rhs.m_Hash)
         return true;

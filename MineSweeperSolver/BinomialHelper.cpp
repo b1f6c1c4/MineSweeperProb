@@ -6,7 +6,7 @@
 static boost::shared_mutex mtx;
 static std::vector<std::vector<double>> BinomialCoeff;
 
-extern "C" DLL_API void CacheBinomials(int n, int m)
+extern "C" void CacheBinomials(int n, int m)
 {
     ++n , ++m;
     if (n < 0)
@@ -74,7 +74,7 @@ extern "C" DLL_API void CacheBinomials(int n, int m)
     }
 }
 
-DLL_API double Binomial(int n, int m)
+double Binomial(int n, int m)
 {
     boost::shared_lock<boost::shared_mutex> lock(mtx, boost::defer_lock);
 
