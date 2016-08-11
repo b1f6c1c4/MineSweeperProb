@@ -6,12 +6,23 @@
 #include <thread>
 #include <string>
 
-std::string StrategyStr = "FL-PSEQZ";
+Strategy TheStrategy;
 
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int CmdShow)
 {
     SetProcessDPIAware();
     CacheBinomials(30 * 16, 99);
+    TheStrategy.Logic = LogicMethod::Full;
+    TheStrategy.InitialPositionSpecified = false; // useless
+    TheStrategy.HeuristicEnabled = true;
+    TheStrategy.DecisionTree.push_back(HeuristicMethod::MinMineProb);
+    TheStrategy.DecisionTree.push_back(HeuristicMethod::MaxZerosProb);
+    TheStrategy.DecisionTree.push_back(HeuristicMethod::MaxZerosExp);
+    TheStrategy.DecisionTree.push_back(HeuristicMethod::MaxQuantityExp);
+    TheStrategy.ExhaustEnabled = true;
+    TheStrategy.ExhaustCriterion = 256;
+    TheStrategy.PruningEnabled = false;
+
     return SetupWindowsDirect2DRenderer();
 }
 
@@ -153,8 +164,7 @@ public:
                 delete m_Mgr;
                 m_Mgr = nullptr;
             }
-            m_Mgr = new GameMgr(30, 16, 99);
-            m_Mgr->BasicStrategy = ReadStrategy(StrategyStr);
+            m_Mgr = new GameMgr(30, 16, 99, TheStrategy);
             this->Update();
             break;
         case 0x43:
@@ -180,8 +190,7 @@ private:
             {
                 if (!m_Manual)
                 {
-                    m_Mgr = new GameMgr(30, 16, 99);
-                    m_Mgr->BasicStrategy = ReadStrategy(StrategyStr);
+                    m_Mgr = new GameMgr(30, 16, 99, TheStrategy);
                     GetApplication()->InvokeLambdaInMainThreadAndWait([this]()
                                                                       {
                                                                           this->Update();
@@ -211,7 +220,7 @@ private:
 
             m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap, false);
             if (m_Mgr->GetSolver().CanOpenForSure == 0)
-                m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic, true);
+                m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic | SolvingState::Drained, true);
 
             auto flag = false;
             auto cnt = m_Mgr->GetBestBlockCount();
