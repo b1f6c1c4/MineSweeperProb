@@ -7,15 +7,17 @@
 class MineSweeperDemo : public GuiWindow
 {
 public:
-    MineSweeperDemo(std::shared_ptr<Strategy> strategy, size_t width, size_t height, size_t totalMines);
+    MineSweeperDemo(std::shared_ptr<Strategy> strategy, size_t width, size_t height, size_t totalMines, size_t mult);
 
     ~MineSweeperDemo();
 
     void Update();
 
     void KeyUp(const NativeWindowKeyInfo &info) override;
-
+    bool CheckMgr();
+    bool ResetMgr();
 private:
+    size_t m_Mult;
     size_t m_Width, m_Height, m_TotalMines;
     std::shared_ptr<Strategy> m_Strategy;
 

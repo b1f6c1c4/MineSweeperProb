@@ -123,5 +123,5 @@ void ReadStrategy(const std::string &hsh, Strategy &st, size_t &width, size_t &h
     NXT('R');
 
     if (st.InitialPositionSpecified)
-        st.Index = indexI + indexJ * width;
+        st.Index = (indexI - 1) + (indexJ - 1) * width;
 }

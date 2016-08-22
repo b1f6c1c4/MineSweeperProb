@@ -2,6 +2,9 @@
 #include <chrono>
 #include <string>
 
+#define UPDATE GetApplication()->InvokeLambdaInMainThread([this]() { this->Update(); })
+#define UPDATE_AND_WAIT GetApplication()->InvokeLambdaInMainThreadAndWait([this]() { this->Update(); })
+
 void MineSweeperDemo::MakeTable(size_t width, size_t height)
 {
     m_Table = new GuiTableComposition;
@@ -24,7 +27,8 @@ void MineSweeperDemo::MakeTable(size_t width, size_t height)
             MakeCell(font, i, j);
 }
 
-void MineSweeperDemo::MakeCell(const FontProperties &font, int i, int j) {
+void MineSweeperDemo::MakeCell(const FontProperties &font, int i, int j)
+{
     auto cell = new GuiCellComposition;
     m_Table->AddChild(cell);
     cell->SetSite(i, j, 1, 1);
@@ -48,7 +52,7 @@ void MineSweeperDemo::MakeCell(const FontProperties &font, int i, int j) {
     cell->AddChild(labelB);
 }
 
-MineSweeperDemo::MineSweeperDemo(std::shared_ptr<Strategy> strategy, size_t width, size_t height, size_t totalMines) : GuiWindow(GetCurrentTheme()->CreateWindowStyle()), m_Width(width), m_Height(height), m_TotalMines(totalMines), m_Strategy(strategy), m_Manual(true)
+MineSweeperDemo::MineSweeperDemo(std::shared_ptr<Strategy> strategy, size_t width, size_t height, size_t totalMines, size_t mult) : GuiWindow(GetCurrentTheme()->CreateWindowStyle()), m_Mult(mult), m_Width(width), m_Height(height), m_TotalMines(totalMines), m_Strategy(strategy), m_Manual(true)
 {
     this->GuiControlHost::SetText(L"MineSweeperDemo");
     this->GetContainerComposition()->SetMinSizeLimitation(GuiGraphicsComposition::LimitToElementAndChildren);
@@ -138,41 +142,45 @@ void MineSweeperDemo::KeyUp(const NativeWindowKeyInfo &info)
     }
 }
 
+bool MineSweeperDemo::CheckMgr()
+{
+    if (m_Mgr != nullptr)
+        return false;
+
+    if (!m_Manual)
+    {
+        m_Mgr = std::make_unique<GameMgr>(m_Width, m_Height, m_TotalMines, *m_Strategy);
+        UPDATE_AND_WAIT;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    return true;
+}
+
+bool MineSweeperDemo::ResetMgr()
+{
+    if (m_Mgr->GetStarted())
+        return false;
+
+    UPDATE_AND_WAIT;
+
+    auto s = m_Mgr->GetSucceed();
+    m_Mgr.reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(s ? 700 : 1200));
+    return true;
+}
+
 void MineSweeperDemo::Process()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds{1000});
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     while (true)
     {
-        if (m_Mgr == nullptr)
-        {
-            if (!m_Manual)
-            {
-                m_Mgr = std::make_unique<GameMgr>(m_Width, m_Height, m_TotalMines, *m_Strategy);
-                GetApplication()->InvokeLambdaInMainThreadAndWait([this]()
-                                                                  {
-                                                                      this->Update();
-                                                                  });
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds{100});
+        if (CheckMgr())
             continue;
-        }
 
-        if (!m_Mgr->GetStarted())
-        {
-            GetApplication()->InvokeLambdaInMainThreadAndWait([this]()
-                                                              {
-                                                                  this->Update();
-                                                              });
-            auto s = m_Mgr->GetSucceed();
-            m_Mgr.reset();
-            std::this_thread::sleep_for(std::chrono::milliseconds{s ? 700 : 1200});
+        if (ResetMgr())
             continue;
-        }
 
-        GetApplication()->InvokeLambdaInMainThread([this]()
-                                                   {
-                                                       this->Update();
-                                                   });
+        UPDATE;
 
         m_Mgr->Solve(SolvingState::Reduce | SolvingState::Overlap, false);
         if (m_Mgr->GetSolver().CanOpenForSure == 0)
@@ -181,7 +189,12 @@ void MineSweeperDemo::Process()
         auto flag = false;
         auto cnt = m_Mgr->GetBestBlockCount();
         const Block *ptr;
-        if (cnt == 0)
+        if (m_Strategy->InitialPositionSpecified && m_Mgr->GetToOpen() + m_Mgr->GetTotalMines() == m_Mgr->GetTotalWidth() * m_Mgr->GetTotalHeight())
+        {
+            cnt = 1;
+            ptr = &m_Strategy->Index;
+        }
+        else if (cnt == 0)
         {
             cnt = m_Mgr->GetPreferredBlockCount();
             ptr = m_Mgr->GetPreferredBlocks();
@@ -216,9 +229,9 @@ void MineSweeperDemo::Process()
                                                        this->Update();
                                                        m_Backs[bbb]->SetColor(flag ? Color(255 - 170, 255, 0) : Color(255, 170, 0));
                                                    });
-        auto ms = 5 * static_cast<int>(sqrt(bestV)) + 1;
+        auto ms = m_Mult; // * static_cast<int>(sqrt(bestV)) + 1;
         if (!flag)
             ms *= 3;
-        std::this_thread::sleep_for(std::chrono::milliseconds{ms});
+        std::this_thread::sleep_for(std::chrono::milliseconds(ms));
     }
 }

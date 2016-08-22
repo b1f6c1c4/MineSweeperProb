@@ -8,6 +8,7 @@
 #include <iostream>
 #include "ReadStrategy.h"
 
+static size_t interval = 100;
 static size_t width, height, totalMines;
 static std::shared_ptr<Strategy> strategy;
 
@@ -15,7 +16,6 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 {
     SetProcessDPIAware();
 
-    auto interval = 1000;
     std::string hsh;
 
 
@@ -23,7 +23,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     po::options_description desc("Options");
     desc.add_options()
         ("help,h", "Print help messages")
-        ("interval,i", po::value<int>(&interval), "Time interval within two moves")
+        ("interval,i", po::value<size_t>(&interval), "Time interval within two moves")
         ("CONFIG", po::value<std::string>(&hsh), "Configuration");
 
     po::positional_options_description positionalOptions;
@@ -69,7 +69,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
 
 void GuiMain()
 {
-    auto window = new MineSweeperDemo(strategy, width, height, totalMines);
+    auto window = new MineSweeperDemo(strategy, width, height, totalMines, interval);
     GetApplication()->Run(window);
     delete window;
 }

@@ -90,11 +90,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Tools\Gaclib\GacUIDemo\GacUIStaticLibrary\GacUIStaticLibrary.vcxproj">
-      <Project>{6698c71d-0d4e-4031-846a-8698f9c9d658}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="MineSweeperDemo.h" />
     <ClInclude Include="ReadStrategy.h" />
   </ItemGroup>
