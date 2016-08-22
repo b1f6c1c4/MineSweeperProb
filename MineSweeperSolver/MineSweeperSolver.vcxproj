@@ -66,7 +66,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y $(SolutionDir)$(IntDir)MineSweeperSolver.dll $(SolutionDir)MineSweeper\bin\x64\Debug\</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -91,7 +92,8 @@
       <HeapCommitSize>1048576</HeapCommitSize>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y $(SolutionDir)$(IntDir)MineSweeperSolver.dll $(SolutionDir)MineSweeper\bin\x64\Release\</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

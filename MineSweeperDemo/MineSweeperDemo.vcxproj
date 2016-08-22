@@ -42,11 +42,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Users\b1f6c1c4\Documents\Tools\Gaclib\Public\Source;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_61_0;C:\Users\b1f6c1c4\Documents\Tools\Gaclib\Public\Source;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_61_0\stage\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Users\b1f6c1c4\Documents\Tools\Gaclib\Public\Source;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <IncludePath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_61_0;C:\Users\b1f6c1c4\Documents\Tools\Gaclib\Public\Source;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
     <LibraryPath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_61_0\stage\lib;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -56,6 +56,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeaderFile>stdafx.h;GacUI.h;GacUIRefletion.h;GacUIWindows.h;Vlpp.h;VlppWorkflow.h</PrecompiledHeaderFile>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_UNICODE;UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -68,7 +69,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>None</DebugInformationFormat>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -80,6 +81,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MineSweeperDemo.cpp" />
+    <ClCompile Include="ReadStrategy.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MineSweeperSolver\MineSweeperSolver.vcxproj">
@@ -90,6 +93,10 @@
     <ProjectReference Include="..\..\..\Tools\Gaclib\GacUIDemo\GacUIStaticLibrary\GacUIStaticLibrary.vcxproj">
       <Project>{6698c71d-0d4e-4031-846a-8698f9c9d658}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MineSweeperDemo.h" />
+    <ClInclude Include="ReadStrategy.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

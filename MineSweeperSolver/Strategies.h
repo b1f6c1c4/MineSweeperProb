@@ -38,6 +38,3 @@ struct Strategy
     int ExhaustCriterion, PruningCriterion;
     std::vector<HeuristicMethod> PruningDecisionTree;
 };
-
-Strategy ReadStrategy(std::string str);
-std::string WriteStrategy(const Strategy &st);
