@@ -2,6 +2,8 @@
 #include <algorithm>
 #include "BinomialHelper.h"
 #include <map>
+#include <cmath>
+#include <cstring>
 
 #define ZEROQ(val) (abs(val) < 1E-3)
 
@@ -563,7 +565,7 @@ void BasicSolver::SimpleOverlapAll()
     {
         m_Pairs_Temp_Size = sz;
         m_Pairs_Temp = new bool[sz];
-        memset(m_Pairs_Temp, 0, sizeof(bool) * m_Pairs_Temp_Size);
+        std::memset(m_Pairs_Temp, 0, sizeof(bool) * m_Pairs_Temp_Size);
     }
 
     for (auto cnt = 0; cnt < m_Matrix.size(); ++cnt)
@@ -765,7 +767,7 @@ void BasicSolver::EnumerateSolutions(const double *matrix, size_t width, size_t 
         auto &lst = m_Solutions.back().Dist;
         lst.reserve(n);
         for (auto row = 0; row < height; ++row)
-            lst.push_back(static_cast<int>(round(M(width - 1, row))));
+            lst.push_back(static_cast<int>(std::round(M(width - 1, row))));
         return;
     }
 

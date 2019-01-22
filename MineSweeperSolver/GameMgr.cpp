@@ -3,6 +3,7 @@
 #include "BinomialHelper.h"
 #include "Drainer.h"
 #include <iostream>
+#include <cmath>
 
 GameMgr::GameMgr(int width, int height, int totalMines, const Strategy &strategy, bool allowWrongGuess) : BasicStrategy(strategy), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
@@ -166,7 +167,7 @@ bool GameMgr::GetSucceed() const
 
 double GameMgr::GetBits() const
 {
-    return log2(m_Solver->GetTotalStates());
+    return std::log2(m_Solver->GetTotalStates());
 }
 
 double GameMgr::GetAllBits() const
@@ -292,7 +293,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
                 throw;
             break;
         case BlockStatus::Unknown:
-        default: 
+        default:
             break;
         }
 #endif
@@ -475,10 +476,12 @@ void GameMgr::Automatic()
     }
 
     if (!m_Settled)
+    {
         if (BasicStrategy.InitialPositionSpecified)
             OpenBlock(BasicStrategy.Index);
         else if (!BasicStrategy.HeuristicEnabled)
             OpenBlock(RandomInteger(m_Blocks.size()));
+    }
 
     if (st == SolvingState::Stale)
     {
@@ -586,6 +589,7 @@ void GameMgr::OpenBlock(int id)
     m_Blocks[id].IsOpen = true;
 
     if (m_Blocks[id].IsMine)
+    {
         if (m_AllowWrongGuess)
         {
             m_WrongGuesses++;
@@ -597,6 +601,7 @@ void GameMgr::OpenBlock(int id)
             m_Started = false;
             return;
         }
+    }
 
     if (m_Solver->GetBlockStatus(id) == BlockStatus::Blank)
         --m_Solver->CanOpenForSure;

@@ -1,5 +1,6 @@
 #include "Solver.h"
 #include <algorithm>
+#include <cmath>
 #include "BinomialHelper.h"
 
 static size_t Hash(const BlockSet &set);
@@ -74,7 +75,7 @@ double Solver::QuantityCondQ(const BlockSet &set, Block blk)
         if (di.m_Result[j] != 0)
         {
             auto p = di.m_Result[j] / di.m_TotalStates;
-            q += -p * log2(p);
+            q += -p * std::log2(p);
         }
 
     return q;
