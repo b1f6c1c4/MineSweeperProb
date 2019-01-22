@@ -19,7 +19,7 @@ int main(const int argc, char **argv)
 	desc.add_options()
 		("help,h", "produce help message")
 		("verbose,v", "show progess")
-		("time,t", "enable timing")
+		("timing,t", "enable timing")
 		("slack,S", "allow wrong guesses")
 		("width,n", po::value<int>(), "grid width")
 		("height,m", po::value<int>(), "grid height")
@@ -123,20 +123,21 @@ int main(const int argc, char **argv)
 
 	if (vm.count("verbose"))
 	{
-		std::cerr << "n = " << width << std::endl;
-		std::cerr << "m = " << height << std::endl;
+		std::cerr << "Grid = " << width << "-";
+		std::cerr << height << "-";
         if (is_fixed_mines)
-            std::cerr << "T = " << fixed_mines << std::endl;
+            std::cerr << "T" << fixed_mines << std::endl;
         else
-            std::cerr << "P = " << probability << std::endl;
+            std::cerr << "P" << probability << std::endl;
 		std::cerr << "Strategy = " << strategy << std::endl;
 		std::cerr << "N = " << rep << std::endl;
 	}
 
     bworker->Process();
 
-    for (size_t i = 0; i < bworker->Result.size(); i++)
-        std::cout << i << ": " << bworker->Result[i] << std::endl;
+    if (!vm.count("timing"))
+        for (size_t i = 0; i < bworker->Result.size(); i++)
+            std::cout << i << ": " << bworker->Result[i] << std::endl;
 
     return 0;
 }

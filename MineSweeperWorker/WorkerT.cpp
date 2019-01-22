@@ -1,5 +1,6 @@
 #include "WorkerT.h"
 #include <chrono>
+#include <iostream>
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -15,9 +16,11 @@ size_t WorkerT::ProcessOne()
 {
     auto t0 = Clock::now();
 
-    AdapterWorker::Run();
+    auto res = AdapterWorker::Run();
 
     auto t1 = Clock::now();
     auto dur = t1 - t0;
-    return dur.count();
+    std::cout << dur.count() << std::endl;
+
+    return res;
 }
