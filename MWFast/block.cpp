@@ -9,6 +9,17 @@ uint8_t blk_t::operator()() const
 	return value_;
 }
 
+blk_t &blk_t::operator++()
+{
+	++value_;
+	return *this;
+}
+
+blk_t blk_t::operator++(int)
+{
+	return value_++;
+}
+
 bool blk_t::is_front() const
 {
 	return value_ & 0x40;
@@ -40,8 +51,13 @@ bool blk_t::is_mine() const
 
 blk_t &blk_t::set_mine(const bool v)
 {
-	value_ &= ~0x10;
-	value_ |= v ? 0x10 : 0x00;
+	if (v)
+	{
+		value_ &= ~0x0f;
+		value_ |= 0x10;
+	}
+	else
+		value_ &= ~0x10;
 	return *this;
 }
 

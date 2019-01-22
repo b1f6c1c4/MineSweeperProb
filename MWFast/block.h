@@ -9,6 +9,9 @@ public:
 	blk_t(uint8_t v);
 	uint8_t operator()() const;
 
+	blk_t &operator++();
+	blk_t operator++(int);
+
 	static blk_t closed_mine();
 	static blk_t closed_simple(uint8_t);
 
