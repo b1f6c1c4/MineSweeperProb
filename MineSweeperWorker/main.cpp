@@ -2,74 +2,141 @@
 #include "Worker.h"
 #include "WorkerT.h"
 #include <cstring>
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <boost/program_options.hpp>
+#include "../MineSweeperSolver/ReadStrategy.h"
 
-void SetupAdapterWorker(AdapterWorker &worker, RawConfiguration config)
+#define NUMT(X) #X
+#define NUM(X) NUMT(X)
+
+namespace po = boost::program_options;
+
+int main(const int argc, char **argv)
 {
-    worker.Config.Width = config.Width;
-    worker.Config.Height = config.Height;
-    worker.Config.TotalMines = config.TotalMines;
-    worker.Config.InitialPositionSpecified = config.InitialPosition >= 0;
-    worker.Config.Index = config.InitialPosition;
-    worker.Config.Logic = config.Logic;
-    worker.Config.HeuristicEnabled = config.HeuristicEnabled;
-    worker.Config.DecisionTree.resize(config.DecisionTreeLen);
-    if (config.DecisionTreeLen > 0)
-        std::memcpy(&*worker.Config.DecisionTree.begin(), config.DecisionTree, config.DecisionTreeLen * sizeof(HeuristicMethod));
-    worker.Config.ExhaustEnabled = config.ExhaustEnabled;
-    worker.Config.ExhaustCriterion = config.ExhaustCriterion;
-    worker.Config.PruningEnabled = false;
-    worker.Config.PruningCriterion = 0;
-}
+	po::options_description desc("A deterministic Minesweeper solver");
+	desc.add_options()
+		("help,h", "produce help message")
+		("verbose,v", "show progess")
+		("time,t", "enable timing")
+		("slack,S", "allow wrong guesses")
+		("width,n", po::value<int>(), "grid width")
+		("height,m", po::value<int>(), "grid height")
+		("fixed-mines,T", po::value<int>(), "total mine count")
+		("probability,P", po::value<double>(), "mine probability")
+		("strategy,s", po::value<std::string>()->default_value("FL-PSEQ-D256"), "strategy")
+		("repetition,N", po::value<size_t>()->default_value(1), "number of evaluations");
 
-void SetupBaseBaseWorker(BaseBaseWorker &worker, size_t repetition)
-{
-    worker.Repetition = repetition;
-}
+	po::variables_map vm;
+	store(parse_command_line(argc, argv, desc), vm);
+	notify(vm);
 
-BaseBaseWorker *MakeWorker(RawConfiguration config, size_t repetition)
-{
-    auto worker = new Worker;
-    SetupAdapterWorker(*worker, config);
-    SetupBaseBaseWorker(*worker, repetition);
-    return worker;
-}
+	if (vm.count("help") || vm.count("fixed-mines") && vm.count("probability"))
+	{
+		std::cerr << desc << std::endl;
+		return 1;
+	}
 
-BaseBaseWorker *MakeWorkerT(RawConfiguration config, size_t repetition)
-{
-    auto worker = new WorkerT;
-    SetupAdapterWorker(*worker, config);
-    SetupBaseBaseWorker(*worker, repetition);
-    return worker;
-}
+    if (!vm.count("width") || !vm.count("height"))
+    {
+        std::cerr << "Invalid grid size" << std::endl;
+        return 1;
+    }
 
-size_t *Run(BaseBaseWorker *worker, size_t &len)
-{
-    worker->Process();
+	const auto width = vm["width"].as<int>();
+	const auto height = vm["height"].as<int>();
 
-    len = worker->Result.size();
-    auto res = new size_t[len];
-    std::memcpy(res, &*worker->Result.begin(), len * sizeof(size_t));
-    return res;
-}
+    if (width <= 1 || height <= 1)
+    {
+        std::cerr << "Invalid grid size" << std::endl;
+        return 1;
+    }
 
-void CancelWorker(BaseBaseWorker *ptr)
-{
-    ptr->Cancel();
-}
+    bool is_fixed_mines;
+    size_t fixed_mines = 0;
+    double probability = 0;
+    if (vm.count("fixed-mines"))
+    {
+        if (vm.count("probability"))
+        {
+            std::cerr << "Specify either total mine count or mine probability" << std::endl;
+            return 1;
+        }
 
-void DisposeWorker(BaseBaseWorker *ptr)
-{
-    if (ptr != nullptr)
-        delete[] ptr;
-}
+        is_fixed_mines = true;
+        fixed_mines = vm["fixed-mines"].as<int>();
+        if (fixed_mines < 0 || fixed_mines > width * height - 1)
+        {
+            std::cerr << "Invalid total mine count" << std::endl;
+            return 1;
+        }
+    }
+    else if (vm.count("probability"))
+    {
+        is_fixed_mines = false;
+        probability = vm["probability"].as<double>();
+        if (probability < 0 || probability > 1)
+        {
+            std::cerr << "Invalid mine probability" << std::endl;
+            return 1;
+        }
+    }
+    else
+    {
+        std::cerr << "Must specify total mine count or mine probability" << std::endl;
+        return 1;
+    }
 
-void DisposeResult(size_t *ptr)
-{
-    if (ptr != nullptr)
-        delete[] ptr;
-}
+    const bool slack = vm.count("slack");
+    const auto strategy = vm["strategy"].as<std::string>();
+    const auto rep = vm["repetition"].as<size_t>();
 
-int main(int argc, char **argv)
-{
+    std::shared_ptr<BaseBaseWorker> bworker;
+    std::shared_ptr<AdapterWorker> aworker;
+    if (vm.count("timing"))
+    {
+        auto w = std::make_shared<WorkerT>();
+        bworker = w;
+        aworker = w;
+    }
+    else
+    {
+        auto w = std::make_shared<Worker>();
+        bworker = w;
+        aworker = w;
+    }
+
+    bworker->Repetition = rep;
+    aworker->Config.Slack = slack;
+    aworker->Config.IsTotalMine = is_fixed_mines;
+    aworker->Config.Width = width;
+    aworker->Config.Height = height;
+    aworker->Config.TotalMines = fixed_mines;
+    aworker->Config.Probability = probability;
+
+    if (!ReadStrategy(strategy, aworker->Config, width, height))
+    {
+        std::cerr << "Invalid strategy" << std::endl;
+        return 1;
+    }
+
+	if (vm.count("verbose"))
+	{
+		std::cerr << "n = " << width << std::endl;
+		std::cerr << "m = " << height << std::endl;
+        if (is_fixed_mines)
+            std::cerr << "T = " << fixed_mines << std::endl;
+        else
+            std::cerr << "P = " << probability << std::endl;
+		std::cerr << "Strategy = " << strategy << std::endl;
+		std::cerr << "N = " << rep << std::endl;
+	}
+
+    bworker->Process();
+
+    for (size_t i = 0; i < bworker->Result.size(); i++)
+        std::cout << i << ": " << bworker->Result[i] << std::endl;
+
     return 0;
 }

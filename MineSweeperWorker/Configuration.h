@@ -7,24 +7,9 @@ struct Configuration : Strategy
     int Width;
     int Height;
 
+    bool IsTotalMine;
     int TotalMines;
-};
+    double Probability;
 
-struct RawConfiguration
-{
-    int Width;
-    int Height;
-
-    int TotalMines;
-
-    int InitialPosition;
-
-    LogicMethod Logic;
-
-    bool HeuristicEnabled;
-    HeuristicMethod *DecisionTree;
-    int DecisionTreeLen;
-
-    bool ExhaustEnabled;
-    int ExhaustCriterion;
+    bool Slack;
 };

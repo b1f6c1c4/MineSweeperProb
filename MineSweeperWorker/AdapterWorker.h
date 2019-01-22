@@ -1,7 +1,6 @@
 #pragma once
 #include "stdafx.h"
-#include "../MineSweeperSolver/GameMgr.h"
-#include "../MineSweeperSolver/BinomialHelper.h"
+#include <random>
 
 class AdapterWorker
 {
@@ -14,23 +13,11 @@ public:
     NO_MOVE(AdapterWorker);
 
 protected:
-    AdapterWorker() { }
+    AdapterWorker();
 
-    size_t Run() const;
+    size_t Run();
     void Cache() const;
+
+private:
+    std::mt19937 m_Random;
 };
-
-inline size_t AdapterWorker::Run() const
-{
-    auto imme = true;
-    GameMgr mgr(Config.Width, Config.Height, Config.TotalMines, Config, !imme);
-    mgr.Automatic();
-    if (imme)
-        return mgr.GetSucceed() ? 0 : 1;
-    return mgr.GetWrongGuesses();
-}
-
-inline void AdapterWorker::Cache() const
-{
-    CacheBinomials(Config.Width * Config.Height, Config.TotalMines);
-}

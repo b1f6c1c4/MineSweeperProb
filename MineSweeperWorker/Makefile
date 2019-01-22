@@ -1,7 +1,7 @@
 SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 CXX=${GCC_PATH}/g++
 AR=ar
-TARGETS=BaseBaseWorker BaseWorker BaseWorkerT Worker WorkerT main
+TARGETS=BaseBaseWorker BaseWorker BaseWorkerT AdapterWorker Worker WorkerT main
 LIBS=-L ${BOOST_PATH}/stage/lib -lboost_program_options -lboost_system -lboost_thread
 DEPS=stdafx.h Configuration.h $(addsuffix .h, $(TARGETS))
 CFLAGS=-I ${BOOST_PATH} --std=c++17 -Wall -Wno-sign-compare -Wno-parentheses -O3 -pthread -DVERSION=\"$$(git describe --always)\" -DCOMMITHASH=\"$$(git rev-parse HEAD)\"

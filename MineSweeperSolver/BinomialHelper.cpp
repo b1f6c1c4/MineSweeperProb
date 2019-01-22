@@ -1,7 +1,7 @@
 #include "BinomialHelper.h"
 #include <vector>
-#include "boost/thread/shared_mutex.hpp"
-#include "boost/thread/lock_types.hpp"
+#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/lock_types.hpp>
 
 static boost::shared_mutex mtx;
 static std::vector<std::vector<double>> BinomialCoeff;
