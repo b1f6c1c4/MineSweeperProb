@@ -1,7 +1,6 @@
 #pragma once
 #include "stdafx.h"
-#include "../../MineSweeperProb/MineSweeperSolver/Strategies.h"
-#include <vector>
+#include "../MineSweeperSolver/Strategies.h"
 
 struct Configuration : Strategy
 {

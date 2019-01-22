@@ -1,1 +1,2 @@
 include MineSweeperSolver/Makefile
+include MineSweeperWorker/Makefile

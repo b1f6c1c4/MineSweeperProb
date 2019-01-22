@@ -1,6 +1,6 @@
 #pragma once
 #include "stdafx.h"
-#include "../MWLiteFundamental/BLL/BaseWorkerT.h"
+#include "BaseWorkerT.h"
 #include "AdapterWorker.h"
 
 class WorkerT : public BaseWorkerT, public AdapterWorker

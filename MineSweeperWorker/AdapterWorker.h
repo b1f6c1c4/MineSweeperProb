@@ -1,7 +1,7 @@
 #pragma once
 #include "stdafx.h"
-#include "../../MineSweeperProb/MineSweeperSolver/GameMgr.h"
-#include "../../MineSweeperProb/MineSweeperSolver/BinomialHelper.h"
+#include "../MineSweeperSolver/GameMgr.h"
+#include "../MineSweeperSolver/BinomialHelper.h"
 
 class AdapterWorker
 {
