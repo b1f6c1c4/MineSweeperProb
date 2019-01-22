@@ -275,22 +275,22 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Preferred.clear();
 
     m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
-#ifdef _DEBUG
+#ifndef NDEBUG
     if (m_Solver->GetTotalStates() == 0)
-        throw;
+        throw std::runtime_error("total states = 0");
 #endif
 
-#ifdef _DEBUG
+#ifndef NDEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)
         switch (m_Solver->GetBlockStatus(i))
         {
-        case BlockStatus::Mine: 
+        case BlockStatus::Mine:
             if (!m_Blocks[i].IsMine)
-                throw;
+                throw std::runtime_error("mine is not mine");
             break;
         case BlockStatus::Blank:
             if (m_Blocks[i].IsMine)
-                throw;
+                throw std::runtime_error("blank is not blank");
             break;
         case BlockStatus::Unknown:
         default:
@@ -307,11 +307,11 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         ASSERT(!m_Best.empty());
         return;
     }
-#ifdef _DEBUG
+#ifndef NDEBUG
 	if (shortcut)
 		for (auto i = 0; i < m_Blocks.size(); ++i)
 			if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-				throw;
+                throw std::runtime_error("not open but blank");
 #endif
 
     if (!BasicStrategy.HeuristicEnabled ||
@@ -406,17 +406,17 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
     if (m_Solver->CanOpenForSure == 0)
         m_Solver->Solve(maxDepth, true);
     if (m_Solver->CanOpenForSure == 0)
-#ifdef _DEBUG
+#ifndef NDEBUG
     {
         for (auto i = 0; i < m_Blocks.size(); ++i)
             if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-                throw;
+                throw std::runtime_error("not open but blank");
         return false;
     }
 #else
         return false;
 #endif
-#ifdef _DEBUG
+#ifndef NDEBUG
     auto flag = false;
 #endif
     for (auto i = 0; i < m_Blocks.size(); ++i)
@@ -424,7 +424,7 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
         if (m_Blocks[i].IsOpen || m_Solver->GetBlockStatus(i) != BlockStatus::Blank)
             continue;
         OpenBlock(i);
-#ifdef _DEBUG
+#ifndef NDEBUG
         flag = true;
 #endif
         if (m_Started)
@@ -472,7 +472,7 @@ void GameMgr::Automatic()
         st = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
         break;
     default:
-        throw;
+        throw std::runtime_error("logic not supported");
     }
 
     if (!m_Settled)

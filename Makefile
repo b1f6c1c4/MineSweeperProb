@@ -1,7 +1,7 @@
 CXX=${GCC_PATH}/g++
 AR=ar
 LIBS=-L ${BOOST_PATH}/stage/lib -lboost_program_options
-CFLAGS=-I ${BOOST_PATH} --std=c++17 -Wall -Wno-sign-compare -Wno-parentheses -O3 -DVERSION=\"$$(git describe --always)\" -DCOMMITHASH=\"$$(git rev-parse HEAD)\"
+CFLAGS=-I ${BOOST_PATH} --std=c++17 -Wall -Wno-sign-compare -Wno-parentheses -O3 -DVERSION=\"$$(git describe --always)\" -DCOMMITHASH=\"$$(git rev-parse HEAD)\" # -DNDEBUG
 
 SOLVER_TARGETS=BasicDrainer BasicSolver Drainer Solver GameMgr BinomialHelper ReadStrategy random
 WORKER_TARGETS=BaseBaseWorker BaseWorker BaseWorkerT AdapterWorker Worker WorkerT main

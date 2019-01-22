@@ -36,7 +36,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     auto solver = new Solver(m_Blocks.size());
 #endif
 
-#ifdef _DEBUG
+#ifndef NDEBUG
     solver->m_SetIDs.clear();
     solver->m_SetIDs.resize(m_Blocks.size(), -1);
 #endif
@@ -50,7 +50,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
         for (auto blk : set)
         {
             auto blkC = m_BlocksLookup[blk];
-#ifdef _DEBUG
+#ifndef NDEBUG
             if (blkC == 0)
                 ASSERT(m_Blocks[0] == blk);
 #endif

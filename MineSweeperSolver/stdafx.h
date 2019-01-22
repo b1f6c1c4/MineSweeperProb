@@ -1,9 +1,10 @@
 #pragma once
 
 #include <limits>
+#include <stdexcept>
 
-#ifdef _DEBUG
-#define ASSERT(val) do { if (!(val)) throw; } while (false)
+#ifndef NDEBUG
+#define ASSERT(val) do { if (!(val)) throw std::runtime_error("oops"); } while (false)
 #else
 #define ASSERT(val)
 #endif

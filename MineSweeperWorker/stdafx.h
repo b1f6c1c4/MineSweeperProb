@@ -1,11 +1,5 @@
 #pragma once
 
-#ifdef _DEBUG
-#define ASSERT(val) do { if (!(val)) throw; } while (false)
-#else
-#define ASSERT(val)
-#endif
-
 #include "Configuration.h"
 
 #include <vector>
