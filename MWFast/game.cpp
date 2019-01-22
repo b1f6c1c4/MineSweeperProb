@@ -1,8 +1,9 @@
 #include "game.h"
 
-game::game(const size_t w, const size_t h) : actual_(w, h, blk_t::closed_simple(0)) { }
+game::game(const size_t w, const size_t h, const std::string &st)
+	: strategy(st), actual_(w, h, blk_t::closed_simple(0)) { }
 
-const grid_t<blk_t> & game::grid() const
+const grid_t<blk_t> &game::grid() const
 {
 	return actual_;
 }
