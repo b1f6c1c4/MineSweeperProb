@@ -13,6 +13,9 @@ bool read_strategy(const std::string &hsh, strategy &st)
 	GET(ch);
 	switch (ch)
 	{
+	case 'Z':
+		st.logic = strategy::logic_method::zero;
+		break;
 	case 'P':
 		st.logic = strategy::logic_method::passive;
 		break;
