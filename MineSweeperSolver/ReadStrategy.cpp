@@ -8,55 +8,58 @@ bool ReadStrategy(const std::string &hsh, Strategy &st, size_t width, size_t hei
     std::stringstream ss(hsh);
 
 #define CHK(s) if (ch != s) return false
-#define NXT(s) do { ss >> ch; CHK(s); } while (false)
+#define NXT(s) do { if (!(ss >> ch)) return false; CHK(s); } while (false)
+#define GET(ch) if (!(ss >> ch)) ch = '\0'
 
     char ch;
-    ss >> ch;
+    GET(ch);
     switch (ch)
     {
-    case 'P':
-        st.Logic = LogicMethod::Passive;
-        break;
-    case 'S':
-        st.Logic = LogicMethod::Single;
-        break;
-    case 'D':
-        st.Logic = LogicMethod::Double;
-        break;
-    case 'F':
-        st.Logic = LogicMethod::Full;
-        break;
-    default:
-        return false;
+        case 'P':
+            st.Logic = LogicMethod::Passive;
+            break;
+        case 'S':
+            st.Logic = LogicMethod::Single;
+            break;
+        case 'D':
+            st.Logic = LogicMethod::Double;
+            break;
+        case 'F':
+            st.Logic = LogicMethod::Full;
+            break;
+        default:
+            return false;
     }
     NXT('L');
 
     st.InitialPositionSpecified = false;
     st.Index = -1;
 
-    ss >> ch;
+    GET(ch);
     if (ch == '@')
     {
         NXT('[');
         st.InitialPositionSpecified = true;
-        ss >> indexI;
+        if (!(ss >> indexI))
+            return false;
         NXT(',');
-        ss >> indexJ;
+        if (!(ss >> indexJ))
+            return false;
         NXT(']');
 
         st.Index = (indexI - 1) + (indexJ - 1) * width;
 
-        ss >> ch;
+        GET(ch);
     }
     CHK('-');
 
     st.HeuristicEnabled = true;
-    ss >> ch;
+    GET(ch);
     if (ch == 'N')
         NXT('H');
     else if (ch == 'P')
     {
-        ss >> ch;
+        GET(ch);
         if (ch == 'u')
         {
             NXT('r');
@@ -66,49 +69,63 @@ bool ReadStrategy(const std::string &hsh, Strategy &st, size_t width, size_t hei
         if (st.HeuristicEnabled)
             st.DecisionTree.push_back(HeuristicMethod::MinMineProb);
     }
-    while (ch != '-')
+    while (ch != '-' && ch != '\0')
     {
         switch (ch)
         {
-        case 'P':
-            st.DecisionTree.push_back(HeuristicMethod::MinMineProb);
-            break;
-        case 'Z':
-            st.DecisionTree.push_back(HeuristicMethod::MaxZeroProb);
-            break;
-        case 'S':
-            st.DecisionTree.push_back(HeuristicMethod::MaxZerosProb);
-            break;
-        case 'E':
-            st.DecisionTree.push_back(HeuristicMethod::MaxZerosExp);
-            break;
-        case 'Q':
-            st.DecisionTree.push_back(HeuristicMethod::MaxQuantityExp);
-            break;
-        case 'F':
-            st.DecisionTree.push_back(HeuristicMethod::MinFrontierDist);
-            break;
-        case 'U':
-            st.DecisionTree.push_back(HeuristicMethod::MaxUpperBound);
-            break;
-        default:
-            break;
+            case 'P':
+                st.DecisionTree.push_back(HeuristicMethod::MinMineProb);
+                break;
+            case 'Z':
+                st.DecisionTree.push_back(HeuristicMethod::MaxZeroProb);
+                break;
+            case 'S':
+                st.DecisionTree.push_back(HeuristicMethod::MaxZerosProb);
+                break;
+            case 'E':
+                st.DecisionTree.push_back(HeuristicMethod::MaxZerosExp);
+                break;
+            case 'Q':
+                st.DecisionTree.push_back(HeuristicMethod::MaxQuantityExp);
+                break;
+            case 'F':
+                st.DecisionTree.push_back(HeuristicMethod::MinFrontierDist);
+                break;
+            case 'U':
+                st.DecisionTree.push_back(HeuristicMethod::MaxUpperBound);
+                break;
+            default:
+                break;
         }
-        ss >> ch;
+        GET(ch);
     }
 
-    st.ExhaustEnabled = false;
-    st.ExhaustCriterion = 0;
-    st.PruningEnabled = false;
-    st.PruningCriterion = 0;
-    ss >> ch;
-    if (ch == 'D')
+    if (ch == '\0')
     {
-        st.ExhaustEnabled = true;
-        ss >> st.ExhaustCriterion;
-
-        ss >> ch;
+        st.ExhaustEnabled = false;
+        st.ExhaustCriterion = 0;
+        st.PruningEnabled = false;
+        st.PruningCriterion = 0;
+        return true;
     }
+
+    GET(ch);
+    if (ch != 'D')
+        return false;
+    st.ExhaustEnabled = true;
+    if (!(ss >> st.ExhaustCriterion))
+        return false;
+
+    GET(ch);
+    if (ch == '\0')
+        return true;
+
+    CHK('-');
+    NXT('P');
+
+    st.PruningEnabled = true;
+    if (!(ss >> st.PruningCriterion))
+        return false;
 
     return true;
 }

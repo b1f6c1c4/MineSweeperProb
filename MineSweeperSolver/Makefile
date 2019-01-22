@@ -1,15 +1,8 @@
 SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-CXX=${GCC_PATH}/g++
-AR=ar
 TARGETS=BasicDrainer BasicSolver Drainer Solver GameMgr BinomialHelper ReadStrategy random
 DEPS=stdafx.h Strategies.h $(addsuffix .h, $(TARGETS))
-CFLAGS=-I ${BOOST_PATH} --std=c++17 -Wall -Wno-sign-compare -Wno-parentheses -O3 -pthread -DVERSION=\"$$(git describe --always)\" -DCOMMITHASH=\"$$(git rev-parse HEAD)\"
 
-.DEFAULT: all
-
-.PHONY: all clean $(SELF_DIR)-clean
-
-all: $(SELF_DIR)build/MineSweeperSolver.a
+.PHONY: clean $(SELF_DIR)-clean
 
 clean: $(SELF_DIR)-clean
 

@@ -94,10 +94,13 @@ void Drainer::Update()
     macro->Hash();
     BasicDrainer::Update(macro);
 
-    m_Prob.clear();
-    m_Prob.resize(m_Mgr.m_Blocks.size(), -1);
-    for (auto i = 0; i < m_Blocks.size(); ++i)
-        m_Prob[m_Blocks[i]] = m_RootMacro->m_Probs[i];
+    if (m_RootMacro->m_Probs.size())
+    {
+        m_Prob.clear();
+        m_Prob.resize(m_Mgr.m_Blocks.size(), -1);
+        for (auto i = 0; i < m_Blocks.size(); ++i)
+            m_Prob[m_Blocks[i]] = m_RootMacro->m_Probs[i];
+    }
     for (auto i = 0; i < m_Mgr.m_Blocks.size(); ++i)
         switch (m_Mgr.m_Solver->GetBlockStatus(i))
         {
