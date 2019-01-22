@@ -4,6 +4,7 @@
 #include <map>
 #include <cmath>
 #include <cstring>
+#include <iostream>
 
 #define ZEROQ(val) (abs(val) < 1E-4)
 
@@ -256,6 +257,7 @@ bool BasicSolver::Solve(SolvingState maxDepth, bool shortcut)
 
     if (m_Solutions.empty())
     {
+        std::err << "the fuck?" << std::endl;
         m_TotalStates = double(0);
         return true;
     }
@@ -890,7 +892,31 @@ void BasicSolver::ProcessSolutions()
                     if (flags[col] & 2 && so.Dist[col] != m_BlockSets[col].size())
                         flags[col] &= ~2;
                 }
-            ASSERT(m_MatrixAugment[row] == v);
+#ifndef NDEBUG
+            if (m_MatrixAugment[row] != v)
+            {
+                std::cerr << "MATRIX SOLUTION FAILED" << std::endl;
+                for (auto j = 0; j < m_BlockSets.size(); ++j)
+                    std::cerr << so.Dist[j] << " ";
+                std::cerr << std::endl;
+                for (auto i = 0; i < m_MatrixAugment.size(); ++i)
+                {
+                    for (auto j = 0; j < m_BlockSets.size(); ++j)
+                    {
+                        if (NZ(m_Matrix[CNT(j)][i], SHF(j)))
+                            std::cerr << "1";
+                        else
+                            std::cerr << "0";
+                    }
+                    std::cerr << " " << m_MatrixAugment[i];
+                    if (i == row)
+                        std::cerr << " != " << v;
+                    std::cerr << std::endl;
+                }
+
+                throw std::runtime_error("matrix solution failed");
+            }
+#endif
         }
         so.States = double(1);
         for (auto i = 0; i < m_BlockSets.size(); ++i)
