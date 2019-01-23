@@ -45,9 +45,13 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_69_0;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_69_0\stage\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_69_0;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\b1f6c1c4\Documents\Tools\boost_1_69_0\stage\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

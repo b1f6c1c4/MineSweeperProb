@@ -189,6 +189,11 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		return;
 	gathered_safe_move = true;
 
+#ifndef NDEBUG
+	std::cerr << "Calculating SE on" << std::endl;
+	std::cerr << logic_.actual();
+#endif
+
 	auto bgrid(logic_.actual());
 	grid_t<uint8_t> btmp(bgrid.width(), bgrid.height(), 0xff);
 	{
