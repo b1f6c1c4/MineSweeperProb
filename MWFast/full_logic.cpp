@@ -12,7 +12,7 @@ logic_result full_logic::try_full_logics(const blk_ref pivot, const bool force)
 	return flag ? logic_result::dirty : logic_result::clean;
 }
 
-logic_result full_logic::try_full_logic(bool force)
+logic_result full_logic::try_full_logic(const bool force)
 {
 	if (!force && !(config->strategy.logic & strategy_t::logic_method::full))
 		return logic_result::clean;
@@ -21,28 +21,37 @@ logic_result full_logic::try_full_logic(bool force)
 	if (front_set_.empty())
 	{
 		const auto st = get_stats(grid_);
+		if (st.closed != 0)
+		{
+			if (st.rest_mines >= st.closed)
+				throw std::runtime_error("Internal error: should be solved in ext");
+			if (st.rest_mines == 0)
+				throw std::runtime_error("Internal error: should be solved in ext");
+		}
+
 		auto prob = rep_t(st.rest_mines);
 		prob /= st.closed;
 		spec_grids_.emplace_back(std::make_pair(grid_, spec_stat{
-			1,
+			binomial(st.closed, st.rest_mines),
 			prob,
 			1,
 			st.closed,
 			st.rest_mines
 			}));
-		return logic_result::clean;
 	}
+	else
+	{
+		auto grid(grid_);
+		for (auto &bb : grid)
+			if (bb.is_closed())
+				bb.set_spec(true), bb.set_mine(false), bb.set_neighbor(0);
 
-	auto grid(grid_);
-	for (auto &bb : grid)
-		if (bb.is_closed())
-			bb.set_spec(true), bb.set_mine(false), bb.set_neighbor(0);
+		speculative_fork(fork_directive{ 0, &grid, false });
+		speculative_fork(fork_directive{ 0, &grid, true });
 
-	speculative_fork(fork_directive{ 0, &grid, false });
-	speculative_fork(fork_directive{ 0, &grid, true });
-
-	if (spec_grids_.empty())
-		return logic_result::invalid;
+		if (spec_grids_.empty())
+			return logic_result::invalid;
+	}
 
 	auto flag = false;
 
@@ -90,7 +99,7 @@ logic_result full_logic::try_full_logic(bool force)
 	}
 }
 
-logic_result full_logic::try_full_logics(bool force)
+logic_result full_logic::try_full_logics(const bool force)
 {
 	bool flag;
 	do

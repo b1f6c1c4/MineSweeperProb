@@ -27,7 +27,7 @@ private:
 	void prepare_full_logic();
 	void speculative_fork(fork_directive directive);
 
-	grid_t<blk_t> grid_;
+	grid_t<blk_t> &grid_;
 	blk_refs front_set_;
 	std::vector<spec_grid_t> spec_grids_;
 };

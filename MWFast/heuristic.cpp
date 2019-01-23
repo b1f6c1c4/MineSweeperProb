@@ -246,7 +246,7 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 					safe++;
 
 #ifdef EXTRA_VERBOSE
-			std::cerr << "total * p(g_" << b.x() << "," << n << ")=" << cnt;
+			std::cerr << "total * p(g_" << b.x() << "," << static_cast<size_t>(n) << ")=" << cnt;
 			std::cerr << " safe=" << safe << " ";
 			for (auto &bt : tmp)
 				if (!bt)

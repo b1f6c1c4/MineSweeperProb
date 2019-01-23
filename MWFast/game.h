@@ -2,11 +2,10 @@
 #include "common.h"
 #include "grid.h"
 #include "block.h"
-#include "strategy.h"
-#include <random>
 #include "basic_logic.h"
 #include "full_logic.h"
 #include "heuristic.h"
+#include <random>
 
 class game
 {
@@ -31,6 +30,8 @@ private:
 	std::shared_ptr<heuristic_solver> heuristic_filter_;
 
 	void force_logic(blk_ref b);
+
+	blk_ref heuristic_select();
 
 	static void initialize_mine(blk_ref b);
 };
