@@ -21,7 +21,7 @@ private:
 	void gather_mine_prob();
 
 	bool gathered_neighbor_dist;
-	grid_t<std::array<rep_t, 8>> h_neighbor_dist_;
+	grid_t<std::array<rep_t, 9>> h_neighbor_dist_;
 	grid_t<rep_t> h_zero_prob_;
 	grid_t<double> h_entropy_;
 	void gather_neighbor_dist(const blk_refs &refs);

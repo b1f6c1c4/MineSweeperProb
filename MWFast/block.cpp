@@ -80,7 +80,7 @@ uint8_t blk_t::neighbor() const
 
 blk_t &blk_t::set_neighbor(const uint8_t v)
 {
-	value_ &= ~0x40;
+	value_ &= ~0x0f;
 	value_ |= v;
 	return *this;
 }

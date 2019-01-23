@@ -4,8 +4,9 @@
 #include <memory>
 #include <utility>
 
-//#define FIXED_GRID_SIZE
-#define WIDTH 30
-#define HEIGHT 16
+// #define EXTRA_VERBOSE
+// #define FIXED_GRID_SIZE
+// #define WIDTH 30
+// #define HEIGHT 16
 
 typedef double rep_t;

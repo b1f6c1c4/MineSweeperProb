@@ -112,6 +112,11 @@ const std::vector<spec_grid_t> & full_logic::spec() const
 	return spec_grids_;
 }
 
+std::shared_ptr<logic_config> full_logic::get_config() const
+{
+	return config;
+}
+
 void full_logic::prepare_full_logic()
 {
 	front_set_.clear();

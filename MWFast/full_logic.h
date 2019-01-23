@@ -13,6 +13,7 @@ public:
 
 	const grid_t<blk_t> &actual() const;
 	const std::vector<spec_grid_t> &spec() const;
+	std::shared_ptr<logic_config> get_config() const;
 
 private:
 	struct fork_directive

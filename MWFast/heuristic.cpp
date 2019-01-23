@@ -7,7 +7,7 @@ heuristic_solver::heuristic_solver(const full_logic &logic)
 	  gathered_mine_prob_(false),
 	  h_mine_prob_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_neighbor_dist(false),
-	  h_neighbor_dist_(logic.actual().width(), logic.actual().height(), std::array<rep_t, 8>{}),
+	  h_neighbor_dist_(logic.actual().width(), logic.actual().height(), std::array<rep_t, 9>{}),
 	  h_zero_prob_(logic.actual().width(), logic.actual().height(), 0),
 	  h_entropy_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_safe_move(false),
@@ -132,7 +132,17 @@ void heuristic_solver::gather_neighbor_dist(const blk_refs &refs)
 			if (bg->is_mine())
 				continue;
 
-			total += gr.second.repitition;
+			size_t extra = 0;
+			rep_t lambda = 1;
+			if (bg->is_closed())
+			{
+				extra = 1;
+				lambda = rep_t(gr.second.total_mines);
+				lambda /= gr.second.closed;
+				lambda = 1 - lambda;
+			}
+
+			total += gr.second.repitition * lambda;
 
 			size_t cnt = 0, cntm = 0;
 			for (const auto bb : bg.neighbors())
@@ -140,11 +150,15 @@ void heuristic_solver::gather_neighbor_dist(const blk_refs &refs)
 					cnt++;
 				else if (bb->is_mine())
 					cntm++;
-
 			for (size_t i = 0; i <= cnt && i <= gr.second.total_mines; i++)
 			{
+				if (gr.second.closed < cnt + extra)
+					throw std::runtime_error("Internal error: no enough closed blocks");
+				if (gr.second.total_mines < i)
+					throw std::runtime_error("Internal error: no enough total mines");
+
 				const auto d = binomial(cnt, i)
-					* binomial(gr.second.closed - cnt, gr.second.total_mines - i)
+					* binomial(gr.second.closed - cnt - extra, gr.second.total_mines - i)
 					/ gr.second.closed_rep;
 				dist[i + cntm] += gr.second.repitition * d;
 			}
@@ -158,7 +172,14 @@ void heuristic_solver::gather_neighbor_dist(const blk_refs &refs)
 		auto &entropy = *h_entropy_(b.x(), b.y());
 		for (auto &v : dist)
 			if (v != 0)
-				entropy += v * std::log(v);
+				entropy -= v * std::log(v);
+
+#ifdef EXTRA_VERBOSE
+		for (size_t i = 0; i <= 8; i++)
+			std::cerr << "p(g_" << b.x() << "," << i << ")=" << dist[i] << std::endl;
+		std::cerr << "total = " << total << std::endl << std::endl;
+		std::cerr << "entropy = " << entropy << " zero = " << dist[0] << std::endl << std::endl;
+#endif
 	}
 }
 
@@ -168,7 +189,20 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		return;
 	gathered_safe_move = true;
 
-	throw std::runtime_error("Internal error: not implemented yet");
+	auto bgrid(logic_.actual());
+	grid_t<uint8_t> btmp(bgrid.width(), bgrid.height(), 0xff);
+	{
+		auto it = bgrid.begin();
+		auto itt = btmp.begin();
+		for (; it != bgrid.end(); ++it, ++itt)
+			if (it->is_closed())
+			{
+				it->set_spec(true);
+				it->set_mine(false);
+				*itt = 0x00;
+			}
+	}
+
 	for (auto b : refs)
 	{
 		auto &prob = *h_zeros_prob_(b.x(), b.y());
@@ -177,13 +211,64 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		prob = 0;
 		exp = 0;
 
-		rep_t grand_total = 0;
-		for (size_t n = 0; n <= 8; n++)
+		rep_t total = 0;
+		for (uint8_t n = 0; n <= 8; n++)
 		{
-			// TODO
+			auto grid(bgrid);
+			auto bb = grid(b.x(), b.y());
+			bb->set_mine(false);
+			bb->set_spec(false);
+			bb->set_closed(false);
+			bb->set_neighbor(n);
+			full_logic logic(grid, logic_.get_config());
+			if (logic.try_full_logics(bb, true) == logic_result::invalid)
+				continue;
+
+			rep_t cnt = 0;
+			auto tmp(btmp);
+			*tmp(b.x(), b.y()) = 0xff;
+
+			for (auto &spec : logic.spec())
+			{
+				cnt += spec.second.repitition;
+				auto it = spec.first.begin();
+				auto itt = tmp.begin();
+				for (; it != spec.first.end(); ++it, ++itt)
+					if (it->is_closed())
+						*itt = 0xff;
+					else if (it->is_mine())
+						*itt = 0xff;
+			}
+
+			size_t safe = 0;
+			for (auto &bt : tmp)
+				if (!bt)
+					safe++;
+
+#ifdef EXTRA_VERBOSE
+			std::cerr << "total * p(g_" << b.x() << "," << n << ")=" << cnt;
+			std::cerr << " safe=" << safe << " ";
+			for (auto &bt : tmp)
+				if (!bt)
+					std::cerr << "+";
+				else
+					std::cerr << "-";
+			std::cerr << std::endl;
+#endif
+
+			total += cnt;
+
+			if (safe != 0)
+				prob += cnt;
+			exp += cnt * safe;
 		}
 
-		prob /= grand_total;
-		exp /= grand_total;
+		prob /= total;
+		exp /= total;
+
+#ifdef EXTRA_VERBOSE
+		std::cerr << "total = " << total << std::endl << std::endl;
+		std::cerr << "prob = " << prob << " exp = " << exp << std::endl << std::endl;
+#endif
 	}
 }
