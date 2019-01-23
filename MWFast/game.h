@@ -3,10 +3,9 @@
 #include "grid.h"
 #include "block.h"
 #include "strategy.h"
-#include "speculative.h"
 #include <random>
-
-typedef elem_reference<blk_t> blk_ref;
+#include "basic_logic.h"
+#include "full_logic.h"
 
 class game
 {
@@ -21,47 +20,15 @@ public:
 	bool run();
 
 	std::mt19937_64 device;
-	strategy strategy;
-	bool is_fixed_mines;
-	size_t total_mines;
+	std::shared_ptr<logic_config> config;
 private:
-	enum class logic_result
-	{
-		clean = 0x00,
-		dirty = 0x01,
-		invalid = 0x02
-	};
-
-	struct fork_directive
-	{
-		size_t index;
-		const grid_t<blk_t> *base;
-		bool value;
-	};
-
-	struct stats
-	{
-		size_t closed;
-		size_t rest_mines;
-	};
 
 	grid_t<blk_t> actual_;
-	std::vector<blk_t> speculative_;
 
-	bool is_finished(grid_t<blk_t> &grid) const;
+	basic_logic basic_solver_;
+	std::shared_ptr<full_logic> full_solver_;
 
-	logic_result try_basic_logic(blk_ref b, bool aggressive);
-	logic_result try_basic_logics(grid_t<blk_t> &grid);
-	logic_result try_single_logic(blk_ref b, bool aggressive);
-	logic_result try_ext_logic(grid_t<blk_t> &grid);
-	logic_result try_full_logic();
-	logic_result try_full_logics();
-
-	stats get_stats(const grid_t<blk_t> &grid) const;
-	void prepare_full_logic();
-	void speculative_fork(fork_directive directive);
-	std::vector<blk_ref> front_set_;
-	std::vector<spec_grid_t> spec_grids_;
+	void two_step_logic(blk_ref b);
 
 	grid_t<rep_t> h_mine_prob_;
 	void gather_mine_prob();
@@ -72,12 +39,6 @@ private:
 	grid_t<rep_t> h_zeros_prob_;
 	grid_t<rep_t> h_zeros_exp_;
 	void gather_safe_move(const std::vector<blk_ref> &refs);
-	// grid_t<rep_t> h_zero_prob_;
-	// grid_t<rep_t> h_zeros_prob_;
-	// grid_t<rep_t> h_zeros_exp_;
-	// grid_t<rep_t> h_quantity_exp_;
-	// grid_t<rep_t> h_frontier_dist_;
-	// grid_t<rep_t> h_upper_bound_;
 
 	static void initialize_mine(blk_ref b);
 };
