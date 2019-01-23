@@ -8,8 +8,9 @@ struct strategy
 	{
 		zero = 0x00,
 		passive = 0x01,
+		extended = 0x08,
 		single = 0x03,
-		full = 0x0b
+		full = 0x1b
 	};
 
 	enum class heuristic_method
@@ -24,11 +25,11 @@ struct strategy
 	};
 
     logic_method logic;
-	size_t initial_x;
-	size_t initial_y;
-    bool heuristic_enabled;
+	size_t initial_x{};
+	size_t initial_y{};
+    bool heuristic_enabled{};
     std::vector<heuristic_method> decision_tree;
-    size_t exhaust_criterion;
+    size_t exhaust_criterion{};
 
 	explicit strategy(const std::string &);
 };
@@ -45,4 +46,19 @@ inline bool operator&(strategy::heuristic_method lhs, strategy::heuristic_method
 	// ReSharper disable once CppInconsistentNaming
 	using T = std::underlying_type_t<strategy::heuristic_method>;
 	return (static_cast<T>(lhs) & static_cast<T>(rhs)) == static_cast<T>(rhs);
+}
+
+inline strategy::logic_method operator|(strategy::logic_method lhs, strategy::logic_method rhs)
+{
+	// ReSharper disable once CppInconsistentNaming
+	using T = std::underlying_type_t<strategy::logic_method>;
+	return static_cast<strategy::logic_method>(static_cast<T>(lhs) | static_cast<T>(rhs));
+}
+
+inline strategy::logic_method &operator|=(strategy::logic_method &lhs, strategy::logic_method rhs)
+{
+	// ReSharper disable once CppInconsistentNaming
+	using T = std::underlying_type_t<strategy::logic_method>;
+	lhs = static_cast<strategy::logic_method>(static_cast<T>(lhs) | static_cast<T>(rhs));
+	return lhs;
 }

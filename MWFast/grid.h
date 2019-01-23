@@ -27,7 +27,7 @@ public:
 	neighbors_t<T> neighbors() { return neighbors_t<T>(*grid_, x_, y_); }
 	const_neighbors_t<T> neighbors() const { return const_neighbors_t<T>(*grid_, x_, y_); }
 
-	grid_t<T> &grid() { return grid_; }
+	grid_t<T> &grid() { return *grid_; }
 	size_t x() const { return x_; }
 	size_t y() const { return y_; }
 protected:
@@ -50,7 +50,7 @@ public:
 
 	const_neighbors_t<T> neighbors() const { return const_neighbors_t<T>(*grid_, x, y); }
 
-	const grid_t<T> &grid() const { return grid_; }
+	const grid_t<T> &grid() const { return *grid_; }
 	size_t x() const { return x_; }
 	size_t y() const { return y_; }
 protected:
@@ -195,25 +195,33 @@ public:
 		std::fill(grid_.begin(), grid_.end(), value);
 	}
 
-	elem_wrapper<T> &operator()(const size_t x, const size_t y) { return grid_[y * WIDTH + x]; }
-	const elem_wrapper<T> &operator()(const size_t x, const size_t y) const { return grid_[y * WIDTH + x]; }
+	elem_reference<T> operator()(const size_t x, const size_t y)
+	{
+		return elem_reference<T>(this, &grid_[y * WIDTH + x], x, y);
+	}
+
+	elem_const_reference<T> operator()(const size_t x, const size_t y) const
+	{
+		return elem_const_reference<T>(this, &grid_[y * WIDTH + x], x, y);
+	}
 
 	// ReSharper disable CppMemberFunctionMayBeStatic
 	size_t width() const { return WIDTH; }
 	size_t height() const { return HEIGHT; }
 	// ReSharper restore CppMemberFunctionMayBeStatic
 
-	typedef typename std::array<elem_wrapper<T>, WIDTH * HEIGHT>::iterator iterator;
-	typedef typename std::array<elem_wrapper<T>, WIDTH * HEIGHT>::const_iterator const_iterator;
+	typedef grid_iterator<T> iterator;
+	typedef grid_const_iterator<T> const_iterator;
 
-	iterator begin() { return grid_.begin(); }
-	iterator end() { return grid_.end(); }
-	const_iterator begin() const { return grid_.begin(); }
-	const_iterator end() const { return grid_.end(); }
+	iterator begin() { return iterator(this, &*grid_.begin(), 0, 0); }
+	iterator end() { return iterator(this, &*grid_.begin() + WIDTH * HEIGHT, 0, HEIGHT); }
+	const_iterator begin() const { return const_iterator(this, &*grid_.begin(), 0, 0); }
+	const_iterator end() const { return const_iterator(this, &*grid_.begin() + WIDTH * HEIGHT, 0, HEIGHT); }
 
-	friend std::ostream &operator<<(std::ostream &os, const grid_t<T> &grid);
+	template <typename U>
+	friend std::ostream &operator<<(std::ostream &os, const grid_t<U> &grid);
 private:
-	std::array<elem_wrapper<T>, WIDTH * HEIGHT> grid_;
+	std::array<T, WIDTH * HEIGHT> grid_;
 };
 
 #else

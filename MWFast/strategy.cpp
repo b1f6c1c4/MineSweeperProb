@@ -29,8 +29,11 @@ bool read_strategy(const std::string &hsh, strategy &st)
 		return false;
 	}
 	NXT('L');
+	GET(ch);
+	if (ch == 'E')
+		st.logic |= strategy::logic_method::extended;
 
-	NXT('@');
+	CHK('@');
 	NXT('[');
 	if (!(ss >> st.initial_x))
 		return false;
