@@ -15,7 +15,8 @@
 game::game(const size_t w, const size_t h, const std::string &st)
 	: strategy(st), is_fixed_mines(false), total_mines(-1), actual_(w, h, blk_t::closed_simple(0)),
 	  h_mine_prob_(w, h, 0), h_neighbor_dist_(w, h, std::array<rep_t, 8>{}),
-      h_zero_prob_(w, h, 0), h_entropy_(w, h, 0) { }
+	  h_zero_prob_(w, h, 0), h_entropy_(w, h, 0),
+	  h_zeros_prob_(w, h, 0), h_zeros_exp_(w, h, 0) { }
 
 const grid_t<blk_t> &game::grid() const
 {
@@ -145,7 +146,6 @@ bool game::run()
 	if (!strategy.heuristic_enabled)
 		return false;
 
-	auto dist_gathered = false;
 	do
 	{
 		std::vector<blk_ref> closed;
@@ -153,6 +153,7 @@ bool game::run()
 			if (it->is_closed())
 				closed.push_back(it);
 
+		auto dist_gathered = false, safe_gathered = false;
 		for (auto m : strategy.decision_tree)
 		{
 			std::vector<blk_ref> next_closed;
@@ -171,6 +172,16 @@ bool game::run()
 				if (!dist_gathered)
 					gather_neighbor_dist(closed), dist_gathered = true;
 				maximize(next_closed, closed, h_entropy_);
+				break;
+			case strategy::heuristic_method::max_zeros_prob:
+				if (!safe_gathered)
+					gather_safe_move(closed), safe_gathered = true;
+				maximize(next_closed, closed, h_zeros_prob_);
+				break;
+			case strategy::heuristic_method::max_zeros_exp:
+				if (!safe_gathered)
+					gather_safe_move(closed), safe_gathered = true;
+				maximize(next_closed, closed, h_zeros_exp_);
 				break;
 			default:
 				throw std::runtime_error("Internal error: heuristic method not supported");
@@ -617,6 +628,77 @@ void game::gather_neighbor_dist(const std::vector<blk_ref> &refs)
 		for (auto &v : dist)
 			if (v != 0)
 				entropy += v * std::log(v);
+	}
+}
+
+void game::gather_safe_move(const std::vector<blk_ref> &refs)
+{
+	for (auto b : refs)
+	{
+		auto &prob = *h_zeros_prob_(b.x(), b.y());
+		auto &exp = *h_zeros_exp_(b.x(), b.y());
+
+		prob = 0;
+		exp = 0;
+
+		rep_t grand_total = 0;
+		for (size_t n = 0; n <= 8; n++)
+		{
+			grid_t<uint8_t> tmp(actual_.width(), actual_.height(), 0x00);
+
+			rep_t total = 0;
+			for (auto &gr : spec_grids_)
+			{
+				auto bg = gr.first(b.x(), b.y());
+				if (bg->is_mine())
+					continue;
+
+				size_t cnt = 0, cntm = 0;
+				for (auto bb : bg.neighbors())
+					if (bb->is_closed())
+						cnt++;
+					else if (bb->is_mine())
+						cntm++;
+
+				if (cntm > n || n > gr.second.total_mines + cntm)
+					continue;
+
+				const auto i = n - cntm;
+				const auto d = binomial(cnt, i)
+					* binomial(gr.second.closed - cnt, gr.second.total_mines - i)
+					/ gr.second.closed_rep;
+				const auto p = gr.second.repitition * d;
+				if (p == 0)
+					continue;
+
+				total += p;
+
+				auto it = gr.first.begin();
+				auto itt = tmp.begin();
+				for (; it != gr.first.end(); ++it, ++itt)
+					if (!it->is_spec())
+						*itt = 0xff;
+					else if (it.x() == b.x() && it.y() == b.y())
+						*itt = 0xff;
+					else if (it->is_closed())
+						*itt |= gr.second.total_mines ? 0x00 : 0xff;
+					else if (it->is_mine())
+						*itt = 0xff;
+			}
+
+			size_t safe = 0;
+			for (auto &bb : tmp)
+				if (!bb)
+					safe++;
+
+			prob += safe ? total : 0;
+			exp += safe * total;
+
+			grand_total += total;
+		}
+
+		prob /= grand_total;
+		exp /= grand_total;
 	}
 }
 

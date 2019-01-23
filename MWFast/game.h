@@ -69,6 +69,9 @@ private:
 	grid_t<rep_t> h_zero_prob_;
 	grid_t<double> h_entropy_;
 	void gather_neighbor_dist(const std::vector<blk_ref> &refs);
+	grid_t<rep_t> h_zeros_prob_;
+	grid_t<rep_t> h_zeros_exp_;
+	void gather_safe_move(const std::vector<blk_ref> &refs);
 	// grid_t<rep_t> h_zero_prob_;
 	// grid_t<rep_t> h_zeros_prob_;
 	// grid_t<rep_t> h_zeros_exp_;
