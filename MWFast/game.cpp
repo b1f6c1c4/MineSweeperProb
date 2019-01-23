@@ -1,6 +1,7 @@
 #include "game.h"
 #include "binomial.h"
 #include <iostream>
+#include <cmath>
 
 #ifndef NDEBUG
 #define CHECK_POINT do { \
@@ -12,7 +13,9 @@
 #endif
 
 game::game(const size_t w, const size_t h, const std::string &st)
-	: strategy(st), is_fixed_mines(false), total_mines(-1), actual_(w, h, blk_t::closed_simple(0)) { }
+	: strategy(st), is_fixed_mines(false), total_mines(-1), actual_(w, h, blk_t::closed_simple(0)),
+	  h_mine_prob_(w, h, 0), h_neighbor_dist_(w, h, std::array<rep_t, 8>{}),
+      h_zero_prob_(w, h, 0), h_entropy_(w, h, 0) { }
 
 const grid_t<blk_t> &game::grid() const
 {
@@ -81,6 +84,42 @@ void game::fill_prob(const double p, const bool buff)
 	}
 }
 
+template <typename T>
+void minimize(std::vector<blk_ref> &next_closed, std::vector<blk_ref> &closed, const grid_t<T> &values)
+{
+	auto opt = std::numeric_limits<rep_t>::max();
+	for (auto b : closed)
+	{
+		const auto v = *values(b.x(), b.y());
+		if (v < opt)
+			opt = v;
+	}
+	for (auto b : closed)
+	{
+		const auto v = *values(b.x(), b.y());
+		if (v <= opt)
+			next_closed.push_back(b);
+	}
+}
+
+template <typename T>
+void maximize(std::vector<blk_ref> &next_closed, std::vector<blk_ref> &closed, const grid_t<T> &values)
+{
+	auto opt = -std::numeric_limits<rep_t>::max();
+	for (auto b : closed)
+	{
+		const auto v = *values(b.x(), b.y());
+		if (v > opt)
+			opt = v;
+	}
+	for (auto b : closed)
+	{
+		const auto v = *values(b.x(), b.y());
+		if (v >= opt)
+			next_closed.push_back(b);
+	}
+}
+
 #define FORCE_LOGIC(X) if ((X) == logic_result::invalid) \
 throw std::runtime_error("Internal error: invalid actual grid")
 
@@ -89,12 +128,82 @@ bool game::run()
 	auto init = actual_(strategy.initial_x, strategy.initial_y);
 	if (init->is_closed())
 	{
-		logical_open(init);
+		if (!init->is_closed())
+			throw std::runtime_error("Internal error: try to open a opened block");
+
+		if (init->is_mine())
+			throw std::runtime_error("Internal error: try to logically open a mine");
+
+		init->set_closed(false);
 		FORCE_LOGIC(try_basic_logic(init, true));
 		FORCE_LOGIC(try_full_logics());
 	}
 
-	return is_finished(actual_);
+	if (is_finished(actual_))
+		return true;
+
+	if (!strategy.heuristic_enabled)
+		return false;
+
+	auto dist_gathered = false;
+	do
+	{
+		std::vector<blk_ref> closed;
+		for (auto it = actual_.begin(); it != actual_.end(); ++it)
+			if (it->is_closed())
+				closed.push_back(it);
+
+		for (auto m : strategy.decision_tree)
+		{
+			std::vector<blk_ref> next_closed;
+			switch (m)
+			{
+			case strategy::heuristic_method::min_mine_prob:
+				gather_mine_prob();
+				minimize(next_closed, closed, h_mine_prob_);
+				break;
+			case strategy::heuristic_method::max_zero_prob:
+				if (!dist_gathered)
+					gather_neighbor_dist(closed), dist_gathered = true;
+				maximize(next_closed, closed, h_zero_prob_);
+				break;
+			case strategy::heuristic_method::max_entropy:
+				if (!dist_gathered)
+					gather_neighbor_dist(closed), dist_gathered = true;
+				maximize(next_closed, closed, h_entropy_);
+				break;
+			default:
+				throw std::runtime_error("Internal error: heuristic method not supported");
+			}
+
+			closed = std::move(next_closed);
+			if (closed.empty())
+				throw std::runtime_error("Internal error: all blocks filtered");
+			if (closed.size() == 1)
+				break;
+		}
+
+		const std::uniform_int_distribution<size_t> dist(0, closed.size() - 1);
+		auto b = closed[dist(device)];
+
+		if (!b->is_closed())
+			throw std::runtime_error("Internal error: try to open a opened block");
+
+		if (b->is_mine())
+			return false;
+
+		b->set_closed(false);
+		for (auto &bb : actual_)
+			bb.set_front(false);
+		for (auto bb : closed)
+			bb->set_front(true);
+		CHECK_POINT;
+		FORCE_LOGIC(try_basic_logic(b, true));
+		FORCE_LOGIC(try_full_logics());
+	}
+	while (!is_finished(actual_));
+
+	return true;
 }
 
 bool game::is_finished(grid_t<blk_t> &grid) const
@@ -104,17 +213,6 @@ bool game::is_finished(grid_t<blk_t> &grid) const
 			return false;
 
 	return true;
-}
-
-void game::logical_open(blk_ref b)
-{
-	if (!b->is_closed())
-		throw std::runtime_error("Internal error: try to open a opened block");
-
-	if (b->is_mine())
-		throw std::runtime_error("Internal error: try to logically open a mine");
-
-	b->set_closed(false);
 }
 
 #define LOGIC(X) do { switch (X) \
@@ -237,9 +335,15 @@ game::logic_result game::try_ext_logic(grid_t<blk_t> &grid)
 	if (!is_fixed_mines)
 		return logic_result::clean;
 
-	const auto st = get_stats(actual_);
+	const auto st = get_stats(grid);
 
-	if (st.rest_mines == st.closed)
+	if (st.rest_mines > grid.width() * grid.height())
+		return logic_result::invalid;
+
+	if (st.rest_mines > st.closed)
+		return logic_result::invalid;
+
+	if (st.rest_mines == 0)
 	{
 		auto flag = false;
 
@@ -256,7 +360,7 @@ game::logic_result game::try_ext_logic(grid_t<blk_t> &grid)
 		return flag ? logic_result::dirty : logic_result::clean;
 	}
 
-	if (st.rest_mines == 0)
+	if (st.rest_mines == st.closed)
 	{
 		auto flag = false;
 
@@ -284,7 +388,16 @@ game::logic_result game::try_full_logic()
 	prepare_full_logic();
 	if (front_set_.empty())
 	{
-		spec_grids_.emplace_back(actual_, 1);
+		const auto st = get_stats(actual_);
+		auto prob = rep_t(st.rest_mines);
+		prob /= st.closed;
+		spec_grids_.emplace_back(std::make_pair(actual_, spec_stat{
+			1,
+			prob,
+			1,
+			st.closed,
+			st.rest_mines
+		}));
 		return logic_result::clean;
 	}
 
@@ -304,9 +417,9 @@ game::logic_result game::try_full_logic()
 	grid_t<uint8_t> tmp(actual_.width(), actual_.height(), 0x00);
 	for (auto &gr : spec_grids_)
 	{
-		auto it = gr.begin();
+		auto it = gr.first.begin();
 		auto itt = tmp.begin();
-		for (; it != gr.end(); ++it, ++itt)
+		for (; it != gr.first.end(); ++it, ++itt)
 		{
 			if (it->is_closed())
 				*itt = 0xff;
@@ -343,8 +456,6 @@ game::logic_result game::try_full_logic()
 
 		return flag ? logic_result::dirty : logic_result::clean;
 	}
-
-	return logic_result::clean;
 }
 
 game::logic_result game::try_full_logics()
@@ -423,7 +534,90 @@ void game::speculative_fork(const fork_directive directive)
 		throw std::runtime_error("P minesweeper is NOT yet supported.");
 
 	const auto st = get_stats(grid);
-	spec_grids_.emplace_back(grid, binomial(st.closed, st.rest_mines));
+	const auto rep = binomial(st.closed, st.rest_mines);
+	auto prob = rep_t(st.rest_mines);
+	prob /= st.closed;
+	spec_grids_.emplace_back(std::make_pair(grid, spec_stat{
+		rep,
+		prob,
+		rep,
+		st.closed,
+		st.rest_mines
+	}));
+}
+
+void game::gather_mine_prob()
+{
+	for (auto &v : h_mine_prob_)
+		v = 0;
+
+	rep_t total = 0;
+	for (auto &gr : spec_grids_)
+	{
+		total += gr.second.repitition;
+
+		auto it = gr.first.begin();
+		auto itt = h_mine_prob_.begin();
+		for (; it != gr.first.end(); ++it, ++itt)
+		{
+			if (!it->is_spec())
+				continue;
+			if (it->is_closed())
+				*itt += gr.second.probability * gr.second.repitition;
+			else if (it->is_mine())
+				*itt += gr.second.repitition;
+		}
+	}
+
+	for (auto &v : h_mine_prob_)
+		v /= total;
+}
+
+void game::gather_neighbor_dist(const std::vector<blk_ref> &refs)
+{
+	for (auto &dist : h_neighbor_dist_)
+		dist.fill(0);
+
+	for (auto b : refs)
+	{
+		auto &dist = *h_neighbor_dist_(b.x(), b.y());
+		dist.fill(0);
+
+		rep_t total = 0;
+		for (auto &gr : spec_grids_)
+		{
+			auto bg = gr.first(b.x(), b.y());
+			if (bg->is_mine())
+				continue;
+
+			total += gr.second.repitition;
+
+			size_t cnt = 0, cntm = 0;
+			for (auto bb : bg.neighbors())
+				if (bb->is_closed())
+					cnt++;
+				else if (bb->is_mine())
+					cntm++;
+
+			for (size_t i = 0; i <= cnt && i <= gr.second.total_mines; i++)
+			{
+				const auto d = binomial(cnt, i)
+					* binomial(gr.second.closed - cnt, gr.second.total_mines - i)
+					/ gr.second.closed_rep;
+				dist[i + cntm] += gr.second.repitition * d;
+			}
+		}
+
+		for (auto &v : dist)
+			v /= total;
+
+		*h_zero_prob_(b.x(), b.y()) = dist[0];
+
+		auto &entropy = *h_entropy_(b.x(), b.y());
+		for (auto &v : dist)
+			if (v != 0)
+				entropy += v * std::log(v);
+	}
 }
 
 void game::initialize_mine(blk_ref b)

@@ -50,7 +50,6 @@ private:
 
 	bool is_finished(grid_t<blk_t> &grid) const;
 
-	void logical_open(blk_ref b);
 	logic_result try_basic_logic(blk_ref b, bool aggressive);
 	logic_result try_basic_logics(grid_t<blk_t> &grid);
 	logic_result try_single_logic(blk_ref b, bool aggressive);
@@ -63,6 +62,19 @@ private:
 	void speculative_fork(fork_directive directive);
 	std::vector<blk_ref> front_set_;
 	std::vector<spec_grid_t> spec_grids_;
+
+	grid_t<rep_t> h_mine_prob_;
+	void gather_mine_prob();
+	grid_t<std::array<rep_t, 8>> h_neighbor_dist_;
+	grid_t<rep_t> h_zero_prob_;
+	grid_t<double> h_entropy_;
+	void gather_neighbor_dist(const std::vector<blk_ref> &refs);
+	// grid_t<rep_t> h_zero_prob_;
+	// grid_t<rep_t> h_zeros_prob_;
+	// grid_t<rep_t> h_zeros_exp_;
+	// grid_t<rep_t> h_quantity_exp_;
+	// grid_t<rep_t> h_frontier_dist_;
+	// grid_t<rep_t> h_upper_bound_;
 
 	static void initialize_mine(blk_ref b);
 };

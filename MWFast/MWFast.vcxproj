@@ -86,7 +86,6 @@
     <ClCompile Include="block.cpp" />
     <ClCompile Include="game.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="speculative.cpp" />
     <ClCompile Include="strategy.cpp" />
   </ItemGroup>
   <ItemGroup>

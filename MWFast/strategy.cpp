@@ -78,7 +78,7 @@ bool read_strategy(const std::string &hsh, strategy &st)
 			st.decision_tree.push_back(strategy::heuristic_method::max_zeros_exp);
 			break;
 		case 'Q':
-			st.decision_tree.push_back(strategy::heuristic_method::max_quantity_exp);
+			st.decision_tree.push_back(strategy::heuristic_method::max_entropy);
 			break;
 		case 'F':
 			st.decision_tree.push_back(strategy::heuristic_method::min_frontier_dist);

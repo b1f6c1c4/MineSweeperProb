@@ -2,10 +2,13 @@
 #include "block.h"
 #include "grid.h"
 
-class spec_grid_t : public grid_t<blk_t>
+struct spec_stat
 {
-public:
-	spec_grid_t(const grid_t<blk_t> &o, rep_t r);
-
 	rep_t repitition;
+	rep_t probability;
+	rep_t closed_rep;
+	size_t closed;
+	size_t total_mines;
 };
+
+typedef std::pair<grid_t<blk_t>, spec_stat> spec_grid_t;

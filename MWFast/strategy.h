@@ -19,7 +19,7 @@ struct strategy
 		max_zero_prob = 0x02,
 		max_zeros_prob = 0x03,
 		max_zeros_exp = 0x04,
-		max_quantity_exp = 0x05,
+		max_entropy = 0x05,
 		min_frontier_dist = 0x06,
 		max_upper_bound = 0x07
 	};

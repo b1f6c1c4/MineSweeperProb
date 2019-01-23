@@ -99,7 +99,14 @@ std::ostream &operator<<(std::ostream &os, const blk_t &b)
 {
 	if (!b.is_closed())
 	{
-		if (b.is_mine())
+		if (b.is_spec())
+		{
+			if (b.is_mine())
+				os << 'X';
+			else
+				os << '-';
+		}
+		else if (b.is_mine())
 			os << 'M';
 		else
 			os << static_cast<size_t>(b.neighbor());
@@ -107,9 +114,9 @@ std::ostream &operator<<(std::ostream &os, const blk_t &b)
 	else if (b.is_front())
 	{
 		if (b.is_mine())
-			os << '+';
+			os << '#';
 		else
-			os << '-';
+			os << '*';
 	}
 	else
 	{
