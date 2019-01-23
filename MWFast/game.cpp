@@ -1,5 +1,15 @@
 #include "game.h"
 #include "binomial.h"
+#include <iostream>
+
+#ifndef NDEBUG
+#define CHECK_POINT do { \
+	std::cerr << actual_; \
+	std::getchar(); \
+} while (false)
+#else
+#define CHECK_POINT
+#endif
 
 game::game(const size_t w, const size_t h, const std::string &st)
 	: strategy(st), is_fixed_mines(false), total_mines(-1), actual_(w, h, blk_t::closed_simple(0)) { }
@@ -124,7 +134,7 @@ game::logic_result game::try_basic_logic(blk_ref b, const bool aggressive)
 
 	if (strategy.logic & strategy::logic_method::passive)
 	{
-		if (!b->is_mine() && b->neighbor() == 0)
+		if (!b->is_mine() && !b->is_spec() && b->neighbor() == 0)
 			for (auto bb : b.neighbors())
 				if (bb->is_closed())
 				{
@@ -172,6 +182,9 @@ game::logic_result game::try_single_logic(blk_ref b, const bool aggressive)
 	if (b->is_mine())
 		throw std::runtime_error("Internal error: try single logic on a mine");
 
+	if (b->is_spec())
+		return logic_result::clean;
+
 	auto flag = false;
 
 	size_t cnt = 0, cntm = 0;
@@ -192,9 +205,10 @@ game::logic_result game::try_single_logic(blk_ref b, const bool aggressive)
 		for (auto bb : b.neighbors())
 			if (bb->is_closed())
 			{
-				if (bb->is_mine())
+				if (!bb->is_spec() && bb->is_mine())
 					return logic_result::invalid;
 				bb->set_closed(false);
+				bb->set_mine(false);
 				flag = true;
 				try_basic_logic(bb, aggressive);
 			}
@@ -204,9 +218,10 @@ game::logic_result game::try_single_logic(blk_ref b, const bool aggressive)
 		for (auto bb : b.neighbors())
 			if (bb->is_closed())
 			{
-				if (!bb->is_mine())
+				if (!bb->is_spec() && !bb->is_mine())
 					return logic_result::invalid;
 				bb->set_closed(false);
+				bb->set_mine(true);
 				flag = true;
 				try_basic_logic(bb, aggressive);
 			}
@@ -228,12 +243,13 @@ game::logic_result game::try_ext_logic(grid_t<blk_t> &grid)
 	{
 		auto flag = false;
 
-		for (auto bb : grid)
+		for (auto &bb : grid)
 			if (bb.is_closed())
 			{
-				if (bb.is_mine())
+				if (!bb.is_spec() && bb.is_mine())
 					return logic_result::invalid;
 				bb.set_closed(false);
+				bb.set_mine(false);
 				flag = true;
 			}
 
@@ -244,12 +260,13 @@ game::logic_result game::try_ext_logic(grid_t<blk_t> &grid)
 	{
 		auto flag = false;
 
-		for (auto bb : grid)
+		for (auto &bb : grid)
 			if (bb.is_closed())
 			{
-				if (!bb.is_mine())
+				if (!bb.is_spec() && !bb.is_mine())
 					return logic_result::invalid;
 				bb.set_closed(false);
+				bb.set_mine(true);
 				flag = true;
 			}
 
@@ -271,35 +288,63 @@ game::logic_result game::try_full_logic()
 		return logic_result::clean;
 	}
 
-	speculative_fork(fork_directive{ 0, &actual_, false });
-	speculative_fork(fork_directive{ 0, &actual_, true });
+	auto grid(actual_);
+	for (auto &bb : grid)
+		if (bb.is_closed())
+			bb.set_spec(true), bb.set_mine(false), bb.set_neighbor(0);
+
+	speculative_fork(fork_directive{0, &grid, false});
+	speculative_fork(fork_directive{0, &grid, true});
 
 	if (spec_grids_.empty())
 		return logic_result::invalid;
 
 	auto flag = false;
-	if (spec_grids_.size() == 1)
+
+	grid_t<uint8_t> tmp(actual_.width(), actual_.height(), 0x00);
+	for (auto &gr : spec_grids_)
 	{
-		for (auto it = spec_grids_[0].begin(); it != spec_grids_[0].end(); ++it)
+		auto it = gr.begin();
+		auto itt = tmp.begin();
+		for (; it != gr.end(); ++it, ++itt)
 		{
 			if (it->is_closed())
+				*itt = 0xff;
+			else if (it->is_mine())
+				*itt |= 0xf0;
+			else
+				*itt |= 0x0f;
+		}
+	}
+	{
+		auto it = actual_.begin();
+		auto itt = tmp.begin();
+		for (; it != actual_.end(); ++it, ++itt)
+		{
+			if (!it->is_closed())
 				continue;
 
-			auto b = actual_(it.x(), it.y());
-			if (it->is_mine() ^ b->is_mine())
-				return logic_result::invalid;
+			if (!(*itt & 0xf0))
+			{
+				if (it->is_mine())
+					return logic_result::invalid;
+				it->set_closed(false);
+				flag |= true;
+			}
 
-			if (!b->is_closed())
-				continue;
-
-			b->set_closed(false);
-			flag |= true;
+			if (!(*itt & 0x0f))
+			{
+				if (!it->is_mine())
+					return logic_result::invalid;
+				it->set_closed(false);
+				flag |= true;
+			}
 		}
 
 		return flag ? logic_result::dirty : logic_result::clean;
 	}
 
-	return logic_result::clean; // TODO
+	return logic_result::clean;
 }
 
 game::logic_result game::try_full_logics()
@@ -310,13 +355,14 @@ game::logic_result game::try_full_logics()
 		flag = false;
 		LOGIC(try_basic_logics(actual_));
 		LOGIC(try_full_logic());
-	} while (flag);
+	}
+	while (flag);
 	return logic_result::clean;
 }
 
 game::stats game::get_stats(const grid_t<blk_t> &grid) const
 {
-	stats st{ 0, total_mines };
+	stats st{0, total_mines};
 	for (auto &b : grid)
 		if (b.is_closed())
 			st.closed++;
@@ -367,8 +413,8 @@ void game::speculative_fork(const fork_directive directive)
 		}
 		if (id < front_set_.size())
 		{
-			speculative_fork(fork_directive{ id, &grid, false });
-			speculative_fork(fork_directive{ id, &grid, true });
+			speculative_fork(fork_directive{id, &grid, false});
+			speculative_fork(fork_directive{id, &grid, true});
 			return;
 		}
 	}

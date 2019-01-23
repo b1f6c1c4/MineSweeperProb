@@ -15,6 +15,9 @@ public:
 	static blk_t closed_mine();
 	static blk_t closed_simple(uint8_t);
 
+	bool is_spec() const;
+	blk_t &set_spec(bool);
+
 	bool is_front() const;
 	blk_t &set_front(bool);
 

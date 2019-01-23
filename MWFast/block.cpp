@@ -20,6 +20,18 @@ blk_t blk_t::operator++(int)
 	return value_++;
 }
 
+bool blk_t::is_spec() const
+{
+	return value_ & 0x80;
+}
+
+blk_t & blk_t::set_spec(const bool v)
+{
+	value_ &= ~0x80;
+	value_ |= v ? 0x80 : 0x00;
+	return *this;
+}
+
 bool blk_t::is_front() const
 {
 	return value_ & 0x40;
