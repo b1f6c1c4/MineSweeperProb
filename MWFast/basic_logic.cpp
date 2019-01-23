@@ -1,18 +1,21 @@
 #include "basic_logic.h"
 
-logic_config::logic_config(::strategy &&s, const bool t, const size_t m)
+logic_config::logic_config(const bool t, const size_t m)
+	: strategy("FL@[1,1]-NH"), is_fixed_mines(t), total_mines(m) { }
+
+logic_config::logic_config(strategy_t &&s, const bool t, const size_t m)
 	: strategy(s), is_fixed_mines(t), total_mines(m) { }
 
 basic_logic::basic_logic(std::shared_ptr<logic_config> config) : config(std::move(config)) {}
 
-logic_result basic_logic::try_basic_logic(blk_ref b, const bool aggressive)
+logic_result basic_logic::try_basic_logic(blk_ref b, const bool aggressive) const
 {
 	if (b->is_closed())
 		throw std::runtime_error("Internal error: try to logic a closed block");
 
 	auto flag = false;
 
-	if (config->strategy.logic & strategy::logic_method::passive)
+	if (config->strategy.logic & strategy_t::logic_method::passive)
 	{
 		if (!b->is_mine() && !b->is_spec() && b->neighbor() == 0)
 			for (auto bb : b.neighbors())
@@ -27,7 +30,7 @@ logic_result basic_logic::try_basic_logic(blk_ref b, const bool aggressive)
 				}
 	}
 
-	if (config->strategy.logic & strategy::logic_method::single)
+	if (config->strategy.logic & strategy_t::logic_method::single)
 	{
 		if (!b->is_mine())
 			LOGIC(try_single_logic(b, aggressive));
@@ -41,7 +44,7 @@ logic_result basic_logic::try_basic_logic(blk_ref b, const bool aggressive)
 	return flag ? logic_result::dirty : logic_result::clean;
 }
 
-logic_result basic_logic::try_basic_logics(grid_t<blk_t> &grid)
+logic_result basic_logic::try_basic_logics(grid_t<blk_t> &grid) const
 {
 	bool flag;
 	do
@@ -57,7 +60,7 @@ logic_result basic_logic::try_basic_logics(grid_t<blk_t> &grid)
 	return logic_result::clean;
 }
 
-logic_result basic_logic::try_single_logic(blk_ref b, const bool aggressive)
+logic_result basic_logic::try_single_logic(blk_ref b, const bool aggressive) const
 {
 	if (b->is_mine())
 		throw std::runtime_error("Internal error: try single logic on a mine");
@@ -90,7 +93,7 @@ logic_result basic_logic::try_single_logic(blk_ref b, const bool aggressive)
 				bb->set_closed(false);
 				bb->set_mine(false);
 				flag = true;
-				try_basic_logic(bb, aggressive);
+				LOGIC(try_basic_logic(bb, aggressive));
 			}
 	}
 	else if (b->neighbor() == cntm + cnt)
@@ -103,16 +106,16 @@ logic_result basic_logic::try_single_logic(blk_ref b, const bool aggressive)
 				bb->set_closed(false);
 				bb->set_mine(true);
 				flag = true;
-				try_basic_logic(bb, aggressive);
+				LOGIC(try_basic_logic(bb, aggressive));
 			}
 	}
 
 	return flag ? logic_result::dirty : logic_result::clean;
 }
 
-logic_result basic_logic::try_ext_logic(grid_t<blk_t> &grid)
+logic_result basic_logic::try_ext_logic(grid_t<blk_t> &grid) const
 {
-	if (!(config->strategy.logic & strategy::logic_method::extended))
+	if (!(config->strategy.logic & strategy_t::logic_method::extended))
 		return logic_result::clean;
 	if (!config->is_fixed_mines)
 		return logic_result::clean;

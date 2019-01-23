@@ -1,7 +1,6 @@
 #include "game.h"
 #include "binomial.h"
 #include <iostream>
-#include <cmath>
 
 #ifndef NDEBUG
 #define CHECK_POINT do { \
@@ -13,11 +12,8 @@
 #endif
 
 game::game(const size_t w, const size_t h, const std::string &st)
-	: config(std::make_shared<logic_config>(strategy(st), false, -1)), actual_(w, h, blk_t::closed_simple(0)),
-	  basic_solver_(config), full_solver_(nullptr),
-	  h_mine_prob_(w, h, 0), h_neighbor_dist_(w, h, std::array<rep_t, 8>{}),
-	  h_zero_prob_(w, h, 0), h_entropy_(w, h, 0),
-	  h_zeros_prob_(w, h, 0), h_zeros_exp_(w, h, 0) { }
+	: config(std::make_shared<logic_config>(strategy_t(st), false, -1)), actual_(w, h, blk_t::closed_simple(0)),
+	  basic_solver_(config), full_solver_(nullptr), heuristic_filter_(nullptr) { }
 
 const grid_t<blk_t> &game::grid() const
 {
@@ -86,42 +82,6 @@ void game::fill_prob(const double p, const bool buff)
 	}
 }
 
-template <typename T>
-void minimize(std::vector<blk_ref> &next_closed, std::vector<blk_ref> &closed, const grid_t<T> &values)
-{
-	auto opt = std::numeric_limits<rep_t>::max();
-	for (auto b : closed)
-	{
-		const auto v = *values(b.x(), b.y());
-		if (v < opt)
-			opt = v;
-	}
-	for (auto b : closed)
-	{
-		const auto v = *values(b.x(), b.y());
-		if (v <= opt)
-			next_closed.push_back(b);
-	}
-}
-
-template <typename T>
-void maximize(std::vector<blk_ref> &next_closed, std::vector<blk_ref> &closed, const grid_t<T> &values)
-{
-	auto opt = -std::numeric_limits<rep_t>::max();
-	for (auto b : closed)
-	{
-		const auto v = *values(b.x(), b.y());
-		if (v > opt)
-			opt = v;
-	}
-	for (auto b : closed)
-	{
-		const auto v = *values(b.x(), b.y());
-		if (v >= opt)
-			next_closed.push_back(b);
-	}
-}
-
 bool game::run()
 {
 	auto init = actual_(config->strategy.initial_x, config->strategy.initial_y);
@@ -134,7 +94,7 @@ bool game::run()
 			throw std::runtime_error("Internal error: try to logically open a mine");
 
 		init->set_closed(false);
-		two_step_logic(init);
+		force_logic(init);
 	}
 
 	if (basic_solver_.is_finished(actual_))
@@ -145,40 +105,32 @@ bool game::run()
 
 	do
 	{
-		std::vector<blk_ref> closed;
+		heuristic_filter_ = std::make_shared<heuristic_solver>(*full_solver_);
+
+		blk_refs closed;
 		for (auto it = actual_.begin(); it != actual_.end(); ++it)
 			if (it->is_closed())
 				closed.push_back(it);
 
-		auto dist_gathered = false, safe_gathered = false;
 		for (auto m : config->strategy.decision_tree)
 		{
-			std::vector<blk_ref> next_closed;
+			blk_refs next_closed;
 			switch (m)
 			{
-			case strategy::heuristic_method::min_mine_prob:
-				gather_mine_prob();
-				minimize(next_closed, closed, h_mine_prob_);
+			case strategy_t::heuristic_method::min_mine_prob:
+				heuristic_filter_->filter_p(next_closed, closed);
 				break;
-			case strategy::heuristic_method::max_zero_prob:
-				if (!dist_gathered)
-					gather_neighbor_dist(closed), dist_gathered = true;
-				maximize(next_closed, closed, h_zero_prob_);
+			case strategy_t::heuristic_method::max_zeros_prob:
+				heuristic_filter_->filter_s(next_closed, closed);
 				break;
-			case strategy::heuristic_method::max_entropy:
-				if (!dist_gathered)
-					gather_neighbor_dist(closed), dist_gathered = true;
-				maximize(next_closed, closed, h_entropy_);
+			case strategy_t::heuristic_method::max_zeros_exp:
+				heuristic_filter_->filter_e(next_closed, closed);
 				break;
-			case strategy::heuristic_method::max_zeros_prob:
-				if (!safe_gathered)
-					gather_safe_move(closed), safe_gathered = true;
-				maximize(next_closed, closed, h_zeros_prob_);
+			case strategy_t::heuristic_method::max_entropy:
+				heuristic_filter_->filter_q(next_closed, closed);
 				break;
-			case strategy::heuristic_method::max_zeros_exp:
-				if (!safe_gathered)
-					gather_safe_move(closed), safe_gathered = true;
-				maximize(next_closed, closed, h_zeros_exp_);
+			case strategy_t::heuristic_method::max_zero_prob:
+				heuristic_filter_->filter_z(next_closed, closed);
 				break;
 			default:
 				throw std::runtime_error("Internal error: heuristic method not supported");
@@ -206,115 +158,17 @@ bool game::run()
 		for (auto bb : closed)
 			bb->set_front(true);
 		CHECK_POINT;
-		two_step_logic(b);
+		force_logic(b);
 	}
 	while (!basic_solver_.is_finished(actual_));
 
 	return true;
 }
 
-void game::two_step_logic(blk_ref b)
+void game::force_logic(const blk_ref b)
 {
-	FORCE_LOGIC(basic_solver_.try_basic_logic(b, true));
-
 	full_solver_ = std::make_shared<full_logic>(actual_, config);
-	FORCE_LOGIC(full_solver_->try_full_logics());
-}
-
-void game::gather_mine_prob()
-{
-	for (auto &v : h_mine_prob_)
-		v = 0;
-
-	rep_t total = 0;
-	for (auto &gr : full_solver_->spec_grids_)
-	{
-		total += gr.second.repitition;
-
-		auto it = gr.first.begin();
-		auto itt = h_mine_prob_.begin();
-		for (; it != gr.first.end(); ++it, ++itt)
-		{
-			if (!it->is_spec())
-				continue;
-			if (it->is_closed())
-				*itt += gr.second.probability * gr.second.repitition;
-			else if (it->is_mine())
-				*itt += gr.second.repitition;
-		}
-	}
-
-	for (auto &v : h_mine_prob_)
-		v /= total;
-}
-
-void game::gather_neighbor_dist(const std::vector<blk_ref> &refs)
-{
-	for (auto &dist : h_neighbor_dist_)
-		dist.fill(0);
-
-	for (auto b : refs)
-	{
-		auto &dist = *h_neighbor_dist_(b.x(), b.y());
-		dist.fill(0);
-
-		rep_t total = 0;
-		for (auto &gr : full_solver_->spec_grids_)
-		{
-			auto bg = gr.first(b.x(), b.y());
-			if (bg->is_mine())
-				continue;
-
-			total += gr.second.repitition;
-
-			size_t cnt = 0, cntm = 0;
-			for (auto bb : bg.neighbors())
-				if (bb->is_closed())
-					cnt++;
-				else if (bb->is_mine())
-					cntm++;
-
-			for (size_t i = 0; i <= cnt && i <= gr.second.total_mines; i++)
-			{
-				const auto d = binomial(cnt, i)
-					* binomial(gr.second.closed - cnt, gr.second.total_mines - i)
-					/ gr.second.closed_rep;
-				dist[i + cntm] += gr.second.repitition * d;
-			}
-		}
-
-		for (auto &v : dist)
-			v /= total;
-
-		*h_zero_prob_(b.x(), b.y()) = dist[0];
-
-		auto &entropy = *h_entropy_(b.x(), b.y());
-		for (auto &v : dist)
-			if (v != 0)
-				entropy += v * std::log(v);
-	}
-}
-
-void game::gather_safe_move(const std::vector<blk_ref> &refs)
-{
-	throw std::runtime_error("Internal error: not implemented yet");
-	for (auto b : refs)
-	{
-		auto &prob = *h_zeros_prob_(b.x(), b.y());
-		auto &exp = *h_zeros_exp_(b.x(), b.y());
-
-		prob = 0;
-		exp = 0;
-
-		rep_t grand_total = 0;
-		for (size_t n = 0; n <= 8; n++)
-		{
-			// TODO
-		}
-
-		prob /= grand_total;
-		exp /= grand_total;
-	}
+	FORCE_LOGIC(full_solver_->try_full_logics(b, false));
 }
 
 void game::initialize_mine(blk_ref b)

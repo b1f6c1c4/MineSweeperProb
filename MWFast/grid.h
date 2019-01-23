@@ -17,7 +17,9 @@ class elem_reference
 {
 public:
 	elem_reference() : grid_(nullptr), value_(nullptr), x_(0), y_(0) { }
-	elem_reference(grid_t<T> *g, T *v, const size_t x, const size_t y) : grid_(g), value_(v), x_(x), y_(y) { }
+
+	elem_reference(grid_t<T> *g, T *v, const size_t x, const size_t y)
+		: grid_(g), value_(v), x_(x), y_(y) { }
 
 	T &operator*() { return *value_; }
 	const T &operator*() const { return *value_; }
@@ -42,13 +44,13 @@ class elem_const_reference
 public:
 	elem_const_reference() : grid_(nullptr), value_(nullptr), x_(0), y_(0) { }
 
-	elem_const_reference(const grid_t<T> *g, const T *v, const size_t x, const size_t y) : grid_(g), value_(v), x_(x),
-	                                                                                       y_(y) { }
+	elem_const_reference(const grid_t<T> *g, const T *v, const size_t x, const size_t y)
+		: grid_(g), value_(v), x_(x), y_(y) { }
 
 	const T &operator*() const { return *value_; }
 	const T *operator->() const { return value_; }
 
-	const_neighbors_t<T> neighbors() const { return const_neighbors_t<T>(*grid_, x, y); }
+	const_neighbors_t<T> neighbors() const { return const_neighbors_t<T>(*grid_, x_, y_); }
 
 	const grid_t<T> &grid() const { return *grid_; }
 	size_t x() const { return x_; }

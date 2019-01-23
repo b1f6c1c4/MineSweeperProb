@@ -2,7 +2,7 @@
 #include "common.h"
 #include <vector>
 
-struct strategy
+struct strategy_t
 {
 	enum class logic_method
 	{
@@ -31,34 +31,34 @@ struct strategy
     std::vector<heuristic_method> decision_tree;
     size_t exhaust_criterion{};
 
-	explicit strategy(const std::string &);
+	explicit strategy_t(const std::string &);
 };
 
-inline bool operator&(strategy::logic_method lhs, strategy::logic_method rhs)
+inline bool operator&(strategy_t::logic_method lhs, strategy_t::logic_method rhs)
 {
 	// ReSharper disable once CppInconsistentNaming
-	using T = std::underlying_type_t<strategy::logic_method>;
+	using T = std::underlying_type_t<strategy_t::logic_method>;
 	return (static_cast<T>(lhs) & static_cast<T>(rhs)) == static_cast<T>(rhs);
 }
 
-inline bool operator&(strategy::heuristic_method lhs, strategy::heuristic_method rhs)
+inline bool operator&(strategy_t::heuristic_method lhs, strategy_t::heuristic_method rhs)
 {
 	// ReSharper disable once CppInconsistentNaming
-	using T = std::underlying_type_t<strategy::heuristic_method>;
+	using T = std::underlying_type_t<strategy_t::heuristic_method>;
 	return (static_cast<T>(lhs) & static_cast<T>(rhs)) == static_cast<T>(rhs);
 }
 
-inline strategy::logic_method operator|(strategy::logic_method lhs, strategy::logic_method rhs)
+inline strategy_t::logic_method operator|(strategy_t::logic_method lhs, strategy_t::logic_method rhs)
 {
 	// ReSharper disable once CppInconsistentNaming
-	using T = std::underlying_type_t<strategy::logic_method>;
-	return static_cast<strategy::logic_method>(static_cast<T>(lhs) | static_cast<T>(rhs));
+	using T = std::underlying_type_t<strategy_t::logic_method>;
+	return static_cast<strategy_t::logic_method>(static_cast<T>(lhs) | static_cast<T>(rhs));
 }
 
-inline strategy::logic_method &operator|=(strategy::logic_method &lhs, strategy::logic_method rhs)
+inline strategy_t::logic_method &operator|=(strategy_t::logic_method &lhs, strategy_t::logic_method rhs)
 {
 	// ReSharper disable once CppInconsistentNaming
-	using T = std::underlying_type_t<strategy::logic_method>;
-	lhs = static_cast<strategy::logic_method>(static_cast<T>(lhs) | static_cast<T>(rhs));
+	using T = std::underlying_type_t<strategy_t::logic_method>;
+	lhs = static_cast<strategy_t::logic_method>(static_cast<T>(lhs) | static_cast<T>(rhs));
 	return lhs;
 }

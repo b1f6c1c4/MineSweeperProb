@@ -4,9 +4,17 @@
 full_logic::full_logic(grid_t<blk_t> &grid, std::shared_ptr<logic_config> config)
 	: basic_logic(config), grid_(grid) { }
 
+logic_result full_logic::try_full_logics(const blk_ref pivot, const bool force)
+{
+	auto flag = false;
+	LOGIC(try_basic_logic(pivot, true));
+	LOGIC(try_full_logics(force));
+	return flag ? logic_result::dirty : logic_result::clean;
+}
+
 logic_result full_logic::try_full_logic(bool force)
 {
-	if (!force && !(config->strategy.logic & strategy::logic_method::full))
+	if (!force && !(config->strategy.logic & strategy_t::logic_method::full))
 		return logic_result::clean;
 
 	prepare_full_logic();
@@ -92,6 +100,16 @@ logic_result full_logic::try_full_logics(bool force)
 		LOGIC(try_full_logic(force));
 	} while (flag);
 	return logic_result::clean;
+}
+
+const grid_t<blk_t> & full_logic::actual() const
+{
+	return grid_;
+}
+
+const std::vector<spec_grid_t> & full_logic::spec() const
+{
+	return spec_grids_;
 }
 
 void full_logic::prepare_full_logic()

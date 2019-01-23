@@ -1,7 +1,7 @@
 #include "strategy.h"
 #include <sstream>
 
-bool read_strategy(const std::string &hsh, strategy &st)
+bool read_strategy(const std::string &hsh, strategy_t &st)
 {
 	std::stringstream ss(hsh);
 
@@ -14,16 +14,16 @@ bool read_strategy(const std::string &hsh, strategy &st)
 	switch (ch)
 	{
 	case 'Z':
-		st.logic = strategy::logic_method::zero;
+		st.logic = strategy_t::logic_method::zero;
 		break;
 	case 'P':
-		st.logic = strategy::logic_method::passive;
+		st.logic = strategy_t::logic_method::passive;
 		break;
 	case 'S':
-		st.logic = strategy::logic_method::single;
+		st.logic = strategy_t::logic_method::single;
 		break;
 	case 'F':
-		st.logic = strategy::logic_method::full;
+		st.logic = strategy_t::logic_method::full;
 		break;
 	default:
 		return false;
@@ -31,7 +31,7 @@ bool read_strategy(const std::string &hsh, strategy &st)
 	NXT('L');
 	GET(ch);
 	if (ch == 'E')
-		st.logic |= strategy::logic_method::extended;
+		st.logic |= strategy_t::logic_method::extended;
 
 	CHK('@');
 	NXT('[');
@@ -59,32 +59,32 @@ bool read_strategy(const std::string &hsh, strategy &st)
 			st.heuristic_enabled = false;
 		}
 		if (st.heuristic_enabled)
-			st.decision_tree.push_back(strategy::heuristic_method::min_mine_prob);
+			st.decision_tree.push_back(strategy_t::heuristic_method::min_mine_prob);
 	}
 	while (ch != '-' && ch != '\0')
 	{
 		switch (ch)
 		{
 		case 'P':
-			st.decision_tree.push_back(strategy::heuristic_method::min_mine_prob);
+			st.decision_tree.push_back(strategy_t::heuristic_method::min_mine_prob);
 			break;
 		case 'Z':
-			st.decision_tree.push_back(strategy::heuristic_method::max_zero_prob);
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_zero_prob);
 			break;
 		case 'S':
-			st.decision_tree.push_back(strategy::heuristic_method::max_zeros_prob);
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_zeros_prob);
 			break;
 		case 'E':
-			st.decision_tree.push_back(strategy::heuristic_method::max_zeros_exp);
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_zeros_exp);
 			break;
 		case 'Q':
-			st.decision_tree.push_back(strategy::heuristic_method::max_entropy);
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_entropy);
 			break;
 		case 'F':
-			st.decision_tree.push_back(strategy::heuristic_method::min_frontier_dist);
+			st.decision_tree.push_back(strategy_t::heuristic_method::min_frontier_dist);
 			break;
 		case 'U':
-			st.decision_tree.push_back(strategy::heuristic_method::max_upper_bound);
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_upper_bound);
 			break;
 		default:
 			break;
@@ -107,7 +107,7 @@ bool read_strategy(const std::string &hsh, strategy &st)
 	return true;
 }
 
-strategy::strategy(const std::string &hsh)
+strategy_t::strategy_t(const std::string &hsh)
 {
 	if (!read_strategy(hsh, *this))
 		throw std::runtime_error("Invalid strategy");

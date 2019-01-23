@@ -87,10 +87,12 @@
     <ClCompile Include="block.cpp" />
     <ClCompile Include="full_logic.cpp" />
     <ClCompile Include="game.cpp" />
+    <ClCompile Include="heuristic.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="strategy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="base_logic.h" />
     <ClInclude Include="basic_logic.h" />
     <ClInclude Include="binomial.h" />
     <ClInclude Include="block.h" />
@@ -98,6 +100,7 @@
     <ClInclude Include="full_logic.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="grid.h" />
+    <ClInclude Include="heuristic.h" />
     <ClInclude Include="speculative.h" />
     <ClInclude Include="strategy.h" />
   </ItemGroup>
