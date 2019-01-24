@@ -2,7 +2,7 @@
 #include "binomial.h"
 #include <cmath>
 
-// #define EXTRA_VERBOSE
+#define EXTRA_VERBOSE
 
 heuristic_solver::heuristic_solver(const full_logic &logic)
 	: logic_(logic),
@@ -195,19 +195,13 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 	std::cerr << logic_.actual();
 #endif
 
-	auto bgrid(logic_.actual());
-	grid_t<uint8_t> btmp(bgrid.width(), bgrid.height(), 0xff);
+	grid_t<uint8_t> btmp(logic_.actual().width(), logic_.actual().height(), 0xff);
 	{
-		auto it = bgrid.begin();
+		auto it = logic_.actual().begin();
 		auto itt = btmp.begin();
-		for (; it != bgrid.end(); ++it, ++itt)
+		for (; it != logic_.actual().end(); ++it, ++itt)
 			if (it->is_closed())
-			{
-				it->set_spec(true);
-				it->set_mine(false);
-				it->set_neighbor(0);
 				*itt = 0x00;
-			}
 	}
 
 	for (auto b : refs)
@@ -221,14 +215,8 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		rep_t total = 0;
 		for (uint8_t n = 0; n <= 8; n++)
 		{
-			auto grid(bgrid);
-			auto bb = grid(b.x(), b.y());
-			bb->set_mine(false);
-			bb->set_spec(false);
-			bb->set_closed(false);
-			bb->set_neighbor(n);
-			full_logic logic(grid, logic_.get_config());
-			if (logic.try_full_logics(bb, true) == logic_result::invalid)
+			auto logic = logic_.fork(b, n);
+			if (logic.try_full_logics(true) == logic_result::invalid)
 				continue;
 
 			rep_t cnt = 0;
@@ -238,9 +226,9 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 			for (auto &gr : logic.specs())
 			{
 				cnt += gr.second.repitition;
-				auto it = grid.begin();
+				auto it = logic_.actual().begin();
 				auto itt = tmp.begin();
-				for (; it != grid.end(); ++it, ++itt)
+				for (; it != logic_.actual().end(); ++it, ++itt)
 					if (it->is_closed())
 						*itt = 0xff;
 					else if (it->is_mine())
@@ -253,7 +241,7 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 					safe++;
 
 #ifdef EXTRA_VERBOSE
-			std::cerr << "total * p(g_" << b.x() << "," << static_cast<size_t>(n) << ")=" << cnt;
+			std::cerr << "total * p(g_" << b.x() << b.y() << "," << static_cast<size_t>(n) << ")=" << cnt;
 			std::cerr << " safe=" << safe << " ";
 			for (auto &bt : tmp)
 				if (!bt)

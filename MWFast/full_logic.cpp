@@ -32,22 +32,49 @@ full_logic::full_logic(grid_t<blk_t> &grid, std::shared_ptr<logic_config> config
 	  grid_st_{}, member_(grid.width(), grid.height(), nullptr),
 	  neighbors_(grid.width(), grid.height(), std::vector<area*>{}), num_areas_(0) { }
 
-logic_result full_logic::try_full_logics(const blk_ref pivot, const bool force)
+full_logic full_logic::fork(blk_const_ref b, const uint8_t n) const
+{
+	auto grid(b.grid());
+	auto bb = grid(b.x(), b.y());
+	bb->set_mine(false);
+	bb->set_spec(false);
+	bb->set_closed(false);
+	bb->set_neighbor(n);
+
+	full_logic logic(grid, config);
+	logic.prepare_full_logic(); // TODO;
+	return logic;
+}
+
+logic_result full_logic::try_full_logics(const blk_ref pivot, const bool spec)
 {
 	auto flag = false;
 	LOGIC(try_basic_logic(pivot, true));
-	LOGIC(try_full_logics(force));
+	LOGIC(try_full_logics(spec));
 	return flag ? logic_result::dirty : logic_result::clean;
 }
 
-logic_result full_logic::try_full_logics(bool force)
+logic_result full_logic::try_full_logics(const bool spec)
 {
+	if (spec)
+	{
+		// *this should be prepared by full_logic::fork. Don't prepare again.
+		if (try_full_logic() == logic_result::invalid)
+			return logic_result::invalid;
+		return logic_result::clean;
+	}
+
 	bool flag;
 	do
 	{
 		flag = false;
 		LOGIC(try_basic_logics(grid_));
-		LOGIC(try_full_logic(force));
+
+		if (!(config->strategy.logic & strategy_t::logic_method::full))
+			return logic_result::clean;
+
+		prepare_full_logic();
+		LOGIC(try_full_logic());
 	}
 	while (flag);
 	return logic_result::clean;
@@ -73,23 +100,8 @@ std::shared_ptr<logic_config> full_logic::get_config() const
 	return config;
 }
 
-logic_result full_logic::try_full_logic(const bool force)
+logic_result full_logic::try_full_logic()
 {
-	if (!force && !(config->strategy.logic & strategy_t::logic_method::full))
-		return logic_result::clean;
-
-	simp_grid_ = grid_;
-	for (auto it = simp_grid_.begin(); it != simp_grid_.end(); ++it)
-		if (it->is_closed())
-			it->set_spec(true), it->set_mine(false), it->set_neighbor(0);
-		else if (!it->is_mine())
-			for (auto b : it.neighbors())
-				if (!b->is_closed() && b->is_mine())
-					it->set_neighbor(it->neighbor() - 1);
-
-	grid_st_ = get_stats(grid_);
-	prepare_full_logic();
-
 	speculative_fork(fork_directive{
 		std::vector<size_t>{},
 		areas_.begin(),
@@ -148,6 +160,16 @@ logic_result full_logic::try_full_logic(const bool force)
 
 void full_logic::prepare_full_logic()
 {
+	simp_grid_ = grid_;
+	for (auto it = simp_grid_.begin(); it != simp_grid_.end(); ++it)
+		if (it->is_closed())
+			it->set_spec(true), it->set_mine(false), it->set_neighbor(0);
+		else if (!it->is_mine())
+			for (auto b : it.neighbors())
+				if (!b->is_closed() && b->is_mine())
+					it->set_neighbor(it->neighbor() - 1);
+
+	grid_st_ = get_stats(grid_);
 	num_areas_ = 0;
 	areas_.clear();
 	spec_grids_.clear();

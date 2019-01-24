@@ -45,8 +45,10 @@ class full_logic : protected basic_logic
 public:
 	full_logic(grid_t<blk_t> &grid, std::shared_ptr<logic_config> config);
 
-	logic_result try_full_logics(blk_ref pivot, bool force = false);
-	logic_result try_full_logics(bool force = false);
+	full_logic fork(blk_const_ref b, uint8_t n) const;
+
+	logic_result try_full_logics(blk_ref pivot, bool spec = false);
+	logic_result try_full_logics(bool spec = false);
 
 	const grid_t<blk_t> &actual() const;
 	const std::list<area> &areas() const;
@@ -61,7 +63,7 @@ private:
 		rep_t repitition;
 	};
 
-	logic_result try_full_logic(bool force = false);
+	logic_result try_full_logic();
 	void prepare_full_logic();
 	void speculative_fork(fork_directive &&directive);
 

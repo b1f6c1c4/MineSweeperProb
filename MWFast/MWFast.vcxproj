@@ -105,7 +105,6 @@
     <ClInclude Include="game.h" />
     <ClInclude Include="grid.h" />
     <ClInclude Include="heuristic.h" />
-    <ClInclude Include="speculative.h" />
     <ClInclude Include="strategy.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

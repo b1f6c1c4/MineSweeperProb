@@ -5,6 +5,7 @@
 #include "strategy.h"
 
 typedef elem_reference<blk_t> blk_ref;
+typedef elem_const_reference<blk_t> blk_const_ref;
 typedef std::vector<blk_ref> blk_refs;
 
 enum class logic_result

@@ -13,13 +13,16 @@ template <typename T>
 class const_neighbors_t;
 
 template <typename T>
+class elem_const_reference;
+
+template <typename T>
 class elem_reference
 {
 public:
 	elem_reference() : grid_(nullptr), value_(nullptr), x_(0), y_(0) { }
 
 	elem_reference(grid_t<T> *g, T *v, const size_t x, const size_t y)
-		: grid_(g), value_(v), x_(x), y_(y) { }
+		: x_(x), y_(y), value_(v), grid_(g) { }
 
 	T &operator*() { return *value_; }
 	const T &operator*() const { return *value_; }
@@ -28,6 +31,8 @@ public:
 
 	neighbors_t<T> neighbors() { return neighbors_t<T>(*grid_, x_, y_); }
 	const_neighbors_t<T> neighbors() const { return const_neighbors_t<T>(*grid_, x_, y_); }
+
+	operator elem_const_reference<T>() { return elem_const_reference<T>(grid_, value_, x_, y_); }
 
 	grid_t<T> &grid() { return *grid_; }
 	size_t x() const { return x_; }
@@ -45,7 +50,7 @@ public:
 	elem_const_reference() : grid_(nullptr), value_(nullptr), x_(0), y_(0) { }
 
 	elem_const_reference(const grid_t<T> *g, const T *v, const size_t x, const size_t y)
-		: grid_(g), value_(v), x_(x), y_(y) { }
+		: x_(x), y_(y), value_(v), grid_(g) { }
 
 	const T &operator*() const { return *value_; }
 	const T *operator->() const { return value_; }
@@ -56,9 +61,9 @@ public:
 	size_t x() const { return x_; }
 	size_t y() const { return y_; }
 protected:
-	const grid_t<T> *grid_;
-	const T *value_;
 	size_t x_, y_;
+	const T *value_;
+	const grid_t<T> *grid_;
 };
 
 template <typename TGrid, typename TTarget>

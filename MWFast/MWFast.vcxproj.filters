@@ -53,9 +53,6 @@
     <ClInclude Include="strategy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="speculative.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="binomial.h">
       <Filter>Header Files</Filter>
     </ClInclude>
