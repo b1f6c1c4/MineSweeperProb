@@ -39,6 +39,9 @@
     <ClCompile Include="heuristic.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="fast_full_logic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="grid.h">
@@ -72,6 +75,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="heuristic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fast_full_logic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

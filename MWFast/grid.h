@@ -33,9 +33,9 @@ public:
 	size_t x() const { return x_; }
 	size_t y() const { return y_; }
 protected:
-	grid_t<T> *grid_;
-	T *value_;
 	size_t x_, y_;
+	T *value_;
+	grid_t<T> *grid_;
 };
 
 template <typename T>

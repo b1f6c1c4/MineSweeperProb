@@ -16,5 +16,6 @@ public:
 
 	bool is_finished(grid_t<blk_t> &grid) const;
 
+protected:
 	std::shared_ptr<logic_config> config;
 };

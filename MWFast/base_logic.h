@@ -22,12 +22,13 @@ struct stats
 
 struct logic_config
 {
-	logic_config(bool t, size_t m);
-	logic_config(strategy_t &&s, bool t, size_t m);
+	logic_config(bool t, size_t m, double p);
+	logic_config(strategy_t &&s, bool t, size_t m, double p);
 
 	strategy_t strategy;
 	bool is_fixed_mines;
 	size_t total_mines;
+	double probability;
 };
 
 #define LOGIC(X) do { switch (X) \

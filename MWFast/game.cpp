@@ -1,5 +1,6 @@
 #include "game.h"
 #include "binomial.h"
+#include "fast_full_logic.h"
 
 #ifndef NDEBUG
 #include <iostream>
