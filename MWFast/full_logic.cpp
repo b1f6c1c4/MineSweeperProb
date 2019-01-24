@@ -33,18 +33,74 @@ full_logic::full_logic(std::shared_ptr<grid_t<blk_t>> grid, std::shared_ptr<logi
 	  neighbors_(grid->width(), grid->height(), std::vector<area*>{}), num_areas_(0),
 	  is_speculative_(false) { }
 
+area *full_logic::emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs)
+{
+	logic.areas_.emplace_back();
+	auto &new_area = logic.areas_.back();
+	new_area.index = logic.num_areas_++;
+	for (auto bb : bs)
+	{
+		new_area.push_back((*logic.grid_)(bb.x(), bb.y()));
+		*logic.member_(bb.x(), bb.y()) = &new_area;
+	}
+	for (const auto nr : a.n_ref)
+	{
+		auto new_nr = logic.neighbors_(nr.x(), nr.y());
+		new_area.n_ref.push_back(new_nr);
+		new_nr->push_back(&new_area);
+	}
+	return &new_area;
+}
+
 full_logic full_logic::speculative_fork(blk_const_ref b, const uint8_t n) const
 {
 	const auto grid = std::make_shared<grid_t<blk_t>>(b.grid());
-	auto bb = (*grid)(b.x(), b.y());
-	bb->set_mine(false);
-	bb->set_spec(false);
-	bb->set_closed(false);
-	bb->set_neighbor(n);
+	(*grid)(b.x(), b.y())->set_mine(false).set_spec(false).set_closed(false).set_neighbor(n);
 
 	full_logic logic(grid, config);
 	logic.is_speculative_ = true;
-	logic.prepare_full_logic(); // TODO;
+	logic.simp_grid_ = simp_grid_;
+	auto nx = n;
+	for (const auto bn : b.neighbors())
+		if (!bn->is_closed() && bn->is_mine())
+			nx--;
+	logic.simp_grid_(b.x(), b.y())->set_mine(false).set_spec(false).set_closed(false).set_neighbor(nx);
+	logic.grid_st_ = get_stats(*grid);
+	logic.num_areas_ = 0;
+
+	for (const auto &a : areas_)
+	{
+		blk_const_refs bns, bfs;
+		for (const blk_const_ref bb : a)
+		{
+			if (bb == b)
+				continue;
+
+			auto flag = false;
+			for (const auto bn : b.neighbors()) // TODO
+				if (bb == bn)
+				{
+					bns.push_back(bb);
+					flag = true;
+					break;
+				}
+
+			if (!flag)
+				bfs.push_back(bb);
+		}
+
+		if (!bns.empty())
+		{
+			auto res = emplace_fork(logic, a, bns);
+			auto new_nr = logic.neighbors_(b.x(), b.y());
+			res->n_ref.push_back(new_nr);
+			new_nr->push_back(res);
+		}
+
+		if (!bfs.empty())
+			// ReSharper disable once CppExpressionWithoutSideEffects
+			emplace_fork(logic, a, bfs);
+	}
 	return logic;
 }
 
@@ -165,7 +221,7 @@ void full_logic::prepare_full_logic()
 	simp_grid_ = *grid_;
 	for (auto it = simp_grid_.begin(); it != simp_grid_.end(); ++it)
 		if (it->is_closed())
-			it->set_spec(true), it->set_mine(false), it->set_neighbor(0);
+			it->set_spec(true).set_mine(false).set_neighbor(0);
 		else if (!it->is_mine())
 			for (auto b : it.neighbors())
 				if (!b->is_closed() && b->is_mine())

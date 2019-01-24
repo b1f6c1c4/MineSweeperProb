@@ -78,4 +78,5 @@ private:
 	bool is_speculative_;
 
 	void finalize(const area_it &ait);
+	static area *emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs);
 };

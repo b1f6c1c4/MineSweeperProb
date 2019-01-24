@@ -4,6 +4,10 @@
 
 #define EXTRA_VERBOSE
 
+#ifdef NDEBUG
+#undef EXTRA_VERBOSE
+#endif
+
 heuristic_solver::heuristic_solver(const full_logic &logic)
 	: logic_(logic),
 	  gathered_mine_prob_(false),

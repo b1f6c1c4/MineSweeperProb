@@ -19,7 +19,7 @@ template <typename T>
 class elem_reference
 {
 public:
-	elem_reference() : grid_(nullptr), value_(nullptr), x_(0), y_(0) { }
+	elem_reference() : x_(0), y_(0), value_(nullptr), grid_(nullptr) { }
 
 	elem_reference(grid_t<T> *g, T *v, const size_t x, const size_t y)
 		: x_(x), y_(y), value_(v), grid_(g) { }
@@ -32,7 +32,7 @@ public:
 	neighbors_t<T> neighbors() { return neighbors_t<T>(*grid_, x_, y_); }
 	const_neighbors_t<T> neighbors() const { return const_neighbors_t<T>(*grid_, x_, y_); }
 
-	operator elem_const_reference<T>() { return elem_const_reference<T>(grid_, value_, x_, y_); }
+	operator elem_const_reference<T>() const { return elem_const_reference<T>(grid_, value_, x_, y_); }
 
 	grid_t<T> &grid() { return *grid_; }
 	size_t x() const { return x_; }
@@ -47,7 +47,7 @@ template <typename T>
 class elem_const_reference
 {
 public:
-	elem_const_reference() : grid_(nullptr), value_(nullptr), x_(0), y_(0) { }
+	elem_const_reference() : x_(0), y_(0), value_(nullptr), grid_(nullptr) { }
 
 	elem_const_reference(const grid_t<T> *g, const T *v, const size_t x, const size_t y)
 		: x_(x), y_(y), value_(v), grid_(g) { }
@@ -60,11 +60,28 @@ public:
 	const grid_t<T> &grid() const { return *grid_; }
 	size_t x() const { return x_; }
 	size_t y() const { return y_; }
+
+	template <typename U>
+	friend bool operator==(const elem_const_reference<U> &lhs, const elem_const_reference<U> &rhs);
+	template <typename U>
+	friend bool operator!=(const elem_const_reference<U> &lhs, const elem_const_reference<U> &rhs);
 protected:
 	size_t x_, y_;
 	const T *value_;
 	const grid_t<T> *grid_;
 };
+
+template <typename T>
+bool operator==(const elem_const_reference<T> &lhs, const elem_const_reference<T> &rhs)
+{
+	return lhs.value_ == rhs.value_;
+}
+
+template <typename T>
+bool operator!=(const elem_const_reference<T> &lhs, const elem_const_reference<T> &rhs)
+{
+	return lhs.value_ != rhs.value_;
+}
 
 template <typename TGrid, typename TTarget>
 size_t construct_neighbor(TGrid &grid, size_t x, size_t y, TTarget &neighbors)
