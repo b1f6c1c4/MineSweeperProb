@@ -1,6 +1,5 @@
 #include "game.h"
 #include "binomial.h"
-#include "fast_full_logic.h"
 
 #ifndef NDEBUG
 #include <iostream>
@@ -13,7 +12,7 @@
 #endif
 
 game::game(const size_t w, const size_t h, const std::string &st)
-	: config(std::make_shared<logic_config>(strategy_t(st), false, -1)),
+	: config(std::make_shared<logic_config>(strategy_t(st), false, -1, NAN)),
 	  actual_(w, h, blk_t::closed_simple(0)),
 	  basic_solver_(config), full_solver_(nullptr), heuristic_filter_(nullptr) { }
 

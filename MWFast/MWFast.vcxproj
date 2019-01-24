@@ -89,7 +89,6 @@
     <ClCompile Include="basic_logic.cpp" />
     <ClCompile Include="binomial.cpp" />
     <ClCompile Include="block.cpp" />
-    <ClCompile Include="fast_full_logic.cpp" />
     <ClCompile Include="full_logic.cpp" />
     <ClCompile Include="game.cpp" />
     <ClCompile Include="heuristic.cpp" />
@@ -102,7 +101,6 @@
     <ClInclude Include="binomial.h" />
     <ClInclude Include="block.h" />
     <ClInclude Include="common.h" />
-    <ClInclude Include="fast_full_logic.h" />
     <ClInclude Include="full_logic.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="grid.h" />

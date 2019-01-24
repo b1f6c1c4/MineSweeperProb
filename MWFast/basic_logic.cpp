@@ -1,10 +1,10 @@
 #include "basic_logic.h"
 
-logic_config::logic_config(const bool t, const size_t m)
-	: strategy("FL@[1,1]-NH"), is_fixed_mines(t), total_mines(m) { }
+logic_config::logic_config(const bool t, const size_t m, const double p)
+	: strategy("FL@[1,1]-Pure"), is_fixed_mines(t), total_mines(m), probability(p) { }
 
-logic_config::logic_config(strategy_t &&s, const bool t, const size_t m)
-	: strategy(s), is_fixed_mines(t), total_mines(m) { }
+logic_config::logic_config(strategy_t &&s, const bool t, const size_t m, const double p)
+	: strategy(s), is_fixed_mines(t), total_mines(m), probability(p) { }
 
 basic_logic::basic_logic(std::shared_ptr<logic_config> config) : config(std::move(config)) {}
 
@@ -37,7 +37,7 @@ logic_result basic_logic::try_basic_logic(blk_ref b, const bool aggressive) cons
 
 		else if (aggressive)
 			for (const auto bb : b.neighbors())
-				if (!bb->is_mine())
+				if (!bb->is_closed() && !bb->is_mine())
 					LOGIC(try_single_logic(bb, false));
 	}
 
@@ -62,6 +62,9 @@ logic_result basic_logic::try_basic_logics(grid_t<blk_t> &grid) const
 
 logic_result basic_logic::try_single_logic(blk_ref b, const bool aggressive) const
 {
+	if (b->is_closed())
+		throw std::runtime_error("Internal error: try single logic on a closed");
+
 	if (b->is_mine())
 		throw std::runtime_error("Internal error: try single logic on a mine");
 

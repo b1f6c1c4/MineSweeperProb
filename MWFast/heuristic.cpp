@@ -88,7 +88,7 @@ void heuristic_solver::gather_mine_prob()
 
 	for (auto &v : h_mine_prob_)
 		v = 0;
-
+	/*
 	rep_t total = 0;
 	for (auto &gr : logic_.spec())
 	{
@@ -108,7 +108,7 @@ void heuristic_solver::gather_mine_prob()
 	}
 
 	for (auto &v : h_mine_prob_)
-		v /= total;
+		v /= total;*/
 }
 
 void heuristic_solver::gather_neighbor_dist(const blk_refs &refs)
@@ -119,7 +119,7 @@ void heuristic_solver::gather_neighbor_dist(const blk_refs &refs)
 
 	for (auto &dist : h_neighbor_dist_)
 		dist.fill(0);
-
+	/*
 	for (auto b : refs)
 	{
 		auto &dist = *h_neighbor_dist_(b.x(), b.y());
@@ -180,7 +180,7 @@ void heuristic_solver::gather_neighbor_dist(const blk_refs &refs)
 		std::cerr << "total = " << total << std::endl << std::endl;
 		std::cerr << "entropy = " << entropy << " zero = " << dist[0] << std::endl << std::endl;
 #endif
-	}
+	}*/
 }
 
 void heuristic_solver::gather_safe_move(const blk_refs &refs)
@@ -193,7 +193,7 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 	std::cerr << "Calculating SE on" << std::endl;
 	std::cerr << logic_.actual();
 #endif
-
+	/*
 	auto bgrid(logic_.actual());
 	grid_t<uint8_t> btmp(bgrid.width(), bgrid.height(), 0xff);
 	{
@@ -275,5 +275,5 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		std::cerr << "total = " << total << std::endl << std::endl;
 		std::cerr << "prob = " << prob << " exp = " << exp << std::endl << std::endl;
 #endif
-	}
+	}*/
 }
