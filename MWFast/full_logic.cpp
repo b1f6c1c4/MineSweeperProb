@@ -31,7 +31,7 @@ full_logic::full_logic(std::shared_ptr<grid_t<blk_t>> grid, std::shared_ptr<logi
 	  simp_grid_(grid->width(), grid->height(), 0),
 	  grid_st_{}, member_(grid->width(), grid->height(), nullptr),
 	  neighbors_(grid->width(), grid->height(), std::vector<area*>{}), num_areas_(0),
-	  is_speculative_(false) { }
+	  is_speculative_(false), safe_count_(0), rep_count_(0) { }
 
 area *full_logic::emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs)
 {
@@ -52,7 +52,7 @@ area *full_logic::emplace_fork(full_logic &logic, const area &a, const blk_const
 	return &new_area;
 }
 
-full_logic full_logic::speculative_fork(blk_const_ref b, const uint8_t n) const
+full_logic full_logic::logic_fork_spec(blk_const_ref b, const uint8_t n) const
 {
 	const auto grid = std::make_shared<grid_t<blk_t>>(b.grid());
 	(*grid)(b.x(), b.y())->set_mine(false).set_spec(false).set_closed(false).set_neighbor(n);
@@ -102,6 +102,14 @@ full_logic full_logic::speculative_fork(blk_const_ref b, const uint8_t n) const
 			emplace_fork(logic, a, bfs);
 	}
 	return logic;
+}
+
+void full_logic::modify_spec(blk_const_ref b, const uint8_t n)
+{
+	auto bg = (*grid_)(b.x(), b.y());
+	auto bx = simp_grid_(b.x(), b.y());
+	bx->set_neighbor(n + bx->neighbor() - bg->neighbor());
+	bg->set_neighbor(n);
 }
 
 logic_result full_logic::try_full_logics(const blk_ref pivot, const bool spec)
@@ -158,8 +166,30 @@ std::shared_ptr<logic_config> full_logic::get_config() const
 	return config;
 }
 
+size_t full_logic::safe_count() const
+{
+	return safe_count_;
+}
+
+rep_t full_logic::rep_count() const
+{
+	return rep_count_;
+}
+
 logic_result full_logic::try_full_logic()
 {
+	spec_grids_.clear();
+	safe_count_ = 0;
+	rep_count_ = 0;
+
+#ifndef NDEBUG
+	if (num_areas_ > 25)
+	{
+		std::cerr << "DEPTH = " << num_areas_ << std::endl;
+		std::cerr << *grid_;
+	}
+#endif
+
 	speculative_fork(fork_directive{
 		std::vector<size_t>{},
 		areas_.begin(),
@@ -174,6 +204,7 @@ logic_result full_logic::try_full_logic()
 	std::vector<uint8_t> atmp(num_areas_, 0x00);
 	for (auto &gr : spec_grids_)
 	{
+		rep_count_ += gr.second.repitition;
 		auto it = gr.first.begin();
 		auto itt = atmp.begin();
 		auto ait = areas_.begin();
@@ -194,7 +225,11 @@ logic_result full_logic::try_full_logic()
 			if (!(*it & 0xf0))
 				for (auto b : *ait)
 				{
-					if (!is_speculative_ && b->is_mine())
+					safe_count_++;
+					if (is_speculative_)
+						continue;
+
+					if (b->is_mine())
 						return logic_result::invalid;
 					b->set_closed(false);
 					b->set_mine(false);
@@ -204,7 +239,9 @@ logic_result full_logic::try_full_logic()
 			if (!(*it & 0x0f))
 				for (auto b : *ait)
 				{
-					if (!is_speculative_ && !b->is_mine())
+					if (is_speculative_)
+						continue;
+					if (!b->is_mine())
 						return logic_result::invalid;
 					b->set_closed(false);
 					b->set_mine(true);
@@ -234,7 +271,6 @@ void full_logic::prepare_full_logic()
 	grid_st_ = get_stats(*grid_);
 	num_areas_ = 0;
 	areas_.clear();
-	spec_grids_.clear();
 	for (auto &n : neighbors_)
 		n.clear();
 

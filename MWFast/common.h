@@ -6,8 +6,8 @@
 #include <limits>
 
 // #define FIXED_GRID_SIZE
-// #define WIDTH 30
-// #define HEIGHT 16
+// #define WIDTH 9
+// #define HEIGHT 9
 
 typedef double rep_t;
 

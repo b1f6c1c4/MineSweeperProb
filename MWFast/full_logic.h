@@ -40,12 +40,20 @@ struct conn_lt
 	bool operator()(const conn_t &lhs, const conn_t &rhs) const;
 };
 
+struct topo_t
+{
+	area *my_area;
+	area_refs neighbors_areas;
+};
+
 class full_logic : protected basic_logic
 {
 public:
 	full_logic(std::shared_ptr<grid_t<blk_t>> grid, std::shared_ptr<logic_config> config);
 
-	full_logic speculative_fork(blk_const_ref b, uint8_t n) const;
+	// topo_t get_topology(blk_const_ref b) const;
+	full_logic logic_fork_spec(blk_const_ref b, uint8_t n) const;
+	void modify_spec(blk_const_ref b, uint8_t n);
 
 	logic_result try_full_logics(blk_ref pivot, bool spec = false);
 	logic_result try_full_logics(bool spec = false);
@@ -54,6 +62,8 @@ public:
 	const std::list<area> &areas() const;
 	const std::vector<spec_t> &specs() const;
 	std::shared_ptr<logic_config> get_config() const;
+	size_t safe_count() const;
+	rep_t rep_count() const;
 
 private:
 	struct fork_directive
@@ -76,6 +86,8 @@ private:
 	size_t num_areas_;
 	std::vector<spec_t> spec_grids_;
 	bool is_speculative_;
+	size_t safe_count_;
+	rep_t rep_count_;
 
 	void finalize(const area_it &ait);
 	static area *emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs);

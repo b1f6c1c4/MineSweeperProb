@@ -5,7 +5,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments> -n 6 -m 1 -T 2 -v -s FL@[2,1]-PSE -N 100</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments> -n 9 -m 9 -T 10 -b -v -s FL@[2,2]-PSE -N 5000</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

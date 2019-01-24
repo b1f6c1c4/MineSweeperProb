@@ -196,7 +196,11 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 
 #ifndef NDEBUG
 	std::cerr << "Calculating SE on" << std::endl;
+	for (auto ref : refs)
+		ref->set_front(true);
 	std::cerr << logic_.actual();
+	for (auto ref : refs)
+		ref->set_front(false);
 #endif
 
 	grid_t<uint8_t> btmp(logic_.actual().width(), logic_.actual().height(), 0xff);
@@ -215,7 +219,7 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 			if (bb->is_closed())
 				ub++;
 			else if (bb->is_mine())
-				lb++;
+				lb++, ub++;
 
 		auto &prob = *h_zeros_prob_(b.x(), b.y());
 		auto &exp = *h_zeros_exp_(b.x(), b.y());
@@ -224,41 +228,19 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		exp = 0;
 
 		rep_t total = 0;
-		for (uint8_t n = lb; n <= ub; n++)
-		{
-			auto logic = logic_.speculative_fork(b, n);
+		auto logic = logic_.logic_fork_spec(b, static_cast<uint8_t>(lb));
+		for (auto n = lb; n <= ub; n++)
+		{	
+			logic.modify_spec(b, static_cast<uint8_t>(n));
 			if (logic.try_full_logics(true) == logic_result::invalid)
 				continue;
 
-			rep_t cnt = 0;
-			auto tmp(btmp);
-			*tmp(b.x(), b.y()) = 0xff;
-
-			for (auto &gr : logic.specs())
-			{
-				cnt += gr.second.repitition;
-				auto it = logic.actual().begin();
-				auto itt = tmp.begin();
-				for (; it != logic.actual().end(); ++it, ++itt)
-					if (it->is_closed())
-						*itt = 0xff;
-					else if (it->is_mine())
-						*itt = 0xff;
-			}
-
-			size_t safe = 0;
-			for (auto &bt : tmp)
-				if (!bt)
-					safe++;
+			const auto cnt = logic.rep_count();
+			const auto safe = logic.safe_count();
 
 #ifdef EXTRA_VERBOSE
-			std::cerr << "total * p(g_" << b.x() << b.y() << "," << static_cast<size_t>(n) << ")=" << cnt;
-			std::cerr << " safe=" << safe << " ";
-			for (auto &bt : tmp)
-				if (!bt)
-					std::cerr << "+";
-				else
-					std::cerr << "-";
+			std::cerr << "total * p(g_" << b.x() << b.y() << "," << n << ")=" << cnt;
+			std::cerr << " safe=" << safe;
 			std::cerr << std::endl;
 #endif
 
@@ -269,11 +251,15 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 			exp += cnt * safe;
 		}
 
+		if (total == 0)
+			throw std::runtime_error("Internal error: distribution doesn't exist");
+
 		prob /= total;
 		exp /= total;
 
 #ifdef EXTRA_VERBOSE
-		std::cerr << "total = " << total << std::endl << std::endl;
+		std::cerr << "g_" << b.x() << b.y() << " lb=" << lb << " ub=" << ub << std::endl;
+		std::cerr << "total = " << total << std::endl;
 		std::cerr << "prob = " << prob << " exp = " << exp << std::endl << std::endl;
 #endif
 	}
