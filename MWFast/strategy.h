@@ -10,7 +10,8 @@ struct strategy_t
 		passive = 0x01,
 		extended = 0x08,
 		single = 0x03,
-		full = 0x1b
+		dual = 0x07,
+		full = 0x1f
 	};
 
 	enum class heuristic_method

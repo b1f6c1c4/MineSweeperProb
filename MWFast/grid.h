@@ -37,6 +37,11 @@ public:
 	grid_t<T> &grid() { return *grid_; }
 	size_t x() const { return x_; }
 	size_t y() const { return y_; }
+
+	template <typename U>
+	friend bool operator==(const elem_reference<U> &lhs, const elem_reference<U> &rhs);
+	template <typename U>
+	friend bool operator!=(const elem_reference<U> &lhs, const elem_reference<U> &rhs);
 protected:
 	size_t x_, y_;
 	T *value_;
@@ -70,6 +75,18 @@ protected:
 	const T *value_;
 	const grid_t<T> *grid_;
 };
+
+template <typename T>
+bool operator==(const elem_reference<T> &lhs, const elem_reference<T> &rhs)
+{
+	return lhs.value_ == rhs.value_;
+}
+
+template <typename T>
+bool operator!=(const elem_reference<T> &lhs, const elem_reference<T> &rhs)
+{
+	return lhs.value_ != rhs.value_;
+}
 
 template <typename T>
 bool operator==(const elem_const_reference<T> &lhs, const elem_const_reference<T> &rhs)

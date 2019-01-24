@@ -22,6 +22,9 @@ bool read_strategy(const std::string &hsh, strategy_t &st)
 	case 'S':
 		st.logic = strategy_t::logic_method::single;
 		break;
+	case 'D':
+		st.logic = strategy_t::logic_method::dual;
+		break;
 	case 'F':
 		st.logic = strategy_t::logic_method::full;
 		break;
@@ -31,7 +34,10 @@ bool read_strategy(const std::string &hsh, strategy_t &st)
 	NXT('L');
 	GET(ch);
 	if (ch == 'E')
+	{
 		st.logic |= strategy_t::logic_method::extended;
+		GET(ch);
+	}
 
 	CHK('@');
 	NXT('[');
