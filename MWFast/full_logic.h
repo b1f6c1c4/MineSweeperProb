@@ -66,6 +66,7 @@ private:
 	void speculative_fork(fork_directive &&directive);
 
 	grid_t<blk_t> &grid_;
+	grid_t<blk_t> simp_grid_;
 	stats grid_st_;
 	grid_t<area*> member_;
 	grid_t<area_refs> neighbors_;

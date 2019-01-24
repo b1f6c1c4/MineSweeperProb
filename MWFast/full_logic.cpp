@@ -10,7 +10,7 @@ conn_t::conn_t(blk_ref b): hash(0), ref(b)
 {
 	for (auto bb : b.neighbors())
 		if (!bb->is_closed() && !bb->is_spec() && !bb->is_mine())
-				emplace(bb);
+			emplace(bb);
 
 	for (auto bb : *this)
 	{
@@ -27,7 +27,9 @@ bool conn_lt::operator()(const conn_t &lhs, const conn_t &rhs) const
 }
 
 full_logic::full_logic(grid_t<blk_t> &grid, std::shared_ptr<logic_config> config)
-	: basic_logic(config), grid_(grid), grid_st_{}, member_(grid.width(), grid.height(), nullptr),
+	: basic_logic(config), grid_(grid),
+	  simp_grid_(grid.width(), grid.height(), 0),
+	  grid_st_{}, member_(grid.width(), grid.height(), nullptr),
 	  neighbors_(grid.width(), grid.height(), std::vector<area*>{}), num_areas_(0) { }
 
 logic_result full_logic::try_full_logics(const blk_ref pivot, const bool force)
@@ -46,21 +48,22 @@ logic_result full_logic::try_full_logics(bool force)
 		flag = false;
 		LOGIC(try_basic_logics(grid_));
 		LOGIC(try_full_logic(force));
-	} while (flag);
+	}
+	while (flag);
 	return logic_result::clean;
 }
 
-const grid_t<blk_t> & full_logic::actual() const
+const grid_t<blk_t> &full_logic::actual() const
 {
 	return grid_;
 }
 
-const std::list<area> & full_logic::areas() const
+const std::list<area> &full_logic::areas() const
 {
 	return areas_;
 }
 
-const std::vector<spec_t> & full_logic::specs() const
+const std::vector<spec_t> &full_logic::specs() const
 {
 	return spec_grids_;
 }
@@ -75,10 +78,14 @@ logic_result full_logic::try_full_logic(const bool force)
 	if (!force && !(config->strategy.logic & strategy_t::logic_method::full))
 		return logic_result::clean;
 
-	auto grid(grid_);
-	for (auto &bb : grid)
-		if (bb.is_closed())
-			bb.set_spec(true), bb.set_mine(false), bb.set_neighbor(0);
+	simp_grid_ = grid_;
+	for (auto it = simp_grid_.begin(); it != simp_grid_.end(); ++it)
+		if (it->is_closed())
+			it->set_spec(true), it->set_mine(false), it->set_neighbor(0);
+		else if (!it->is_mine())
+			for (auto b : it.neighbors())
+				if (!b->is_closed() && b->is_mine())
+					it->set_neighbor(it->neighbor() - 1);
 
 	grid_st_ = get_stats(grid_);
 	prepare_full_logic();
@@ -144,6 +151,8 @@ void full_logic::prepare_full_logic()
 	num_areas_ = 0;
 	areas_.clear();
 	spec_grids_.clear();
+	for (auto &n : neighbors_)
+		n.clear();
 
 	std::multiset<conn_t, conn_lt> connection;
 	for (auto it = grid_.begin(); it != grid_.end(); ++it)
@@ -182,7 +191,7 @@ void full_logic::speculative_fork(fork_directive &&directive)
 {
 	if (directive.values.size() == num_areas_)
 	{
-		spec_grids_.emplace_back(std::make_pair(directive.values, enum_stat{ directive.repitition }));
+		spec_grids_.emplace_back(std::make_pair(directive.values, enum_stat{directive.repitition}));
 		return;
 	}
 
@@ -222,10 +231,10 @@ void full_logic::speculative_fork(fork_directive &&directive)
 			if (ax->index < directive.ait->index)
 				p += directive.values[ax->index];
 			else
-				nub += directive.ait->size();
+				nub += ax->size();
 		}
 
-		auto b = grid_(areas.x(), areas.y());
+		auto b = simp_grid_(areas.x(), areas.y());
 		if (b->is_closed())
 			throw std::runtime_error("Internal error: should not check closed's neighbor");
 		if (b->is_mine())

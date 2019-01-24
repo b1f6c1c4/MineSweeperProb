@@ -112,6 +112,8 @@ bool game::run()
 		b->set_spec(true);
 		CHECK_POINT;
 		b->set_spec(false);
+		for (auto &bb : actual_)
+			bb.set_front(false);
 #endif
 
 		if (b->is_mine())
