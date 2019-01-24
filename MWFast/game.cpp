@@ -109,10 +109,9 @@ bool game::run()
 		auto b = heuristic_select();
 
 #ifndef NDEBUG
-		for (auto &bb : actual_)
-			bb.set_front(false);
-		b->set_front(true);
+		b->set_spec(true);
 		CHECK_POINT;
+		b->set_spec(false);
 #endif
 
 		if (b->is_mine())
@@ -171,6 +170,13 @@ blk_ref game::heuristic_select()
 		if (closed.size() == 1)
 			break;
 	}
+
+#ifndef NDEBUG
+	for (auto &b : actual_)
+		b.set_front(false);
+	for (auto b : closed)
+		b->set_front(true);
+#endif
 
 	const std::uniform_int_distribution<size_t> dist(0, closed.size() - 1);
 	auto b = closed[dist(device)];

@@ -9,8 +9,7 @@ bool blk_ref_lt::operator()(const blk_ref &lhs, const blk_ref &rhs) const
 conn_t::conn_t(blk_ref b): hash(0), ref(b)
 {
 	for (auto bb : b.neighbors())
-		if (!bb->is_closed())
-			if (!bb->is_mine())
+		if (!bb->is_closed() && !bb->is_spec() && !bb->is_mine())
 				emplace(bb);
 
 	for (auto bb : *this)
@@ -118,18 +117,20 @@ logic_result full_logic::try_full_logic(const bool force)
 			if (!(*it & 0xf0))
 				for (auto b : *ait)
 				{
-					if (b->is_mine())
+					if (!b->is_spec() && b->is_mine())
 						return logic_result::invalid;
 					b->set_closed(false);
+					b->set_mine(false);
 					flag |= true;
 				}
 
 			if (!(*it & 0x0f))
 				for (auto b : *ait)
 				{
-					if (!b->is_mine())
+					if (!b->is_spec() && !b->is_mine())
 						return logic_result::invalid;
 					b->set_closed(false);
+					b->set_mine(true);
 					flag |= true;
 				}
 		}
@@ -140,6 +141,10 @@ logic_result full_logic::try_full_logic(const bool force)
 
 void full_logic::prepare_full_logic()
 {
+	num_areas_ = 0;
+	areas_.clear();
+	spec_grids_.clear();
+
 	std::multiset<conn_t, conn_lt> connection;
 	for (auto it = grid_.begin(); it != grid_.end(); ++it)
 		if (it->is_closed())
@@ -225,6 +230,8 @@ void full_logic::speculative_fork(fork_directive &&directive)
 			throw std::runtime_error("Internal error: should not check closed's neighbor");
 		if (b->is_mine())
 			throw std::runtime_error("Internal error: should not check mine's neighbor");
+		if (b->is_spec())
+			continue;
 		if (b->neighbor() < p || b->neighbor() > p + ait_sz + nub)
 			return;
 

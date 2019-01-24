@@ -111,12 +111,19 @@ std::ostream &operator<<(std::ostream &os, const blk_t &b)
 		else
 			os << static_cast<size_t>(b.neighbor());
 	}
-	else if (b.is_front())
+	else if (b.is_spec())
 	{
 		if (b.is_mine())
 			os << '#';
 		else
 			os << '*';
+	}
+	else if (b.is_front())
+	{
+		if (b.is_mine())
+			os << '+';
+		else
+			os << '-';
 	}
 	else
 	{

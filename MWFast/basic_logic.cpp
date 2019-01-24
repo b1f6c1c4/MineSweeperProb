@@ -17,22 +17,21 @@ logic_result basic_logic::try_basic_logic(blk_ref b, const bool aggressive) cons
 
 	if (config->strategy.logic & strategy_t::logic_method::passive)
 	{
-		if (!b->is_mine() && !b->is_spec() && b->neighbor() == 0)
+		if (!b->is_spec() && !b->is_mine() && b->neighbor() == 0)
 			for (auto bb : b.neighbors())
 				if (bb->is_closed())
 				{
-					if (bb->is_mine())
+					if (!b->is_spec() && bb->is_mine())
 						return logic_result::invalid;
 					bb->set_closed(false);
 					flag = true;
-					if (try_basic_logic(bb, aggressive) == logic_result::invalid)
-						return logic_result::invalid;
+					LOGIC(try_basic_logic(bb, aggressive));
 				}
 	}
 
 	if (config->strategy.logic & strategy_t::logic_method::single)
 	{
-		if (!b->is_mine())
+		if (!b->is_spec() && !b->is_mine())
 			LOGIC(try_single_logic(b, aggressive));
 
 		else if (aggressive)
@@ -65,11 +64,11 @@ logic_result basic_logic::try_single_logic(blk_ref b, const bool aggressive) con
 	if (b->is_closed())
 		throw std::runtime_error("Internal error: try single logic on a closed");
 
-	if (b->is_mine())
-		throw std::runtime_error("Internal error: try single logic on a mine");
-
 	if (b->is_spec())
 		return logic_result::clean;
+
+	if (b->is_mine())
+		throw std::runtime_error("Internal error: try single logic on a mine");
 
 	auto flag = false;
 

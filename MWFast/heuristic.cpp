@@ -2,6 +2,8 @@
 #include "binomial.h"
 #include <cmath>
 
+// #define EXTRA_VERBOSE
+
 heuristic_solver::heuristic_solver(const full_logic &logic)
 	: logic_(logic),
 	  gathered_mine_prob_(false),
@@ -88,27 +90,26 @@ void heuristic_solver::gather_mine_prob()
 
 	for (auto &v : h_mine_prob_)
 		v = 0;
-	/*
+
 	rep_t total = 0;
-	for (auto &gr : logic_.spec())
+	for (auto &gr : logic_.specs())
 	{
 		total += gr.second.repitition;
 
 		auto it = gr.first.begin();
-		auto itt = h_mine_prob_.begin();
-		for (; it != gr.first.end(); ++it, ++itt)
+		auto ait = logic_.areas().begin();
+		for (; it != gr.first.end(); ++it, ++ait)
 		{
-			if (!it->is_spec())
-				continue;
-			if (it->is_closed())
-				*itt += gr.second.probability * gr.second.repitition;
-			else if (it->is_mine())
-				*itt += gr.second.repitition;
+			auto prob = rep_t(*it);
+			prob /= ait->size();
+
+			for (auto b : *ait)
+				*h_mine_prob_(b.x(), b.y()) += prob * gr.second.repitition;
 		}
 	}
 
 	for (auto &v : h_mine_prob_)
-		v /= total;*/
+		v /= total;
 }
 
 void heuristic_solver::gather_neighbor_dist(const blk_refs &refs)
@@ -193,7 +194,7 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 	std::cerr << "Calculating SE on" << std::endl;
 	std::cerr << logic_.actual();
 #endif
-	/*
+
 	auto bgrid(logic_.actual());
 	grid_t<uint8_t> btmp(bgrid.width(), bgrid.height(), 0xff);
 	{
@@ -204,6 +205,7 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 			{
 				it->set_spec(true);
 				it->set_mine(false);
+				it->set_neighbor(0);
 				*itt = 0x00;
 			}
 	}
@@ -233,12 +235,12 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 			auto tmp(btmp);
 			*tmp(b.x(), b.y()) = 0xff;
 
-			for (auto &spec : logic.spec())
+			for (auto &gr : logic.specs())
 			{
-				cnt += spec.second.repitition;
-				auto it = spec.first.begin();
+				cnt += gr.second.repitition;
+				auto it = grid.begin();
 				auto itt = tmp.begin();
-				for (; it != spec.first.end(); ++it, ++itt)
+				for (; it != grid.end(); ++it, ++itt)
 					if (it->is_closed())
 						*itt = 0xff;
 					else if (it->is_mine())
@@ -275,5 +277,5 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		std::cerr << "total = " << total << std::endl << std::endl;
 		std::cerr << "prob = " << prob << " exp = " << exp << std::endl << std::endl;
 #endif
-	}*/
+	}
 }
