@@ -4,7 +4,7 @@
 #ifndef NDEBUG
 #include <iostream>
 #define CHECK_POINT do { \
-	std::cerr << actual_; \
+	std::cerr << *actual_; \
 	std::getchar(); \
 } while (false)
 #else
@@ -13,12 +13,12 @@
 
 game::game(const size_t w, const size_t h, const std::string &st)
 	: config(std::make_shared<logic_config>(strategy_t(st), false, -1, NAN)),
-	  actual_(w, h, blk_t::closed_simple(0)),
+	  actual_(std::make_shared<grid_t<blk_t>>(w, h, blk_t::closed_simple(0))),
 	  basic_solver_(config), full_solver_(nullptr), heuristic_filter_(nullptr) { }
 
 const grid_t<blk_t> &game::grid() const
 {
-	return actual_;
+	return *actual_;
 }
 
 void game::fill_fixed(size_t m, const bool buff)
@@ -26,8 +26,8 @@ void game::fill_fixed(size_t m, const bool buff)
 	config->is_fixed_mines = true;
 	config->total_mines = m;
 
-	const std::uniform_int_distribution<size_t> dx(0, actual_.width() - 1);
-	const std::uniform_int_distribution<size_t> dy(0, actual_.height() - 1);
+	const std::uniform_int_distribution<size_t> dx(0, actual_->width() - 1);
+	const std::uniform_int_distribution<size_t> dy(0, actual_->height() - 1);
 
 	while (m)
 	{
@@ -46,7 +46,7 @@ void game::fill_fixed(size_t m, const bool buff)
 					continue;
 		}
 
-		auto b = actual_(x, y);
+		auto b = (*actual_)(x, y);
 		if (b->is_mine())
 			continue;
 		initialize_mine(b);
@@ -61,7 +61,7 @@ void game::fill_prob(const double p, const bool buff)
 
 	const std::bernoulli_distribution d(p);
 
-	for (auto it = actual_.begin(); it != actual_.end(); ++it)
+	for (auto it = actual_->begin(); it != actual_->end(); ++it)
 	{
 		const auto x = it.x(), y = it.y();
 
@@ -85,7 +85,7 @@ void game::fill_prob(const double p, const bool buff)
 
 bool game::run()
 {
-	auto init = actual_(config->strategy.initial_x, config->strategy.initial_y);
+	auto init = (*actual_)(config->strategy.initial_x, config->strategy.initial_y);
 	if (init->is_closed())
 	{
 		if (!init->is_closed())
@@ -98,7 +98,7 @@ bool game::run()
 		force_logic(init);
 	}
 
-	if (basic_solver_.is_finished(actual_))
+	if (basic_solver_.is_finished(*actual_))
 		return true;
 
 	if (!config->strategy.heuristic_enabled)
@@ -112,7 +112,7 @@ bool game::run()
 		b->set_spec(true);
 		CHECK_POINT;
 		b->set_spec(false);
-		for (auto &bb : actual_)
+		for (auto &bb : *actual_)
 			bb.set_front(false);
 #endif
 
@@ -122,7 +122,7 @@ bool game::run()
 		b->set_closed(false);
 		force_logic(b);
 	}
-	while (!basic_solver_.is_finished(actual_));
+	while (!basic_solver_.is_finished(*actual_));
 
 	return true;
 }
@@ -138,7 +138,7 @@ blk_ref game::heuristic_select()
 	heuristic_filter_ = std::make_shared<heuristic_solver>(*full_solver_);
 
 	blk_refs closed;
-	for (auto it = actual_.begin(); it != actual_.end(); ++it)
+	for (auto it = actual_->begin(); it != actual_->end(); ++it)
 		if (it->is_closed())
 			closed.push_back(it);
 
@@ -174,7 +174,7 @@ blk_ref game::heuristic_select()
 	}
 
 #ifndef NDEBUG
-	for (auto &b : actual_)
+	for (auto &b : *actual_)
 		b.set_front(false);
 	for (auto b : closed)
 		b->set_front(true);

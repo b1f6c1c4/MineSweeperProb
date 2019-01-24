@@ -43,9 +43,9 @@ struct conn_lt
 class full_logic : protected basic_logic
 {
 public:
-	full_logic(grid_t<blk_t> &grid, std::shared_ptr<logic_config> config);
+	full_logic(std::shared_ptr<grid_t<blk_t>> grid, std::shared_ptr<logic_config> config);
 
-	full_logic fork(blk_const_ref b, uint8_t n) const;
+	full_logic speculative_fork(blk_const_ref b, uint8_t n) const;
 
 	logic_result try_full_logics(blk_ref pivot, bool spec = false);
 	logic_result try_full_logics(bool spec = false);
@@ -67,7 +67,7 @@ private:
 	void prepare_full_logic();
 	void speculative_fork(fork_directive &&directive);
 
-	grid_t<blk_t> &grid_;
+	std::shared_ptr<grid_t<blk_t>> grid_;
 	grid_t<blk_t> simp_grid_;
 	stats grid_st_;
 	grid_t<area*> member_;
@@ -75,6 +75,7 @@ private:
 	std::list<area> areas_;
 	size_t num_areas_;
 	std::vector<spec_t> spec_grids_;
+	bool is_speculative_;
 
 	void finalize(const area_it &ait);
 };

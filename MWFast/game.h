@@ -23,7 +23,7 @@ public:
 	std::shared_ptr<logic_config> config;
 private:
 
-	grid_t<blk_t> actual_;
+	std::shared_ptr<grid_t<blk_t>> actual_;
 
 	basic_logic basic_solver_;
 	std::shared_ptr<full_logic> full_solver_;

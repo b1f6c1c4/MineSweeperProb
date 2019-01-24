@@ -206,6 +206,13 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 
 	for (auto b : refs)
 	{
+		size_t lb = 0, ub = 0;
+		for (auto bb : b.neighbors())
+			if (bb->is_closed())
+				ub++;
+			else if (bb->is_mine())
+				lb++;
+
 		auto &prob = *h_zeros_prob_(b.x(), b.y());
 		auto &exp = *h_zeros_exp_(b.x(), b.y());
 
@@ -213,9 +220,9 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		exp = 0;
 
 		rep_t total = 0;
-		for (uint8_t n = 0; n <= 8; n++)
+		for (uint8_t n = lb; n <= ub; n++)
 		{
-			auto logic = logic_.fork(b, n);
+			auto logic = logic_.speculative_fork(b, n);
 			if (logic.try_full_logics(true) == logic_result::invalid)
 				continue;
 
@@ -226,9 +233,9 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 			for (auto &gr : logic.specs())
 			{
 				cnt += gr.second.repitition;
-				auto it = logic_.actual().begin();
+				auto it = logic.actual().begin();
 				auto itt = tmp.begin();
-				for (; it != logic_.actual().end(); ++it, ++itt)
+				for (; it != logic.actual().end(); ++it, ++itt)
 					if (it->is_closed())
 						*itt = 0xff;
 					else if (it->is_mine())

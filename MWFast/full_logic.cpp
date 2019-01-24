@@ -26,22 +26,24 @@ bool conn_lt::operator()(const conn_t &lhs, const conn_t &rhs) const
 	return lhs.hash < rhs.hash;
 }
 
-full_logic::full_logic(grid_t<blk_t> &grid, std::shared_ptr<logic_config> config)
+full_logic::full_logic(std::shared_ptr<grid_t<blk_t>> grid, std::shared_ptr<logic_config> config)
 	: basic_logic(config), grid_(grid),
-	  simp_grid_(grid.width(), grid.height(), 0),
-	  grid_st_{}, member_(grid.width(), grid.height(), nullptr),
-	  neighbors_(grid.width(), grid.height(), std::vector<area*>{}), num_areas_(0) { }
+	  simp_grid_(grid->width(), grid->height(), 0),
+	  grid_st_{}, member_(grid->width(), grid->height(), nullptr),
+	  neighbors_(grid->width(), grid->height(), std::vector<area*>{}), num_areas_(0),
+	  is_speculative_(false) { }
 
-full_logic full_logic::fork(blk_const_ref b, const uint8_t n) const
+full_logic full_logic::speculative_fork(blk_const_ref b, const uint8_t n) const
 {
-	auto grid(b.grid());
-	auto bb = grid(b.x(), b.y());
+	const auto grid = std::make_shared<grid_t<blk_t>>(b.grid());
+	auto bb = (*grid)(b.x(), b.y());
 	bb->set_mine(false);
 	bb->set_spec(false);
 	bb->set_closed(false);
 	bb->set_neighbor(n);
 
 	full_logic logic(grid, config);
+	logic.is_speculative_ = true;
 	logic.prepare_full_logic(); // TODO;
 	return logic;
 }
@@ -68,7 +70,7 @@ logic_result full_logic::try_full_logics(const bool spec)
 	do
 	{
 		flag = false;
-		LOGIC(try_basic_logics(grid_));
+		LOGIC(try_basic_logics(*grid_));
 
 		if (!(config->strategy.logic & strategy_t::logic_method::full))
 			return logic_result::clean;
@@ -82,7 +84,7 @@ logic_result full_logic::try_full_logics(const bool spec)
 
 const grid_t<blk_t> &full_logic::actual() const
 {
-	return grid_;
+	return *grid_;
 }
 
 const std::list<area> &full_logic::areas() const
@@ -136,7 +138,7 @@ logic_result full_logic::try_full_logic()
 			if (!(*it & 0xf0))
 				for (auto b : *ait)
 				{
-					if (!b->is_spec() && b->is_mine())
+					if (!is_speculative_ && b->is_mine())
 						return logic_result::invalid;
 					b->set_closed(false);
 					b->set_mine(false);
@@ -146,7 +148,7 @@ logic_result full_logic::try_full_logic()
 			if (!(*it & 0x0f))
 				for (auto b : *ait)
 				{
-					if (!b->is_spec() && !b->is_mine())
+					if (!is_speculative_ && !b->is_mine())
 						return logic_result::invalid;
 					b->set_closed(false);
 					b->set_mine(true);
@@ -160,16 +162,20 @@ logic_result full_logic::try_full_logic()
 
 void full_logic::prepare_full_logic()
 {
-	simp_grid_ = grid_;
+	simp_grid_ = *grid_;
 	for (auto it = simp_grid_.begin(); it != simp_grid_.end(); ++it)
 		if (it->is_closed())
 			it->set_spec(true), it->set_mine(false), it->set_neighbor(0);
 		else if (!it->is_mine())
 			for (auto b : it.neighbors())
 				if (!b->is_closed() && b->is_mine())
+				{
+					if (it->neighbor() == 0)
+						throw std::runtime_error("Internal error: no enough neighbor");
 					it->set_neighbor(it->neighbor() - 1);
+				}
 
-	grid_st_ = get_stats(grid_);
+	grid_st_ = get_stats(*grid_);
 	num_areas_ = 0;
 	areas_.clear();
 	spec_grids_.clear();
@@ -177,7 +183,7 @@ void full_logic::prepare_full_logic()
 		n.clear();
 
 	std::multiset<conn_t, conn_lt> connection;
-	for (auto it = grid_.begin(); it != grid_.end(); ++it)
+	for (auto it = grid_->begin(); it != grid_->end(); ++it)
 		if (it->is_closed())
 			connection.emplace(it);
 
@@ -263,8 +269,6 @@ void full_logic::speculative_fork(fork_directive &&directive)
 			throw std::runtime_error("Internal error: should not check mine's neighbor");
 		if (b->is_spec())
 			continue;
-		if (b->neighbor() < p || b->neighbor() > p + ait_sz + nub)
-			return;
 
 		if (b->neighbor() > p + tub + nub)
 			return;
