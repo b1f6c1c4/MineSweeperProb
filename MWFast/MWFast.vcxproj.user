@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments> -n 16 -m 16 -T 40 -b -v -s DL@[2,2]-Pure -N 5000</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments> -n 30 -m 16 -T 99 -v -s FL@[1,1]-NH -N 1000</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments> -n 9 -m 9 -T 10 -b -v -s FL@[2,2]-PSE -N 5000</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments> -n 30 -m 16 -T 99 -v -s FL@[1,1]-NH -N 1000</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

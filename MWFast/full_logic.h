@@ -3,6 +3,7 @@
 #include "basic_logic.h"
 #include <list>
 #include <set>
+#include "lp.h"
 
 struct enum_stat
 {
@@ -88,6 +89,8 @@ private:
 	bool is_speculative_;
 	size_t safe_count_;
 	rep_t rep_count_;
+
+	std::shared_ptr<lp<area, list_simple>> lp;
 
 	void finalize(const area_it &ait);
 	static area *emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs);

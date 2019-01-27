@@ -1,5 +1,6 @@
 #include "full_logic.h"
 #include "binomial.h"
+#include "lp.h"
 
 bool blk_ref_lt::operator()(const blk_ref &lhs, const blk_ref &rhs) const
 {
@@ -31,7 +32,7 @@ full_logic::full_logic(std::shared_ptr<grid_t<blk_t>> grid, std::shared_ptr<logi
 	  simp_grid_(grid->width(), grid->height(), 0),
 	  grid_st_{}, member_(grid->width(), grid->height(), nullptr),
 	  neighbors_(grid->width(), grid->height(), std::vector<area*>{}), num_areas_(0),
-	  is_speculative_(false), safe_count_(0), rep_count_(0) { }
+	  is_speculative_(false), safe_count_(0), rep_count_(0), lp(nullptr) { }
 
 area *full_logic::emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs)
 {
@@ -140,7 +141,8 @@ logic_result full_logic::try_full_logics(const bool spec)
 			return logic_result::clean;
 
 		prepare_full_logic();
-		LOGIC(try_full_logic());
+		if (num_areas_)
+			LOGIC(try_full_logic());
 	}
 	while (flag);
 	return logic_result::clean;
@@ -183,46 +185,53 @@ logic_result full_logic::try_full_logic()
 	rep_count_ = 0;
 
 #ifndef NDEBUG
-	if (num_areas_ > 25)
+	if (num_areas_ == 33)
 	{
 		std::cerr << "DEPTH = " << num_areas_ << std::endl;
 		std::cerr << *grid_;
 	}
 #endif
 
-	speculative_fork(fork_directive{
-		std::vector<size_t>{},
-		areas_.begin(),
-		1
-	});
-
-	if (spec_grids_.empty())
-		return logic_result::invalid;
-
-	auto flag = false;
-
-	std::vector<uint8_t> atmp(num_areas_, 0x00);
-	for (auto &gr : spec_grids_)
+	size_t cons = 0;
+	if (config->is_fixed_mines)
+		cons++;
 	{
-		rep_count_ += gr.second.repitition;
-		auto it = gr.first.begin();
-		auto itt = atmp.begin();
-		auto ait = areas_.begin();
-		for (; it != gr.first.end(); ++it, ++itt, ++ait)
-		{
-			if (*it > 0)
-				*itt |= 0xf0;
-			if (*it < ait->size())
-				*itt |= 0x0f;
-		}
+		auto it = simp_grid_.begin();
+		auto itn = neighbors_.begin();
+		for (; it != simp_grid_.end(); ++it, ++itn)
+			if (!it->is_closed() && !it->is_mine() && !itn->empty())
+				++cons;
 	}
 
+	if (lp == nullptr)
+		lp = make_lp(areas_, num_areas_, cons);
+	else
+		lp->reset(num_areas_, cons);
+
+	if (config->is_fixed_mines)
+		lp->constraint(grid_st_.rest_mines);
 	{
-		auto it = atmp.begin();
+		auto it = simp_grid_.begin();
+		auto itn = neighbors_.begin();
+		for (; it != simp_grid_.end(); ++it, ++itn)
+			if (!it->is_closed() && !it->is_mine() && !itn->empty())
+				lp->constraint(*itn, it->neighbor());
+	}
+
+	const auto result = lp->solve();
+	if (result == logic_result::invalid)
+		return logic_result::invalid;
+
+	if (result == logic_result::clean)
+		return logic_result::clean;
+
+	{
+		auto flag = false;
+		auto it = lp->get_result().begin();
 		auto ait = areas_.begin();
-		for (; it != atmp.end(); ++it, ++ait)
+		for (; ait != areas_.end(); ++it, ++ait)
 		{
-			if (!(*it & 0xf0))
+			if (it->second == 0)
 				for (auto b : *ait)
 				{
 					safe_count_++;
@@ -236,7 +245,7 @@ logic_result full_logic::try_full_logic()
 					flag |= true;
 				}
 
-			if (!(*it & 0x0f))
+			if (it->first == ait->size())
 				for (auto b : *ait)
 				{
 					if (is_speculative_)
