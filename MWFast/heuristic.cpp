@@ -2,7 +2,7 @@
 #include "binomial.h"
 #include <cmath>
 
-#define EXTRA_VERBOSE
+//#define EXTRA_VERBOSE
 
 #ifdef NDEBUG
 #undef EXTRA_VERBOSE
@@ -13,8 +13,9 @@ heuristic_solver::heuristic_solver(const full_logic &logic)
 	  gathered_mine_prob_est_(false),
 	  h_mine_prob_est_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_zeros_est_(false),
-	  h_zero_est_(logic.actual().width(), logic.actual().height(), 0),
-	  h_zeros_est_(logic.actual().width(), logic.actual().height(), 0),
+	  h_zero_prob_est_(logic.actual().width(), logic.actual().height(), 0),
+	  h_zeros_prob_est_(logic.actual().width(), logic.actual().height(), 0),
+	  h_zeros_exp_est_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_mine_prob_(false),
 	  h_mine_prob_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_neighbor_dist(false),
@@ -61,24 +62,6 @@ void maximize(blk_refs &next_closed, const blk_refs &closed, const grid_t<T> &va
 	}
 }
 
-void heuristic_solver::filter_lp(blk_refs &next_closed, const blk_refs &closed)
-{
-	gather_mine_prob_est();
-	minimize(next_closed, closed, h_mine_prob_est_);
-}
-
-void heuristic_solver::filter_ls(blk_refs &next_closed, const blk_refs &closed)
-{
-	gather_zeros_est(closed);
-	minimize(next_closed, closed, h_zeros_est_);
-}
-
-void heuristic_solver::filter_lz(blk_refs &next_closed, const blk_refs &closed)
-{
-	gather_zeros_est(closed);
-	minimize(next_closed, closed, h_zero_est_);
-}
-
 void heuristic_solver::filter_p(blk_refs &next_closed, const blk_refs &closed)
 {
 	gather_mine_prob();
@@ -107,6 +90,30 @@ void heuristic_solver::filter_z(blk_refs &next_closed, const blk_refs &closed)
 {
 	gather_neighbor_dist(closed);
 	maximize(next_closed, closed, h_zero_prob_);
+}
+
+void heuristic_solver::filter_lp(blk_refs &next_closed, const blk_refs &closed)
+{
+	gather_mine_prob_est();
+	minimize(next_closed, closed, h_mine_prob_est_);
+}
+
+void heuristic_solver::filter_ls(blk_refs &next_closed, const blk_refs &closed)
+{
+	gather_zeros_est(closed);
+	maximize(next_closed, closed, h_zeros_prob_est_);
+}
+
+void heuristic_solver::filter_le(blk_refs &next_closed, const blk_refs &closed)
+{
+	gather_zeros_est(closed);
+	maximize(next_closed, closed, h_zeros_exp_est_);
+}
+
+void heuristic_solver::filter_lz(blk_refs &next_closed, const blk_refs &closed)
+{
+	gather_zeros_est(closed);
+	maximize(next_closed, closed, h_zero_prob_est_);
 }
 
 void heuristic_solver::gather_mine_prob_est()
@@ -156,17 +163,20 @@ void heuristic_solver::gather_zeros_est(const blk_refs &refs)
 	{
 		size_t lb = 0, ub = 0;
 		for (auto bb : b.neighbors())
-			if (!bb->is_closed())
+			if (bb->is_closed())
 				ub++;
 			else if (bb->is_mine())
 				lb++, ub++;
 
-		auto &zero_est = *h_zero_est_(b.x(), b.y());
-		auto &zeros_est = *h_zeros_est_(b.x(), b.y());
+		auto &z_est = *h_zero_prob_est_(b.x(), b.y());
+		auto &p_est = *h_zeros_prob_est_(b.x(), b.y());
+		auto &e_est = *h_zeros_exp_est_(b.x(), b.y());
 
-		zero_est = 0;
-		zeros_est = 0;
+		z_est = 0;
+		p_est = 0;
+		e_est = 0;
 
+		rep_t total = 0;
 		auto logic = logic_.logic_fork_spec(b, static_cast<uint8_t>(lb));
 		for (auto n = lb; n <= ub; n++)
 		{
@@ -174,27 +184,41 @@ void heuristic_solver::gather_zeros_est(const blk_refs &refs)
 			if (logic.try_full_logics(true) == logic_result::invalid)
 				continue;
 
+			rep_t cnt = 1;
+			auto it = logic.areas().begin();
+			auto itt = logic.lp_solver().get_result().begin();
+			for (; it != logic.areas().end(); ++it, ++itt)
+			{
+				cnt *= (binomial(it->size(), itt->first) + binomial(it->size(), itt->second)) / 2;
+				cnt *= itt->second - itt->first + 1;
+			}
+
 			if (n == lb)
-				zero_est = 1;
+				z_est += cnt;
 
 			const auto safe = logic.safe_count();
 
 #ifdef EXTRA_VERBOSE
-			std::cerr << "p(g_" << b.x() << b.y() << "," << n << ")";
+			std::cerr << "total * p(g_" << b.x() << b.y() << "," << n << ")=" << cnt;
 			std::cerr << " safe=" << safe;
 			std::cerr << std::endl;
 #endif
 
-			if (safe != 0)
-				zeros_est = 1;
+			total += cnt;
 
-			if (zero_est && zeros_est)
-				break;
+			if (safe != 0)
+				p_est += cnt;
+			e_est += safe * cnt;
 		}
+
+		z_est /= total;
+		p_est /= total;
+		e_est /= total;
 
 #ifdef EXTRA_VERBOSE
 		std::cerr << "g_" << b.x() << b.y() << " lb=" << lb << " ub=" << ub << std::endl;
-		std::cerr << "zero = " << zero_est << " zeros = " << zeros_est << std::endl << std::endl;
+		std::cerr << "total = " << total << std::endl;
+		std::cerr << "zero = " << z_est << " prob = " << p_est << " exp = " << e_est << std::endl << std::endl;
 #endif
 	}
 }
@@ -343,7 +367,7 @@ void heuristic_solver::gather_safe_move(const blk_refs &refs)
 		rep_t total = 0;
 		auto logic = logic_.logic_fork_spec(b, static_cast<uint8_t>(lb));
 		for (auto n = lb; n <= ub; n++)
-		{	
+		{
 			logic.modify_spec(b, static_cast<uint8_t>(n));
 			if (logic.try_full_logics(true) == logic_result::invalid)
 				continue;

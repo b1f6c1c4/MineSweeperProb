@@ -168,6 +168,9 @@ blk_ref game::heuristic_select()
 		case strategy_t::heuristic_method::max_zeros_prob_est:
 			heuristic_filter_->filter_ls(next_closed, closed);
 			break;
+		case strategy_t::heuristic_method::max_zeros_exp_est:
+			heuristic_filter_->filter_le(next_closed, closed);
+			break;
 		case strategy_t::heuristic_method::max_zero_prob_est:
 			heuristic_filter_->filter_lz(next_closed, closed);
 			break;

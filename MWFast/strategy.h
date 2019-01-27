@@ -26,6 +26,7 @@ struct strategy_t
 		min_mine_prob_est = 0x11,
 		max_zero_prob_est = 0x12,
 		max_zeros_prob_est = 0x13,
+		max_zeros_exp_est = 0x14,
 		max_upper_bound_est = 0x17
 	};
 

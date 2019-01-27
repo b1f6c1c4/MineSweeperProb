@@ -224,8 +224,9 @@ logic_result full_logic::try_full_logic()
 		auto it = simp_grid_.begin();
 		auto itn = neighbors_.begin();
 		for (; it != simp_grid_.end(); ++it, ++itn)
-			if (!it->is_closed() && !it->is_mine() && !itn->empty())
-				lp_->constraint(*itn, it->neighbor());
+			if (!it->is_closed() && !it->is_mine())
+				if (!itn->empty())
+					lp_->constraint(*itn, it->neighbor());
 	}
 
 	const auto result = lp_->solve();

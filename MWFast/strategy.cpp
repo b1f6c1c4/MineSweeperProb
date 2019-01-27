@@ -101,6 +101,9 @@ bool read_strategy(const std::string &hsh, strategy_t &st)
 		case 's':
 			st.decision_tree.push_back(strategy_t::heuristic_method::max_zeros_prob_est);
 			break;
+		case 'e':
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_zeros_exp_est);
+			break;
 		case 'u':
 			st.decision_tree.push_back(strategy_t::heuristic_method::max_upper_bound_est);
 			break;
