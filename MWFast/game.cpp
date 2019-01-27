@@ -147,9 +147,6 @@ blk_ref game::heuristic_select()
 		blk_refs next_closed;
 		switch (m)
 		{
-		case strategy_t::heuristic_method::min_area_max_prob:
-			heuristic_filter_->filter_lp(next_closed, closed);
-			break;
 		case strategy_t::heuristic_method::min_mine_prob:
 			heuristic_filter_->filter_p(next_closed, closed);
 			break;
@@ -164,6 +161,15 @@ blk_ref game::heuristic_select()
 			break;
 		case strategy_t::heuristic_method::max_zero_prob:
 			heuristic_filter_->filter_z(next_closed, closed);
+			break;
+		case strategy_t::heuristic_method::min_mine_prob_est:
+			heuristic_filter_->filter_lp(next_closed, closed);
+			break;
+		case strategy_t::heuristic_method::max_zeros_prob_est:
+			heuristic_filter_->filter_ls(next_closed, closed);
+			break;
+		case strategy_t::heuristic_method::max_zero_prob_est:
+			heuristic_filter_->filter_lz(next_closed, closed);
 			break;
 		default:
 			throw std::runtime_error("Internal error: heuristic method not supported");

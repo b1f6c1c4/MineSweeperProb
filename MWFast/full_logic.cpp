@@ -183,6 +183,11 @@ const lp<area, list_simple> & full_logic::lp_solver() const
 	return *lp_;
 }
 
+const grid_t<area *> &full_logic::member() const
+{
+	return member_;
+}
+
 logic_result full_logic::try_full_logic()
 {
 	spec_grids_.clear();
@@ -190,7 +195,7 @@ logic_result full_logic::try_full_logic()
 	rep_count_ = 0;
 
 #ifndef NDEBUG
-	if (num_areas_ == 33)
+	if (num_areas_ > 30)
 	{
 		std::cerr << "DEPTH = " << num_areas_ << std::endl;
 		std::cerr << *grid_;

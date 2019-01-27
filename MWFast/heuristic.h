@@ -7,19 +7,26 @@ class heuristic_solver
 public:
 	explicit heuristic_solver(const full_logic &logic);
 
-	void filter_lp(blk_refs &next_closed, const blk_refs &closed);
 	void filter_p(blk_refs &next_closed, const blk_refs &closed);
 	void filter_s(blk_refs &next_closed, const blk_refs &closed);
 	void filter_e(blk_refs &next_closed, const blk_refs &closed);
 	void filter_q(blk_refs &next_closed, const blk_refs &closed);
 	void filter_z(blk_refs &next_closed, const blk_refs &closed);
+	void filter_lp(blk_refs &next_closed, const blk_refs &closed);
+	void filter_ls(blk_refs &next_closed, const blk_refs &closed);
+	void filter_lz(blk_refs &next_closed, const blk_refs &closed);
 
 private:
 	const full_logic &logic_;
 
-	bool gathered_area_max_prob_;
-	grid_t<rep_t> h_area_max_prob_;
-	void gather_area_max_prob();
+	bool gathered_mine_prob_est_;
+	grid_t<rep_t> h_mine_prob_est_;
+	void gather_mine_prob_est();
+
+	bool gathered_zeros_est_;
+	grid_t<rep_t> h_zero_est_;
+	grid_t<rep_t> h_zeros_est_;
+	void gather_zeros_est(const blk_refs &refs);
 
 	bool gathered_mine_prob_;
 	grid_t<rep_t> h_mine_prob_;

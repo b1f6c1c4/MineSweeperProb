@@ -16,14 +16,17 @@ struct strategy_t
 
 	enum class heuristic_method
 	{
-		min_area_max_prob = 0x08,
 		min_mine_prob = 0x01,
 		max_zero_prob = 0x02,
 		max_zeros_prob = 0x03,
 		max_zeros_exp = 0x04,
 		max_entropy = 0x05,
 		min_frontier_dist = 0x06,
-		max_upper_bound = 0x07
+		max_upper_bound = 0x07,
+		min_mine_prob_est = 0x11,
+		max_zero_prob_est = 0x12,
+		max_zeros_prob_est = 0x13,
+		max_upper_bound_est = 0x17
 	};
 
     logic_method logic;

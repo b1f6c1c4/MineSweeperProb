@@ -66,6 +66,7 @@ public:
 	size_t safe_count() const;
 	rep_t rep_count() const;
 	const lp<area, list_simple> &lp_solver() const;
+	const grid_t<area*> &member() const;
 
 private:
 	struct fork_directive

@@ -116,7 +116,7 @@ int main(const int argc, char **argv)
 		{
 			game g(width, height, strategy);
 #ifndef NDEBUG
-			g.device = std::mt19937_64(114514 + i + 22);
+			g.device = std::mt19937_64(114514 + i);
 #else
 			g.device = properly_seeded_random_engine<std::mt19937_64>();
 #endif

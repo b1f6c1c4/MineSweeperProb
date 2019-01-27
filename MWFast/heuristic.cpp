@@ -10,8 +10,11 @@
 
 heuristic_solver::heuristic_solver(const full_logic &logic)
 	: logic_(logic),
-	  gathered_area_max_prob_(false),
-	  h_area_max_prob_(logic.actual().width(), logic.actual().height(), 0),
+	  gathered_mine_prob_est_(false),
+	  h_mine_prob_est_(logic.actual().width(), logic.actual().height(), 0),
+	  gathered_zeros_est_(false),
+	  h_zero_est_(logic.actual().width(), logic.actual().height(), 0),
+	  h_zeros_est_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_mine_prob_(false),
 	  h_mine_prob_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_neighbor_dist(false),
@@ -60,8 +63,20 @@ void maximize(blk_refs &next_closed, const blk_refs &closed, const grid_t<T> &va
 
 void heuristic_solver::filter_lp(blk_refs &next_closed, const blk_refs &closed)
 {
-	gather_area_max_prob();
-	minimize(next_closed, closed, h_area_max_prob_);
+	gather_mine_prob_est();
+	minimize(next_closed, closed, h_mine_prob_est_);
+}
+
+void heuristic_solver::filter_ls(blk_refs &next_closed, const blk_refs &closed)
+{
+	gather_zeros_est(closed);
+	minimize(next_closed, closed, h_zeros_est_);
+}
+
+void heuristic_solver::filter_lz(blk_refs &next_closed, const blk_refs &closed)
+{
+	gather_zeros_est(closed);
+	minimize(next_closed, closed, h_zero_est_);
 }
 
 void heuristic_solver::filter_p(blk_refs &next_closed, const blk_refs &closed)
@@ -94,11 +109,11 @@ void heuristic_solver::filter_z(blk_refs &next_closed, const blk_refs &closed)
 	maximize(next_closed, closed, h_zero_prob_);
 }
 
-void heuristic_solver::gather_area_max_prob()
+void heuristic_solver::gather_mine_prob_est()
 {
-	if (gathered_area_max_prob_)
+	if (gathered_mine_prob_est_)
 		return;
-	gathered_area_max_prob_ = true;
+	gathered_mine_prob_est_ = true;
 
 	auto &lp = logic_.lp_solver();
 	auto it = lp.get_result().begin();
@@ -109,7 +124,78 @@ void heuristic_solver::gather_area_max_prob()
 		prob /= ait->size();
 
 		for (auto b : *ait)
-			*h_area_max_prob_(b.x(), b.y()) += prob;
+			*h_mine_prob_est_(b.x(), b.y()) += prob;
+	}
+}
+
+void heuristic_solver::gather_zeros_est(const blk_refs &refs)
+{
+	if (gathered_zeros_est_)
+		return;
+	gathered_zeros_est_ = true;
+
+#ifndef NDEBUG
+	std::cerr << "Calculating sz on" << std::endl;
+	for (auto ref : refs)
+		ref->set_front(true);
+	std::cerr << logic_.actual();
+	for (auto ref : refs)
+		ref->set_front(false);
+#endif
+
+	grid_t<uint8_t> btmp(logic_.actual().width(), logic_.actual().height(), 0xff);
+	{
+		auto it = logic_.actual().begin();
+		auto itt = btmp.begin();
+		for (; it != logic_.actual().end(); ++it, ++itt)
+			if (it->is_closed())
+				*itt = 0x00;
+	}
+
+	for (auto b : refs)
+	{
+		size_t lb = 0, ub = 0;
+		for (auto bb : b.neighbors())
+			if (!bb->is_closed())
+				ub++;
+			else if (bb->is_mine())
+				lb++, ub++;
+
+		auto &zero_est = *h_zero_est_(b.x(), b.y());
+		auto &zeros_est = *h_zeros_est_(b.x(), b.y());
+
+		zero_est = 0;
+		zeros_est = 0;
+
+		auto logic = logic_.logic_fork_spec(b, static_cast<uint8_t>(lb));
+		for (auto n = lb; n <= ub; n++)
+		{
+			logic.modify_spec(b, static_cast<uint8_t>(n));
+			if (logic.try_full_logics(true) == logic_result::invalid)
+				continue;
+
+			if (n == lb)
+				zero_est = 1;
+
+			const auto safe = logic.safe_count();
+
+#ifdef EXTRA_VERBOSE
+			std::cerr << "p(g_" << b.x() << b.y() << "," << n << ")";
+			std::cerr << " safe=" << safe;
+			std::cerr << std::endl;
+#endif
+
+			if (safe != 0)
+				zeros_est = 1;
+
+			if (zero_est && zeros_est)
+				break;
+		}
+
+#ifdef EXTRA_VERBOSE
+		std::cerr << "g_" << b.x() << b.y() << " lb=" << lb << " ub=" << ub << std::endl;
+		std::cerr << "zero = " << zero_est << " zeros = " << zeros_est << std::endl << std::endl;
+#endif
 	}
 }
 

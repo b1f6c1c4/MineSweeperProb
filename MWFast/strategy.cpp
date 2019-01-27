@@ -71,9 +71,6 @@ bool read_strategy(const std::string &hsh, strategy_t &st)
 	{
 		switch (ch)
 		{
-		case 'p':
-			st.decision_tree.push_back(strategy_t::heuristic_method::min_area_max_prob);
-			break;
 		case 'P':
 			st.decision_tree.push_back(strategy_t::heuristic_method::min_mine_prob);
 			break;
@@ -94,6 +91,18 @@ bool read_strategy(const std::string &hsh, strategy_t &st)
 			break;
 		case 'U':
 			st.decision_tree.push_back(strategy_t::heuristic_method::max_upper_bound);
+			break;
+		case 'p':
+			st.decision_tree.push_back(strategy_t::heuristic_method::min_mine_prob_est);
+			break;
+		case 'z':
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_zero_prob_est);
+			break;
+		case 's':
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_zeros_prob_est);
+			break;
+		case 'u':
+			st.decision_tree.push_back(strategy_t::heuristic_method::max_upper_bound_est);
 			break;
 		default:
 			break;
