@@ -16,6 +16,7 @@ struct strategy_t
 
 	enum class heuristic_method
 	{
+		min_area_max_prob = 0x08,
 		min_mine_prob = 0x01,
 		max_zero_prob = 0x02,
 		max_zeros_prob = 0x03,

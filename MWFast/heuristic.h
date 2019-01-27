@@ -7,6 +7,7 @@ class heuristic_solver
 public:
 	explicit heuristic_solver(const full_logic &logic);
 
+	void filter_lp(blk_refs &next_closed, const blk_refs &closed);
 	void filter_p(blk_refs &next_closed, const blk_refs &closed);
 	void filter_s(blk_refs &next_closed, const blk_refs &closed);
 	void filter_e(blk_refs &next_closed, const blk_refs &closed);
@@ -15,6 +16,10 @@ public:
 
 private:
 	const full_logic &logic_;
+
+	bool gathered_area_max_prob_;
+	grid_t<rep_t> h_area_max_prob_;
+	void gather_area_max_prob();
 
 	bool gathered_mine_prob_;
 	grid_t<rep_t> h_mine_prob_;

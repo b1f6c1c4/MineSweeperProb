@@ -10,6 +10,8 @@
 
 heuristic_solver::heuristic_solver(const full_logic &logic)
 	: logic_(logic),
+	  gathered_area_max_prob_(false),
+	  h_area_max_prob_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_mine_prob_(false),
 	  h_mine_prob_(logic.actual().width(), logic.actual().height(), 0),
 	  gathered_neighbor_dist(false),
@@ -56,6 +58,12 @@ void maximize(blk_refs &next_closed, const blk_refs &closed, const grid_t<T> &va
 	}
 }
 
+void heuristic_solver::filter_lp(blk_refs &next_closed, const blk_refs &closed)
+{
+	gather_area_max_prob();
+	minimize(next_closed, closed, h_area_max_prob_);
+}
+
 void heuristic_solver::filter_p(blk_refs &next_closed, const blk_refs &closed)
 {
 	gather_mine_prob();
@@ -84,6 +92,25 @@ void heuristic_solver::filter_z(blk_refs &next_closed, const blk_refs &closed)
 {
 	gather_neighbor_dist(closed);
 	maximize(next_closed, closed, h_zero_prob_);
+}
+
+void heuristic_solver::gather_area_max_prob()
+{
+	if (gathered_area_max_prob_)
+		return;
+	gathered_area_max_prob_ = true;
+
+	auto &lp = logic_.lp_solver();
+	auto it = lp.get_result().begin();
+	auto ait = logic_.areas().begin();
+	for (; it != lp.get_result().end(); ++it, ++ait)
+	{
+		auto prob = rep_t(it->second);
+		prob /= ait->size();
+
+		for (auto b : *ait)
+			*h_area_max_prob_(b.x(), b.y()) += prob;
+	}
 }
 
 void heuristic_solver::gather_mine_prob()

@@ -32,7 +32,7 @@ full_logic::full_logic(std::shared_ptr<grid_t<blk_t>> grid, std::shared_ptr<logi
 	  simp_grid_(grid->width(), grid->height(), 0),
 	  grid_st_{}, member_(grid->width(), grid->height(), nullptr),
 	  neighbors_(grid->width(), grid->height(), std::vector<area*>{}), num_areas_(0),
-	  is_speculative_(false), safe_count_(0), rep_count_(0), lp(nullptr) { }
+	  is_speculative_(false), safe_count_(0), rep_count_(0), lp_(nullptr) { }
 
 area *full_logic::emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs)
 {
@@ -178,6 +178,11 @@ rep_t full_logic::rep_count() const
 	return rep_count_;
 }
 
+const lp<area, list_simple> & full_logic::lp_solver() const
+{
+	return *lp_;
+}
+
 logic_result full_logic::try_full_logic()
 {
 	spec_grids_.clear();
@@ -203,22 +208,22 @@ logic_result full_logic::try_full_logic()
 				++cons;
 	}
 
-	if (lp == nullptr)
-		lp = make_lp(areas_, num_areas_, cons);
+	if (lp_ == nullptr)
+		lp_ = make_lp(areas_, num_areas_, cons);
 	else
-		lp->reset(num_areas_, cons);
+		lp_->reset(num_areas_, cons);
 
 	if (config->is_fixed_mines)
-		lp->constraint(grid_st_.rest_mines);
+		lp_->constraint(grid_st_.rest_mines);
 	{
 		auto it = simp_grid_.begin();
 		auto itn = neighbors_.begin();
 		for (; it != simp_grid_.end(); ++it, ++itn)
 			if (!it->is_closed() && !it->is_mine() && !itn->empty())
-				lp->constraint(*itn, it->neighbor());
+				lp_->constraint(*itn, it->neighbor());
 	}
 
-	const auto result = lp->solve();
+	const auto result = lp_->solve();
 	if (result == logic_result::invalid)
 		return logic_result::invalid;
 
@@ -227,7 +232,7 @@ logic_result full_logic::try_full_logic()
 
 	{
 		auto flag = false;
-		auto it = lp->get_result().begin();
+		auto it = lp_->get_result().begin();
 		auto ait = areas_.begin();
 		for (; ait != areas_.end(); ++it, ++ait)
 		{

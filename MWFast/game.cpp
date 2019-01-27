@@ -147,6 +147,9 @@ blk_ref game::heuristic_select()
 		blk_refs next_closed;
 		switch (m)
 		{
+		case strategy_t::heuristic_method::min_area_max_prob:
+			heuristic_filter_->filter_lp(next_closed, closed);
+			break;
 		case strategy_t::heuristic_method::min_mine_prob:
 			heuristic_filter_->filter_p(next_closed, closed);
 			break;

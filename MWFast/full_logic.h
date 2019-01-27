@@ -65,6 +65,7 @@ public:
 	std::shared_ptr<logic_config> get_config() const;
 	size_t safe_count() const;
 	rep_t rep_count() const;
+	const lp<area, list_simple> &lp_solver() const;
 
 private:
 	struct fork_directive
@@ -90,7 +91,7 @@ private:
 	size_t safe_count_;
 	rep_t rep_count_;
 
-	std::shared_ptr<lp<area, list_simple>> lp;
+	std::shared_ptr<lp<area, list_simple>> lp_;
 
 	void finalize(const area_it &ait);
 	static area *emplace_fork(full_logic &logic, const area &a, const blk_const_refs &bs);
