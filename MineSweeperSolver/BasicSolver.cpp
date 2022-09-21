@@ -3,7 +3,7 @@
 #include "BinomialHelper.h"
 #include <map>
 
-#define ZEROQ(val) (abs(val) < 1E-3)
+#define ZEROQ(val) (std::abs(val) < 1E-4)
 
 #define M(x, y) matrix[(x) * height + (y)]
 
@@ -19,7 +19,7 @@ BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), m_State(SolvingState
     m_Matrix.emplace_back();
 }
 
-BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(Binomial(count, mines)), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(mines)
+BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(Binomial((int)count, mines)), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(mines)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
@@ -35,8 +35,7 @@ BasicSolver::BasicSolver(const BasicSolver &other) : CanOpenForSure(other.CanOpe
 
 BasicSolver::~BasicSolver()
 {
-    if (m_Pairs_Temp != nullptr)
-        delete[] m_Pairs_Temp;
+    delete[] m_Pairs_Temp;
 }
 
 BlockStatus BasicSolver::GetBlockStatus(Block block) const
@@ -88,9 +87,9 @@ void BasicSolver::AddRestrain(Block blk, bool isMine)
     }
     m_State &= SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
     if (m_Manager[blk] == BlockStatus::Blank && isMine)
-        THROW;
+        throw std::runtime_error("blank is not blank");
     if (m_Manager[blk] == BlockStatus::Mine && !isMine)
-        THROW;
+        throw std::runtime_error("mine is not mine");
 }
 
 void BasicSolver::AddRestrain(const BlockSet &set, int mines)
@@ -162,7 +161,7 @@ void BasicSolver::AddRestrain(const BlockSet &set, int mines)
             {
                 it.push_back(set[p]);
                 m_BlockSets[col].erase(m_BlockSets[col].begin() + q);
-                m_SetIDs[set[p++]] = m_BlockSets.size() - 1;
+                m_SetIDs[set[p++]] = (int)m_BlockSets.size() - 1;
             }
         }
 
@@ -173,7 +172,7 @@ void BasicSolver::AddRestrain(const BlockSet &set, int mines)
         }
         for (auto i = 0; i < m_Matrix[CNT(col)].size() - 1; ++i)
             if (NZ(m_Matrix[CNT(col)][i], SHF(col)))
-            SB(m_Matrix[CNT(m_BlockSets.size() - 1)][i], SHF(m_BlockSets.size() - 1));
+                SB(m_Matrix[CNT(m_BlockSets.size() - 1)][i], SHF(m_BlockSets.size() - 1));
         SB(m_Matrix[CNT(m_BlockSets.size() - 1)].back(), SHF(m_BlockSets.size() - 1));
     }
 
@@ -232,15 +231,15 @@ bool BasicSolver::Solve(SolvingState maxDepth, bool shortcut)
     for (auto col = 0; col < width - 1; ++col)
         for (auto row = 0; row < height; ++row)
             if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
-            M(col, row) = 1;
+                M(col, row) = 1;
             else
-            M(col, row) = 0;
+                M(col, row) = 0;
     for (auto row = 0; row < height; ++row)
-    M(m_BlockSets.size(), row) = m_MatrixAugment[row];
+        M(m_BlockSets.size(), row) = m_MatrixAugment[row];
     Gauss(matrix, width, height);
 
     if (!m_Minors.empty() &&
-        m_Minors.back() == m_BlockSets.size())
+            m_Minors.back() == m_BlockSets.size())
         m_Minors.pop_back();
     else
     {
@@ -283,7 +282,7 @@ void BasicSolver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &
 
 void BasicSolver::DropColumn(int col)
 {
-#ifdef _DEBUG
+#ifndef NDEBUG
     for (auto blk : m_BlockSets[col])
         ASSERT(m_SetIDs[blk] != col);
 #endif
@@ -300,12 +299,12 @@ void BasicSolver::DropColumn(int col)
         }
         for (auto j = 0; j < m_Matrix[CNT(last)].size(); ++j)
             if (NZ(m_Matrix[CNT(last)][j], SHF(last)))
-            SB(m_Matrix[CNT(col)][j], SHF(col));
+                SB(m_Matrix[CNT(col)][j], SHF(col));
             else
-            CB(m_Matrix[CNT(col)][j], SHF(col));
+                CB(m_Matrix[CNT(col)][j], SHF(col));
     }
     for (auto j = 0; j < m_Matrix[CNT(last)].size(); ++j)
-    CB(m_Matrix[CNT(last)][j], SHF(last));
+        CB(m_Matrix[CNT(last)][j], SHF(last));
     if (last % CONT_SIZE == 0)
         m_Matrix.pop_back();
 }
@@ -335,23 +334,23 @@ bool BasicSolver::ReduceBlockSet(int col)
     auto dMines = 0;
     auto &setN = m_Reduce_Temp;
     setN.clear();
-    for (auto it = m_BlockSets[col].begin(); it != m_BlockSets[col].end(); ++it)
+    for (int &it : m_BlockSets[col])
     {
-        switch (m_Manager[*it])
+        switch (m_Manager[it])
         {
-        case BlockStatus::Mine:
-            ++dMines;
-            m_SetIDs[*it] = -1;
-            break;
-        case BlockStatus::Blank:
-            m_SetIDs[*it] = -2;
-            break;
-        case BlockStatus::Unknown:
-            ASSERT(m_SetIDs[*it] == col);
-            setN.push_back(*it);
-            break;
-        default:
-            ASSERT(false);
+            case BlockStatus::Mine:
+                ++dMines;
+                m_SetIDs[it] = -1;
+                break;
+            case BlockStatus::Blank:
+                m_SetIDs[it] = -2;
+                break;
+            case BlockStatus::Unknown:
+                ASSERT(m_SetIDs[it] == col);
+                setN.push_back(it);
+                break;
+            default:
+                ASSERT(false);
         }
     }
     setN.swap(m_BlockSets[col]);
@@ -417,7 +416,7 @@ bool BasicSolver::ReduceRestrainMine(int row)
         for (auto j = 0; j < m_Matrix[CNT(col)].size(); ++j)
             if (NZ(m_Matrix[CNT(col)][j], SHF(col)))
             {
-                m_MatrixAugment[j] -= m_BlockSets[col].size();
+                m_MatrixAugment[j] -= (int)m_BlockSets[col].size();
                 sum[j] -= m_BlockSets[col].size();
                 ASSERT(m_MatrixAugment[j] >= 0);
             }
@@ -607,28 +606,28 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
     typedef std::pair<int, int> Iv;
 
     auto sum = [this](const std::vector<Container> &lst)-> Iv
+    {
+        Iv iv(0, 0);
+        for (auto cnt = 0; cnt < lst.size(); ++cnt)
         {
-            Iv iv(0, 0);
-            for (auto cnt = 0; cnt < lst.size(); ++cnt)
-            {
-                auto v = lst[cnt];
-                for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift , v >>= 1)
-                    if (NZ(v, 0))
-                        iv.second += m_BlockSets[cnt * CONT_SIZE + shift].size();
-                    else if (v == 0)
-                        break;
-            }
-            return iv;
-        };
+            auto v = lst[cnt];
+            for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift , v >>= 1)
+                if (NZ(v, 0))
+                    iv.second += (int)m_BlockSets[cnt * CONT_SIZE + shift].size();
+                else if (v == 0)
+                    break;
+        }
+        return iv;
+    };
 
     auto subs = [](Iv i1, Iv i2)-> Iv
-        {
-            return Iv(i1.first - i2.second, i1.second - i2.first);
-        };
+    {
+        return { i1.first - i2.second, i1.second - i2.first };
+    };
     auto ints = [](Iv i1, Iv i2)-> Iv
-        {
-            return Iv(MAX(i1.first, i2.first), MIN(i1.second, i2.second));
-        };
+    {
+        return { MAX(i1.first, i2.first), MIN(i1.second, i2.second) };
+    };
 
     auto ivAC = Iv(m_MatrixAugment[r1], m_MatrixAugment[r1]), ivBC = Iv(m_MatrixAugment[r2], m_MatrixAugment[r2]);
     auto ivA0 = sum(exceptA), ivB0 = sum(exceptB), ivC0 = sum(intersection);
@@ -641,50 +640,50 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
     ivC = ints(ivC, ints(subs(ivAC, ivA), subs(ivBC, ivB)));
 
     auto proc = [this](const std::vector<Container> &lst, const Iv &iv0, const Iv &iv)
-        {
-            if (lst.empty())
-                return;
-            if (iv0.second == iv.first)
-                for (auto cnt = 0; cnt < lst.size(); ++cnt)
-                {
-                    auto v = lst[cnt];
-                    for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift , v >>= 1)
-                        if (NZ(v, 0))
+    {
+        if (lst.empty())
+            return;
+        if (iv0.second == iv.first)
+            for (auto cnt = 0; cnt < lst.size(); ++cnt)
+            {
+                auto v = lst[cnt];
+                for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift , v >>= 1)
+                    if (NZ(v, 0))
+                    {
+                        for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
                         {
-                            for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
-                            {
-                                if (m_Manager[blk] == BlockStatus::Mine)
-                                    continue;
-                                ASSERT(m_Manager[blk] == BlockStatus::Unknown);
-                                m_Manager[blk] = BlockStatus::Mine;
-                                m_RestMines--;
-                                m_State = SolvingState::Stale;
-                            }
+                            if (m_Manager[blk] == BlockStatus::Mine)
+                                continue;
+                            ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+                            m_Manager[blk] = BlockStatus::Mine;
+                            m_RestMines--;
+                            m_State = SolvingState::Stale;
                         }
-                        else if (v == 0)
-                            break;
-                }
-            else if (iv0.first == iv.second)
-                for (auto cnt = 0; cnt < lst.size(); ++cnt)
-                {
-                    auto v = lst[cnt];
-                    for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift , v >>= 1)
-                        if (NZ(v, 0))
+                    }
+                    else if (v == 0)
+                        break;
+            }
+        else if (iv0.first == iv.second)
+            for (auto cnt = 0; cnt < lst.size(); ++cnt)
+            {
+                auto v = lst[cnt];
+                for (auto shift = 0; shift < CONT_WIDTH(lst, cnt); ++shift , v >>= 1)
+                    if (NZ(v, 0))
+                    {
+                        for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
                         {
-                            for (const auto &blk : m_BlockSets[cnt * CONT_SIZE + shift])
-                            {
-                                if (m_Manager[blk] == BlockStatus::Blank)
-                                    continue;
-                                ASSERT(m_Manager[blk] == BlockStatus::Unknown);
-                                m_Manager[blk] = BlockStatus::Blank;
-                                ++CanOpenForSure;
-                                m_State = SolvingState::Stale;
-                            }
+                            if (m_Manager[blk] == BlockStatus::Blank)
+                                continue;
+                            ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+                            m_Manager[blk] = BlockStatus::Blank;
+                            ++CanOpenForSure;
+                            m_State = SolvingState::Stale;
                         }
-                        else if (v == 0)
-                            break;
-                }
-        };
+                    }
+                    else if (v == 0)
+                        break;
+            }
+    };
 
     proc(exceptA, ivA0, ivA);
     proc(exceptB, ivB0, ivB);
@@ -701,7 +700,7 @@ void BasicSolver::Gauss(double *matrix, size_t width, size_t height)
     {
         int biasRow;
         for (biasRow = major; biasRow < height; ++biasRow)
-            if (abs(M(col, biasRow)) >= 1E-8)
+            if (std::abs(M(col, biasRow)) >= 1E-8)
                 break;
         if (biasRow >= height)
         {
@@ -717,7 +716,7 @@ void BasicSolver::Gauss(double *matrix, size_t width, size_t height)
         {
             if (row != biasRow)
                 vec[row] = -M(col, row) * theBiasInv;
-#ifdef _DEBUG
+#ifndef NDEBUG
             if (row == major)
                 M(col, row) = 1;
             else
@@ -731,9 +730,9 @@ void BasicSolver::Gauss(double *matrix, size_t width, size_t height)
                 if (!ZEROQ(bias))
                     for (auto row = 0; row < height; ++row)
                         if (row == major)
-                        M(co, row) *= theBiasInv;
+                            M(co, row) *= theBiasInv;
                         else
-                        M(co, row) += vec[row] * bias;
+                            M(co, row) += vec[row] * bias;
             }
         else
             for (auto co = col + 1; co < width; ++co)
@@ -741,15 +740,15 @@ void BasicSolver::Gauss(double *matrix, size_t width, size_t height)
                 auto swap = M(co, major);
                 auto bias = M(co, biasRow);
                 if (ZEROQ(bias))
-                M(co, major) = 0 , M(co, biasRow) = swap;
+                    M(co, major) = 0 , M(co, biasRow) = swap;
                 else
                     for (auto row = 0; row < height; ++row)
                         if (row == major)
-                        M(co, row) = bias * theBiasInv;
+                            M(co, row) = bias * theBiasInv;
                         else if (row == biasRow)
-                        M(co, row) = swap + vec[major] * bias;
+                            M(co, row) = swap + vec[major] * bias;
                         else
-                        M(co, row) += vec[row] * bias;
+                            M(co, row) += vec[row] * bias;
             }
         ++major;
     }
@@ -782,7 +781,7 @@ void BasicSolver::EnumerateSolutions(const double *matrix, size_t width, size_t 
         auto mainRow = 0;
         for (auto col = 0; col < n; ++col)
             if (minorID < m_Minors.size() &&
-                col == m_Minors[minorID])
+                    col == m_Minors[minorID])
             {
                 if (minorID >= m_NonZero_Temp.size())
                     m_NonZero_Temp.emplace_back();
@@ -803,7 +802,7 @@ void BasicSolver::EnumerateSolutions(const double *matrix, size_t width, size_t 
     }
 #define AGGR(val) \
     for (auto mainRow : m_NonZero_Temp[stack.size() - 1]) \
-        sums[mainRow] -= (val) * M(m_Minors[stack.size() - 1], mainRow)
+    sums[mainRow] -= (val) * M(m_Minors[stack.size() - 1], mainRow)
 
     auto &stack = m_Stack_Temp;
     stack.clear();
@@ -826,7 +825,7 @@ void BasicSolver::EnumerateSolutions(const double *matrix, size_t width, size_t 
                     }
                     auto val = static_cast<int>(v);
                     if (val < 0 ||
-                        val > cnts[mainRow])
+                            val > cnts[mainRow])
                     {
                         flag = false;
                         break;
@@ -876,11 +875,15 @@ void BasicSolver::ProcessSolutions()
     {
         for (auto row = 0; row < m_MatrixAugment.size(); ++row)
         {
+#ifndef NDEBUG
             auto v = 0;
+#endif
             for (auto col = 0; col < m_BlockSets.size(); ++col)
                 if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
                 {
+#ifndef NDEBUG
                     v += so.Dist[col];
+#endif
                     if (flags[col] == 0)
                         continue;
                     if (flags[col] & 1 && so.Dist[col] != 0)
@@ -892,7 +895,7 @@ void BasicSolver::ProcessSolutions()
         }
         so.States = double(1);
         for (auto i = 0; i < m_BlockSets.size(); ++i)
-            so.States *= Binomial(m_BlockSets[i].size(), so.Dist[i]);
+            so.States *= Binomial((int)m_BlockSets[i].size(), so.Dist[i]);
         m_TotalStates += so.States;
         for (auto i = 0; i < m_BlockSets.size(); ++i)
             exp[i] += so.States * so.Dist[i];
@@ -907,7 +910,7 @@ void BasicSolver::ProcessSolutions()
 
     for (auto i = 0; i < m_BlockSets.size(); ++i)
     {
-        auto prod = m_TotalStates * m_BlockSets[i].size();
+        auto prod = m_TotalStates * (double)m_BlockSets[i].size();
         if (flags[i] & 1)
         {
             for (auto &blk : m_BlockSets[i])
@@ -938,7 +941,7 @@ void BasicSolver::ProcessSolutions()
 }
 
 
-#ifdef _DEBUG
+#ifndef NDEBUG
 void BasicSolver::CheckForConsistency(bool complete)
 {
     if (m_Matrix.empty())
@@ -950,7 +953,7 @@ void BasicSolver::CheckForConsistency(bool complete)
             auto v = m_Matrix[cnt][i];
             for (auto shift = 0; shift < (cnt == m_Matrix.size() - 1 ? SHF(m_BlockSets.size()) : CONT_SIZE); ++shift, v >>= 1)
                 if (NZ(v, 0))
-                    sum[i] += m_BlockSets[cnt * CONT_SIZE + shift].size();
+                    sum[i] += (int)m_BlockSets[cnt * CONT_SIZE + shift].size();
                 else if (v == 0)
                     break;
         }

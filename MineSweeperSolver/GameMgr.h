@@ -21,7 +21,7 @@ class
     GameMgr
 {
 public:
-    GameMgr(int width, int height, int totalMines, const Strategy &strategy, bool allowWrongGuess = false);
+    GameMgr(int width, int height, int totalMines, Strategy strategy, bool allowWrongGuess = false);
     explicit GameMgr(std::istream &sr);
     ~GameMgr();
 

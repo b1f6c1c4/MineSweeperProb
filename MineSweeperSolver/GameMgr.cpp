@@ -3,8 +3,9 @@
 #include "BinomialHelper.h"
 #include "Drainer.h"
 #include <iostream>
+#include <utility>
 
-GameMgr::GameMgr(int width, int height, int totalMines, const Strategy &strategy, bool allowWrongGuess) : BasicStrategy(strategy), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
         m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
@@ -259,7 +260,7 @@ void Largest(BlockSet &bests, std::function<double(int)> fun)
             bestVal = p;
             newBests.clear();
         }
-        if (bestVal - abs(bestVal) * 1E-8 <= p)
+        if (bestVal - std::abs(bestVal) * 1E-8 <= p)
             newBests.push_back(bests[i]);
     }
     newBests.swap(bests);
@@ -274,22 +275,22 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Preferred.clear();
 
     m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
-#ifdef _DEBUG
+#ifndef NDEBUG
     if (m_Solver->GetTotalStates() == 0)
-        THROW;
+        throw std::runtime_error("total states = 0");
 #endif
 
-#ifdef _DEBUG
+#ifndef NDEBUG
     for (auto i = 0; i < m_Blocks.size(); ++i)
         switch (m_Solver->GetBlockStatus(i))
         {
-        case BlockStatus::Mine: 
+        case BlockStatus::Mine:
             if (!m_Blocks[i].IsMine)
-                THROW;
+                throw std::runtime_error("mine is not mine");
             break;
         case BlockStatus::Blank:
             if (m_Blocks[i].IsMine)
-                THROW;
+                throw std::runtime_error("blank is not blank");
             break;
         case BlockStatus::Unknown:
         default: 
@@ -306,11 +307,11 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         ASSERT(!m_Best.empty());
         return;
     }
-#ifdef _DEBUG
+#ifndef NDEBUG
 	if (shortcut)
 		for (auto i = 0; i < m_Blocks.size(); ++i)
 			if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-				THROW;
+                throw std::runtime_error("not open but blank");
 #endif
 
     if (!BasicStrategy.HeuristicEnabled ||
@@ -405,17 +406,17 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
     if (m_Solver->CanOpenForSure == 0)
         m_Solver->Solve(maxDepth, true);
     if (m_Solver->CanOpenForSure == 0)
-#ifdef _DEBUG
+#ifndef NDEBUG
     {
         for (auto i = 0; i < m_Blocks.size(); ++i)
             if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-                THROW;
+                throw std::runtime_error("not open but blank");
         return false;
     }
 #else
         return false;
 #endif
-#ifdef _DEBUG
+#ifndef NDEBUG
     auto flag = false;
 #endif
     for (auto i = 0; i < m_Blocks.size(); ++i)
@@ -423,7 +424,7 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
         if (m_Blocks[i].IsOpen || m_Solver->GetBlockStatus(i) != BlockStatus::Blank)
             continue;
         OpenBlock(i);
-#ifdef _DEBUG
+#ifndef NDEBUG
         flag = true;
 #endif
         if (m_Started)
@@ -471,7 +472,7 @@ void GameMgr::Automatic()
         st = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
         break;
     default:
-        THROW;
+        throw std::runtime_error("logic not supported");
     }
 
     if (!m_Settled)

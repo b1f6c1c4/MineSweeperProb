@@ -133,7 +133,7 @@ private:
     void EnumerateSolutions(const double *matrix, size_t width, size_t height);
     void ProcessSolutions();
 
-#ifdef _DEBUG
+#ifndef NDEBUG
     void CheckForConsistency(bool complete);
 #endif
 };
