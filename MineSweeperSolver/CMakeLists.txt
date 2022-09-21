@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.21)
 project(MineSweeperSolver)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 
+add_compile_options(-march=native)
 add_compile_options(-Wall -Wextra -Werror)
 add_compile_options(-Wno-parentheses)
 add_compile_options(-Wno-missing-field-initializers)
