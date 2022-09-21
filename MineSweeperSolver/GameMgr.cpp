@@ -276,7 +276,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
 #ifdef _DEBUG
     if (m_Solver->GetTotalStates() == 0)
-        throw;
+        THROW;
 #endif
 
 #ifdef _DEBUG
@@ -285,11 +285,11 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         {
         case BlockStatus::Mine: 
             if (!m_Blocks[i].IsMine)
-                throw;
+                THROW;
             break;
         case BlockStatus::Blank:
             if (m_Blocks[i].IsMine)
-                throw;
+                THROW;
             break;
         case BlockStatus::Unknown:
         default: 
@@ -310,7 +310,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 	if (shortcut)
 		for (auto i = 0; i < m_Blocks.size(); ++i)
 			if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-				throw;
+				THROW;
 #endif
 
     if (!BasicStrategy.HeuristicEnabled ||
@@ -409,7 +409,7 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
     {
         for (auto i = 0; i < m_Blocks.size(); ++i)
             if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
-                throw;
+                THROW;
         return false;
     }
 #else
@@ -471,7 +471,7 @@ void GameMgr::Automatic()
         st = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
         break;
     default:
-        throw;
+        THROW;
     }
 
     if (!m_Settled)

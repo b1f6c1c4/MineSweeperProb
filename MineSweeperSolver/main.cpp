@@ -1,7 +1,6 @@
 #include <csignal>
 #include <iostream>
 #include <set>
-#include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -132,11 +131,27 @@ finish:
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
+    if (argc != 2 && argc != 3) {
         std::cout << "Usage: " << argv[0]
-                  << R"( [PSDF]L(@\[<I>,<J>\])?-(NH|Pure|[PZSEQFU]+)(-D<D>)?-<W>-<H>-T<M>-(SFAR|SNR) <number>)"
+                  << R"( [PSDF]L(@\[<I>,<J>\])?-(NH|Pure|[PZSEQFU]+)(-D<D>)?-<W>-<H>-T<M>-(SFAR|SNR) [<number>])"
                   << std::endl;
         return 2;
+    }
+
+    auto cfg = parse(argv[1]);
+    cache(cfg);
+
+    if (argc == 2) {
+        SeedEngine();
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "EndlessLoop"
+        while (true) {
+            auto res = run(cfg);
+            std::cout << (res ? 'S' : 'F');
+            std::flush(std::cout);
+        }
+#pragma clang diagnostic pop
     }
 
     auto total_num = std::atol(argv[2]);
@@ -154,9 +169,6 @@ int main(int argc, char *argv[]) {
                   << errored << " errored, "
                   << timeout << " timeout\r";
     };
-
-    auto cfg = parse(argv[1]);
-    cache(cfg);
 
     // Process Hierarchy:
     //

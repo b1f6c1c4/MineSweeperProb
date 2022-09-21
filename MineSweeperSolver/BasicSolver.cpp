@@ -88,9 +88,9 @@ void BasicSolver::AddRestrain(Block blk, bool isMine)
     }
     m_State &= SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
     if (m_Manager[blk] == BlockStatus::Blank && isMine)
-        throw;
+        THROW;
     if (m_Manager[blk] == BlockStatus::Mine && !isMine)
-        throw;
+        THROW;
 }
 
 void BasicSolver::AddRestrain(const BlockSet &set, int mines)
