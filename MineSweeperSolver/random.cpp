@@ -13,10 +13,14 @@ auto ProperlySeededRandomEngine() -> typename std::enable_if<!!N, T>::type
     return seededEngine;
 }
 
-static std::mt19937_64 m_random = ProperlySeededRandomEngine<std::mt19937_64>();
+static std::mt19937_64 *m_random = nullptr;
+
+void SeedEngine() {
+    m_random = new std::mt19937_64{ ProperlySeededRandomEngine<std::mt19937_64>() };
+}
 
 int RandomInteger(int maxExclusive)
 {
     std::uniform_int_distribution<int> dist(0, maxExclusive - 1);
-    return dist(m_random);
+    return dist(*m_random);
 }
