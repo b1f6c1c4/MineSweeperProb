@@ -11,12 +11,12 @@
 #include "facade.hpp"
 
 NLOHMANN_JSON_SERIALIZE_ENUM(LogicMethod, {
-    {LogicMethod::Passive, "PL"},
-    {LogicMethod::Single, "SL"},
-    {LogicMethod::SingleExtended, "SLE"},
-    {LogicMethod::Double, "DL"},
-    {LogicMethod::DoubleExtended, "DLE"},
-    {LogicMethod::Full, "FL"},
+    { LogicMethod::Passive, "PL" },
+    { LogicMethod::Single, "SL" },
+    { LogicMethod::SingleExtended, "SLE" },
+    { LogicMethod::Double, "DL" },
+    { LogicMethod::DoubleExtended, "DLE" },
+    { LogicMethod::Full, "FL" },
 })
 
 std::string to_string(const std::vector<HeuristicMethod> &dt) {
@@ -76,7 +76,7 @@ void sig_handler(int signal) {
 }
 
 void sig_empty(int signal) {
-    (void)signal;
+    (void) signal;
 }
 
 [[noreturn]] void worker_entry(int fd[2], const Configuration &cfg) {
@@ -103,7 +103,7 @@ void sig_empty(int signal) {
     }
 }
 
-[[noreturn]] void monitor_entry(int fd[2], const Configuration &cfg) {
+[[noreturn]] void monitor_entry(int fd[2], const Configuration &cfg, size_t n) {
     close(fd[0]);
 
     struct sigaction sa = {};
@@ -116,7 +116,6 @@ void sig_empty(int signal) {
 
     // spawn workers
     std::set<pid_t> workers;
-    auto n = get_nprocs();
     for (auto i = 0; i < n; i++)
         if (auto p = fork(); !p)
             worker_entry(fd, cfg);
@@ -186,7 +185,7 @@ void sig_empty(int signal) {
     }
 
     // Exiting: send SIGTERM and then SIGKILL
-    for (auto p : workers)
+    for (auto p: workers)
         if (kill(p, SIGKILL))
             if (errno != ESRCH)
                 perror("monitor/kill(3)");
@@ -207,15 +206,15 @@ void sig_empty(int signal) {
                 exit(3);
         }
     }
-finish:
+    finish:
     close(fd[1]);
     exit(0);
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2 && argc != 3) {
+    if (argc < 2 || argc > 4) {
         std::cout << "Usage: " << argv[0]
-                  << R"( [PSDF]L(@\[<I>,<J>\])?-(NH|Pure|[PZSEQFU]+)(-D<D>)?-<W>-<H>-T<M>-(SFAR|SNR) [<number>])"
+                  << R"( [PSDF]L(@\[<I>,<J>\])?-(NH|Pure|[PZSEQFU]+)(-D<D>)?-<W>-<H>-T<M>-(SFAR|SNR) [<number> [<nprocs>]])"
                   << std::endl;
         return 2;
     }
@@ -236,7 +235,11 @@ int main(int argc, char *argv[]) {
 #pragma clang diagnostic pop
     }
 
+#ifdef SLURM
+    const auto report_interval = 60; // s
+#else
     const auto report_interval = 5; // s
+#endif
 
     auto total_num = std::atol(argv[2]);
     auto old_received = 0l;
@@ -245,8 +248,9 @@ int main(int argc, char *argv[]) {
     auto errored = 0l;
     auto timeout = 0l;
     auto strange = 0l;
-    auto report = [&]{
-        std::cerr << received << "/" << total_num
+    auto report = [&] {
+        std::cerr << argv[1] << " "
+                  << received << "/" << total_num
                   << " (" << 100.0 * static_cast<double>(received) / static_cast<double>(total_num)
                   << "%): "
                   << succeeded << "/" << received
@@ -255,7 +259,12 @@ int main(int argc, char *argv[]) {
                   << errored << " E, "
                   << timeout << " T, "
                   << strange << " U, "
-                  << static_cast<double>(received - old_received) / report_interval << " OP/s\r";
+                  << static_cast<double>(received - old_received) / report_interval << " OP/s"
+#ifdef SLURM
+                  << "\n";
+#else
+                  << "\r";
+#endif
         old_received = received;
     };
 
@@ -273,10 +282,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    auto nprocs = argc < 4 ? get_nprocs() : std::atoi(argv[3]);
     if (!(g_monitor = fork()))
-        monitor_entry(fd, cfg);
+        monitor_entry(fd, cfg, nprocs);
     close(fd[1]);
-    std::cerr << "Main PID: " << getpid() << "  Monitor PID: " << g_monitor << "\n";
+    std::cerr << argv[1] << "  Main PID: " << getpid()<< "  Monitor PID: " << g_monitor
+            << " Num: " << total_num << "  CPUs: " << nprocs << "\n";
 
     struct sigaction sa = {};
     sa.sa_handler = &sig_handler;
@@ -331,7 +342,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-finish:;
+    finish:;
     timespec end_of_computation;
     clock_gettime(CLOCK_MONOTONIC, &end_of_computation);
 
@@ -353,7 +364,8 @@ finish:;
     if (!cfg.InitialPositionSpecified)
         j["strategy"]["initial"] = nullptr;
     else
-        j["strategy"]["initial"] = { { "x", cfg.Index % cfg.Width + 1 }, { "y", cfg.Index / cfg.Width + 1 } };
+        j["strategy"]["initial"] = { { "x", cfg.Index % cfg.Width + 1 },
+                                     { "y", cfg.Index / cfg.Width + 1 } };
     if (!cfg.HeuristicEnabled)
         j["strategy"]["heuristic"] = "Pure";
     else {
@@ -372,8 +384,9 @@ finish:;
     j["result"]["error"] = errored;
     j["result"]["timeout"] = timeout;
     j["result"]["strange"] = strange;
-    j["duration"] = static_cast<double>(end_of_computation.tv_sec - start_of_computation.tv_sec)
-            + static_cast<double>(end_of_computation.tv_nsec - start_of_computation.tv_nsec) * 1e-9;
-    j["speed"] = static_cast<double>(received) / j["duration"].get<double>();
+    j["exec"]["duration"] = static_cast<double>(end_of_computation.tv_sec - start_of_computation.tv_sec)
+                            + static_cast<double>(end_of_computation.tv_nsec - start_of_computation.tv_nsec) * 1e-9;
+    j["exec"]["cpu"] = nprocs;
+    j["exec"]["speed"] = static_cast<double>(received) / j["exec"]["duration"].get<double>() / nprocs;
     std::cout << j << std::endl;
 }
