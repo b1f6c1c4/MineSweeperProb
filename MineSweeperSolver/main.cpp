@@ -1,10 +1,11 @@
 #include <csignal>
+#include <ctime>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <set>
 #include <sys/sysinfo.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <nlohmann/json.hpp>
 
 #include "random.h"
 #include "facade.hpp"
@@ -54,9 +55,13 @@ std::string to_string(const std::vector<HeuristicMethod> &dt) {
 
 static pid_t g_monitor;
 static std::sig_atomic_t g_exiting = 0;
+static std::sig_atomic_t g_alarm = 0;
 
 void sig_handler(int signal) {
-    (void)signal;
+    if (signal == SIGALRM) {
+        g_alarm++;
+        return;
+    }
     switch (g_exiting++) {
         case 0:
             break;
@@ -231,7 +236,10 @@ int main(int argc, char *argv[]) {
 #pragma clang diagnostic pop
     }
 
+    const auto report_interval = 5; // s
+
     auto total_num = std::atol(argv[2]);
+    auto old_received = 0l;
     auto received = 0l;
     auto succeeded = 0l;
     auto errored = 0l;
@@ -246,7 +254,9 @@ int main(int argc, char *argv[]) {
                   << "%) P, "
                   << errored << " E, "
                   << timeout << " T, "
-                  << strange << " U\r";
+                  << strange << " U, "
+                  << static_cast<double>(received - old_received) / report_interval << " OP/s\r";
+        old_received = received;
     };
 
     // Process Hierarchy:
@@ -274,19 +284,33 @@ int main(int argc, char *argv[]) {
     sigaction(SIGINT, &sa, nullptr);
     sigaction(SIGQUIT, &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
+    sigaction(SIGALRM, &sa, nullptr);
+
+    timespec start_of_computation;
+    clock_gettime(CLOCK_MONOTONIC, &start_of_computation);
+
+    auto old_alarm = g_alarm;
+    alarm(report_interval);
 
     char buf[16384];
     while (received < total_num) {
         if (g_exiting)
-            break;
+            goto finish;
+        auto new_alarm = g_alarm;
+        if (new_alarm > old_alarm) {
+            report();
+            old_alarm = new_alarm;
+            alarm(report_interval);
+        }
         if (auto len = read(fd[0], buf, sizeof(buf)); len > 0) {
             for (auto i = 0z; i < len; i++)
                 switch (buf[i]) {
                     case 'S':
-                        succeeded++, received++;
-                        break;
+                        succeeded++;
+                        [[fallthrough]];
                     case 'F':
-                        received++;
+                        if (++received >= total_num)
+                            goto finish;
                         break;
                     case 'T':
                         timeout++;
@@ -298,7 +322,6 @@ int main(int argc, char *argv[]) {
                         strange++;
                         break;
                 }
-            report();
         } else if (len == 0) {
             std::cerr << "Warning: Pipe closed too soon\n";
             break;
@@ -307,6 +330,10 @@ int main(int argc, char *argv[]) {
             exit(3);
         }
     }
+
+finish:;
+    timespec end_of_computation;
+    clock_gettime(CLOCK_MONOTONIC, &end_of_computation);
 
     close(fd[0]);
     kill(g_monitor, SIGTERM);
@@ -345,5 +372,8 @@ int main(int argc, char *argv[]) {
     j["result"]["error"] = errored;
     j["result"]["timeout"] = timeout;
     j["result"]["strange"] = strange;
+    j["duration"] = static_cast<double>(end_of_computation.tv_sec - start_of_computation.tv_sec)
+            + static_cast<double>(end_of_computation.tv_nsec - start_of_computation.tv_nsec) * 1e-9;
+    j["speed"] = static_cast<double>(received) / j["duration"].get<double>();
     std::cout << j << std::endl;
 }
