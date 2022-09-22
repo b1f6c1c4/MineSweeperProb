@@ -15,6 +15,16 @@ add_compile_options(-Wno-sign-compare)
 set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
+include(FetchContent)
+
+set(JSON_MultipleHeaders OFF)
+FetchContent_Declare(json
+        GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
+        GIT_PROGRESS TRUE
+        GIT_SHALLOW TRUE
+        GIT_TAG v3.11.2)
+FetchContent_MakeAvailable(json)
+
 find_package(Boost 1.80.0 REQUIRED)
 
 add_executable(MineSweeperSolver
@@ -29,3 +39,4 @@ add_executable(MineSweeperSolver
         main.cpp)
 target_link_libraries(MineSweeperSolver PRIVATE boost_thread)
 target_link_libraries(MineSweeperSolver PRIVATE pthread)
+target_link_libraries(MineSweeperSolver PRIVATE nlohmann_json::nlohmann_json)

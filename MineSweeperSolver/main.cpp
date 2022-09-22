@@ -4,9 +4,53 @@
 #include <sys/sysinfo.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <nlohmann/json.hpp>
 
 #include "random.h"
 #include "facade.hpp"
+
+NLOHMANN_JSON_SERIALIZE_ENUM(LogicMethod, {
+    {LogicMethod::Passive, "PL"},
+    {LogicMethod::Single, "SL"},
+    {LogicMethod::SingleExtended, "SLE"},
+    {LogicMethod::Double, "DL"},
+    {LogicMethod::DoubleExtended, "DLE"},
+    {LogicMethod::Full, "FL"},
+})
+
+std::string to_string(const std::vector<HeuristicMethod> &dt) {
+    if (dt.empty())
+        return "NH";
+    std::string str;
+    for (auto m: dt)
+        switch (m) {
+            case HeuristicMethod::None:
+                str.push_back(' ');
+                break;
+            case HeuristicMethod::MinMineProb:
+                str.push_back('P');
+                break;
+            case HeuristicMethod::MaxZeroProb:
+                str.push_back('Z');
+                break;
+            case HeuristicMethod::MaxZerosProb:
+                str.push_back('S');
+                break;
+            case HeuristicMethod::MaxZerosExp:
+                str.push_back('E');
+                break;
+            case HeuristicMethod::MaxQuantityExp:
+                str.push_back('Q');
+                break;
+            case HeuristicMethod::MinFrontierDist:
+                str.push_back('F');
+                break;
+            case HeuristicMethod::MaxUpperBound:
+                str.push_back('U');
+                break;
+        }
+    return str;
+}
 
 static pid_t g_monitor;
 static std::sig_atomic_t g_exiting = 0;
@@ -233,7 +277,34 @@ int main(int argc, char *argv[]) {
         perror("main/waitpid(3)");
         exit(3);
     }
-    std::cout << argv[1] << "\n";
-    std::cout << received << "\n";
-    std::cout << succeeded << std::endl;
+
+    nlohmann::json j;
+    j["string"] = argv[1];
+    j["game"]["width"] = cfg.Width;
+    j["game"]["height"] = cfg.Height;
+    j["game"]["mines"] = cfg.TotalMines;
+    j["game"]["snr"] = cfg.IsSNR;
+    j["strategy"]["logic"] = cfg.Logic;
+    if (!cfg.InitialPositionSpecified)
+        j["strategy"]["initial"] = nullptr;
+    else
+        j["strategy"]["initial"] = { { "x", cfg.Index % cfg.Width + 1 }, { "y", cfg.Index / cfg.Width + 1 } };
+    if (!cfg.HeuristicEnabled)
+        j["strategy"]["heuristic"] = "Pure";
+    else {
+        j["strategy"]["heuristic"] = to_string(cfg.DecisionTree);
+    }
+    if (!cfg.ExhaustEnabled)
+        j["strategy"]["exhaust"] = 0;
+    else
+        j["strategy"]["exhaust"] = cfg.ExhaustCriterion;
+    if (!cfg.PruningEnabled)
+        j["strategy"]["pruning"] = 0;
+    else
+        j["strategy"]["pruning"] = cfg.PruningCriterion;
+    j["result"]["pass"] = succeeded;
+    j["result"]["fail"] = received - succeeded;
+    j["result"]["error"] = errored;
+    j["result"]["timeout"] = timeout;
+    std::cout << j << std::endl;
 }
