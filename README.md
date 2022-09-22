@@ -1,26 +1,125 @@
 # MineSweeperProb
 A deterministic Minesweeper solver
 
-# Projects
-## MineSweeperSolver
-A configurable core Minesweeper solver written in C++.
+## Build
 
-## MineSweeper
-An interactive UI written in C#, invoking the core solver using P/Invoke.
+```bash
+sudo pacman -S cmake ninja boost
+cmake -S MineSweeperSolver -B cmake-bulid-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-mnative' -G Ninja
+cmake --build cmake-build-release
+```
 
-## MineSweeperDemo
-A non-interactive demo for the core written in C++, invoking the core solver.
+## Winning Rate
 
-# Branches
-## double
-The solver implementation internally uses `double` to calculate. Thus, the grid size can not be too large. It's enough for the expert-level game (99 mines over a 30 * 16 grid) or smaller, but not the "super" - (720 mines over an 83 * 40 grid).
+<table>
+    <thead>
+        <tr>
+            <th>Board Size</th>
+            <th>Rule</th>
+            <th>Strategy</th>
+            <th>Rate</th>
+            <th>Cmd</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan=4>8x8<br>10 mines</td>
+            <td rowspan=2>SFAR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-8-8-T10-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-8-8-T10-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td rowspan=2>SNR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-8-8-T10-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-8-8-T10-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+    </tbody>
+    <tbody>
+        <tr>
+            <td rowspan=4>9x9<br>10 mines</td>
+            <td rowspan=2>SFAR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-9-9-T10-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-9-9-T10-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td rowspan=2>SNR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-9-9-T10-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-9-9-T10-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+    </tbody>
+    <tbody>
+        <tr>
+            <td rowspan=4>16x16<br>40 mines</td>
+            <td rowspan=2>SFAR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-16-16-T40-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-16-16-T40-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td rowspan=2>SNR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-16-16-T40-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-16-16-T40-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+    </tbody>
+    <tbody>
+        <tr>
+            <td rowspan=4>8x8<br>99 mines</td>
+            <td rowspan=2>SFAR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-30-16-T99-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-30-16-T99-SFAR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td rowspan=2>SNR</td>
+            <td>PSEQ</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-30-16-T99-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+        <tr>
+            <td>PSEQ-D256</td>
+            <td>TODO</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-30-16-T99-SNR 100000000</pre>Approx. takes 10 hours to run on an 8-core machine.</details></td>
+        </tr>
+    </tbody>
+</table>
 
-## master
-The solver implementation internally uses high-precision calculation. The scale limitation is the memory and time limitation. However, it leads to increased time consumption.
-
-# Strategies
-A strategy consists of three algorithms: an initial algorithm, a logical algorithm, and a conjectural algorithm. The initial algorithm is used to determine the first move. The logical algorithm is used to deduce *safe* blocks. The conjectural algorithm is used to making guesses when the logical algorithm fails.
-`struct Strategy` is where to the configure the solver. Let `InitialPositionSpecified = true` and assign a number to `Index` to specify the initial algorithm. Use `Logic` to specify the logical algorithm. Use `HeuristicEnabled` and `DecisionTree` to specify the conjectural algorithm. Moreover, enable `ExhaustEnabled` and choose appropriate `ExhaustCriterion` can bring about significant improvements in the success rate. However, time consumption blooms as well, which may be cut down by `PruningEnabled`, `PruningCriterion` and `PruningDecisionTree`.
-
-# Usage
-You may refer to `MineSweeperDemo` for how to invoke the solver in C++, and `MineSweeper` for that in C#.

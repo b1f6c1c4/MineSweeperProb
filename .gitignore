@@ -19,3 +19,6 @@ x64
 ipch
 *.opendb
 *~
+
+cmake-build-*
+.idea
