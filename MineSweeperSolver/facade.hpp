@@ -8,6 +8,8 @@ struct Configuration : Strategy // NOLINT(cppcoreguidelines-pro-type-member-init
     int Height;
 
     int TotalMines;
+
+    bool IsSNR;
 };
 
 Configuration parse(const char *hsh);

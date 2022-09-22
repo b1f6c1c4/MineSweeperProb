@@ -21,7 +21,7 @@ class
     GameMgr
 {
 public:
-    GameMgr(int width, int height, int totalMines, Strategy strategy, bool allowWrongGuess = false);
+    GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess = false);
     explicit GameMgr(std::istream &sr);
     ~GameMgr();
 
@@ -70,6 +70,7 @@ public:
 private:
     bool m_AllowWrongGuess;
     int m_TotalWidth, m_TotalHeight, m_TotalMines;
+    bool m_IsSNR;
     bool m_Settled, m_Started, m_Succeed;
     std::vector<BlockProperty> m_Blocks;
     std::vector<BlockSet> m_BlocksR;

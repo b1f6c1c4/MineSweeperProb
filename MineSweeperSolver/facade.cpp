@@ -128,11 +128,16 @@ Configuration parse(const char *hsh)
     NXT('-');
     NXT('S');
     ss >> ch;
-    if (ch == 'F')
+    if (ch == 'F') {
         NXT('A');
-    else if (ch != 'N')
+        NXT('R');
+        cfg.IsSNR = false;
+    } else if (ch == 'N') {
+        NXT('R');
+        cfg.IsSNR = true;
+    } else {
         FAIL;
-    NXT('R');
+    }
 
     if (st.InitialPositionSpecified)
         st.Index = (indexI - 1) + (indexJ - 1) * cfg.Width;
@@ -142,7 +147,7 @@ Configuration parse(const char *hsh)
 
 bool run(const Configuration &Config)
 {
-    GameMgr mgr(Config.Width, Config.Height, Config.TotalMines, Config, false);
+    GameMgr mgr(Config.Width, Config.Height, Config.TotalMines, Config.IsSNR, Config, false);
     mgr.Automatic();
     return mgr.GetSucceed();
 }

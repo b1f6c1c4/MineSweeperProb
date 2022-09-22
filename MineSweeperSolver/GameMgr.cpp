@@ -5,7 +5,7 @@
 #include <iostream>
 #include <utility>
 
-GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
         m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
@@ -39,7 +39,7 @@ GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy, bool 
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val));
     READ(m_AllowWrongGuess);
@@ -47,6 +47,7 @@ GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), 
     READ(m_TotalWidth);
     READ(m_TotalHeight);
     READ(m_TotalMines);
+    READ(m_IsSNR);
     READ(m_Settled);
     READ(m_Started);
     READ(m_ToOpen);
@@ -532,6 +533,7 @@ void GameMgr::Save(std::ostream &sw) const
     WRITE(m_TotalWidth);
     WRITE(m_TotalHeight);
     WRITE(m_TotalMines);
+    WRITE(m_IsSNR);
     WRITE(m_Settled);
     WRITE(m_Started);
     WRITE(m_ToOpen);
@@ -554,9 +556,15 @@ void GameMgr::SettleMines(int initID)
 {
     for (auto totalMines = m_TotalMines; totalMines > 0;)
     {
+again:
         auto id = RandomInteger(m_TotalWidth * m_TotalHeight);
         if (id == initID)
-            continue;
+            goto again;
+        if (m_IsSNR) {
+            for (auto &blk : m_BlocksR[initID])
+                if (id == blk)
+                    goto again;
+        }
         if (m_Blocks[id].IsMine)
             continue;
         m_Blocks[id].IsMine = true;
