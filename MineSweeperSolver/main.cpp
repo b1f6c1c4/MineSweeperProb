@@ -128,7 +128,42 @@ void sig_empty(int signal) {
         }
 
         // Verify if main process is still there
-        const char ch = pid > 0 ? 'Q' : 't';
+        char ch;
+        if (pid <= 0) {
+            ch = 't';
+        } else {
+            if (WIFSIGNALED(ws)) {
+                switch (WTERMSIG(ws)) {
+                    case SIGALRM: // timeout
+                        std::cerr << "\nWarning: Worker " << pid << " timeout\n";
+                        ch = 'T';
+                        break;
+                    case SIGSEGV: // error
+                        std::cerr << "\nWarning: Worker " << pid << " killed by SIGSEGV\n";
+                        ch = 'E';
+                        break;
+                    case SIGABRT: // error
+                        std::cerr << "\nWarning: Worker " << pid << " killed by SIGABRT\n";
+                        ch = 'E';
+                        break;
+                    default:
+                        std::cerr << "\nWarning: Worker " << pid << " killed by " << WTERMSIG(ws) << "\n";
+                        ch = 'U';
+                        break;
+                }
+            } else if (WIFEXITED(ws)) {
+                if (WEXITSTATUS(ws) != 0) {
+                    std::cerr << "\nWarning: Worker " << pid << " exited with " << WEXITSTATUS(ws) << "\n";
+                    ch = 'U';
+                } else {
+                    ch = 't';
+                }
+            } else {
+                std::cerr << "\nWarning: Worker " << pid << " wtf-ed\n";
+                ch = 'U';
+            }
+            workers.erase(pid);
+        }
         if (write(fd[1], &ch, 1) != 1) {
             if (errno == EPIPE)
                 break;
@@ -138,8 +173,6 @@ void sig_empty(int signal) {
 
         // replenish workers
         if (pid > 0) {
-            std::cerr << "\nWarning: Worker " << pid << " exited abnormally " << WEXITSTATUS(ws) << "\n";
-            workers.erase(pid);
             if (auto p = fork(); !p)
                 worker_entry(fd, cfg);
             else
@@ -203,15 +236,17 @@ int main(int argc, char *argv[]) {
     auto succeeded = 0l;
     auto errored = 0l;
     auto timeout = 0l;
+    auto strange = 0l;
     auto report = [&]{
         std::cerr << received << "/" << total_num
                   << " (" << 100.0 * static_cast<double>(received) / static_cast<double>(total_num)
-                  << "%) received, "
+                  << "%): "
                   << succeeded << "/" << received
                   << " (" << 100.0 * static_cast<double>(succeeded) / static_cast<double>(received)
-                  << "%) succeeded, "
-                  << errored << " errored, "
-                  << timeout << " timeout\r";
+                  << "%) P, "
+                  << errored << " E, "
+                  << timeout << " T, "
+                  << strange << " U\r";
     };
 
     // Process Hierarchy:
@@ -253,11 +288,14 @@ int main(int argc, char *argv[]) {
                     case 'F':
                         received++;
                         break;
+                    case 'T':
+                        timeout++;
+                        break;
                     case 'E':
                         errored++;
                         break;
-                    case 'Q':
-                        timeout++;
+                    case 'U':
+                        strange++;
                         break;
                 }
             report();
@@ -306,5 +344,6 @@ int main(int argc, char *argv[]) {
     j["result"]["fail"] = received - succeeded;
     j["result"]["error"] = errored;
     j["result"]["timeout"] = timeout;
+    j["result"]["strange"] = strange;
     std::cout << j << std::endl;
 }
