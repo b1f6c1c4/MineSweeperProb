@@ -139,7 +139,7 @@ void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet &bests)
 {
     if (!m_Mgr.BasicStrategy.PruningEnabled)
         return;
-#define LARGEST(exp) Largest(bests, std::function<double(Block)>([this, macro](Block blk) { return exp; } ))
+#define LARGEST(exp) Largest(bests, std::function<double(Block)>([macro](Block blk) { return exp; } ))
     if (macro->m_Solver->GetTotalStates() <= m_Mgr.BasicStrategy.ExhaustCriterion)
         return;
     for (auto heu : m_Mgr.BasicStrategy.PruningDecisionTree)
