@@ -1,61 +1,59 @@
 #!/usr/bin/node
 
-import * as readline from 'node:readline';
+import fs from 'node:fs';
 
-const rl = readline.createInterface({
-  input: process.stdin,
-});
+const dic = JSON.parse(fs.readFileSync(process.argv[2]));
 
-const dic = {};
-
-rl.on('line', (input) => {
-  const obj = JSON.parse(input);
-  if (!(obj.string in dic))
-    dic[obj.string] = [0,0,0];
-  dic[obj.string][0] += obj.result.pass;
-  dic[obj.string][1] += obj.result.pass + obj.result.fail;
-  dic[obj.string][2] += obj.exec.cpu * obj.exec.duration;
-});
-
-rl.on('close', () => {
-  for (const k in dic) {
-    if (dic[k][1] % 1e8)
-      console.error(`Warning: ${k} is ${dic[k][1]} not N*1e8`);
+for (const k in dic) {
+    const t = 1e8 * dic[k].speed / 8 / 60;
     dic[k] = {
-      r: Math.round(dic[k][0] / dic[k][1] * 1e8) / (1e8 / 100),
-      t: Math.round(dic[k][2] / dic[k][1] * 1e8 / 8 / 60),
+        r: dic[k].rate,
+        t: t >= 120 ? Math.round(t / 60) + ' hours' : Math.round(t) + ' minutes',
     };
-  }
+}
 
-  const g = (hsh) => dic[hsh] || { r: 'TODO', t: '???' };
+const g = (hsh) => dic[hsh] || { r: 'TODO', t: '???' };
 
-  const f = (c) => `
+const f = (c) => `
             <td rowspan=2>SFAR</td>
             <td>PSEQ</td>
             <td>${g(`FL@[1,1]-PSEQ-${c}-SFAR`).r}</td>
             <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-${c}-SFAR 100000000</pre>
-              Approx. takes ${g(`FL@[1,1]-PSEQ-${c}-SFAR`).t} min to run on an 8-core machine.</details></td>
+              Approx. takes ${g(`FL@[1,1]-PSEQ-${c}-SFAR`).t} to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td>PSEQ-D256</td>
             <td>${g(`FL@[1,1]-PSEQ-D256-${c}-SFAR`).r}</td>
             <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-${c}-SFAR 100000000</pre>
-              Approx. takes ${g(`FL@[1,1]-PSEQ-D256-${c}-SFAR`).t} min to run on an 8-core machine.</details></td>
+              Approx. takes ${g(`FL@[1,1]-PSEQ-D256-${c}-SFAR`).t} to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=2>SNR</td>
             <td>PSEQ</td>
             <td>${g(`FL@[3,3]-PSEQ-${c}-SNR`).r}</td>
             <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-${c}-SNR 100000000</pre>
-              Approx. takes ${g(`FL@[3,3]-PSEQ-${c}-SNR`).t} min to run on an 8-core machine.</details></td>
+              Approx. takes ${g(`FL@[3,3]-PSEQ-${c}-SNR`).t} to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td>PSEQ-D256</td>
             <td>${g(`FL@[3,3]-PSEQ-D256-${c}-SNR`).r}</td>
             <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-${c}-SNR 100000000</pre>
-              Approx. takes ${g(`FL@[3,3]-PSEQ-D256-${c}-SNR`).t} min to run on an 8-core machine.</details></td>`;
+              Approx. takes ${g(`FL@[3,3]-PSEQ-D256-${c}-SNR`).t} to run on an 8-core machine.</details></td>`;
 
-  console.log(`
+console.log(`
+# MineSweeperProb
+A deterministic Minesweeper solver
+
+## Build
+
+${'```'}bash
+sudo pacman -S cmake ninja boost
+cmake -S MineSweeperSolver -B cmake-bulid-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-mnative' -G Ninja
+cmake --build cmake-build-release
+${'```'}
+
+## Winning Rate
+
 <table>
     <thead>
         <tr>
@@ -82,4 +80,3 @@ rl.on('close', () => {
     </tbody>
 </table>
 `);
-});

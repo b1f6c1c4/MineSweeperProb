@@ -34,6 +34,13 @@ static auto offset_of(double v, int digits, int min) {
 std::string fmt_fixed(double lb, double cn, double ub) {
     static constexpr auto UNC_DIGITS = 2;
 
+    if (std::isinf(lb) || std::isnan(lb))
+        throw std::runtime_error{ "lb not finite" };
+    if (std::isinf(cn) || std::isnan(cn))
+        throw std::runtime_error{ "cn not finite" };
+    if (std::isinf(ub) || std::isnan(ub))
+        throw std::runtime_error{ "ub not finite" };
+
     if (lb > cn) lb = cn;
     if (ub < cn) ub = cn;
 

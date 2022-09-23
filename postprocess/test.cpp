@@ -30,6 +30,13 @@ go_bandit([]{
             it("margin", [] { AssertThat(fmt_fixed(-0, 0, 0.0001), Equals("0.00000+0.00010-0")); });
             it("signed_small", [] { AssertThat(fmt_fixed(-10, 0, 5.0), Equals("0.0+5.0-10")); });
             it("signed_large", [] { AssertThat(fmt_fixed(-0.010, 0, 1000), Equals("0.000+1000-0.010")); });
+            it("inf_upper", [] { AssertThrows(std::runtime_error, \
+                                    fmt_fixed(0, 0, std::numeric_limits<double>::infinity())); });
+            it("inf_center", [] { AssertThrows(std::runtime_error, fmt_fixed(0, std::numeric_limits<double>::infinity(), \
+                                    std::numeric_limits<double>::infinity())); });
+            it("inf_lower", [] { AssertThrows(std::runtime_error, fmt_fixed(std::numeric_limits<double>::infinity(), \
+                                    std::numeric_limits<double>::infinity(), \
+                                    std::numeric_limits<double>::infinity())); });
         });
     });
 });

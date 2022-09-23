@@ -4,12 +4,15 @@
 #include <map>
 #include <wstp.h>
 
+#include "fmt.hpp"
+
 using namespace std::string_literals;
 
 struct info_t {
     long pass, fail;
     double cost; // cpu-second
     double lb, cn, ub;
+    nlohmann::json config;
 };
 
 void to_json(nlohmann::json &j, const info_t &p) {
@@ -60,6 +63,7 @@ bis[{p_, f_}] := N@bi[p, p + f, 0.05];
         lb->second.pass += j["result"]["pass"].get<long>();
         lb->second.fail += j["result"]["fail"].get<long>();
         lb->second.cost += j["exec"]["duration"].get<double>() * j["exec"]["cpu"].get<int>();
+        lb->second.config = j["config"];
     }
 
     std::cerr << "Sending requests\n";
@@ -112,9 +116,10 @@ bis[{p_, f_}] := N@bi[p, p + f, 0.05];
                 goto again;
         }
         answer[k]["n"] = v.pass + v.fail;
-        answer[k]["rate"] = fmt_percent(v.lb, v.cn, v.ub);
+        answer[k]["rate"] = fmt_fixed(100 * v.lb, 100 * v.cn, 100 * v.ub) + "%";
         answer[k]["speed"] = v.cost / static_cast<double>(v.pass + v.fail);
         answer[k]["raw"] = v;
+        answer[k]["config"] = std::move(v.config);
     }
 
     WSDeinitialize(env);
