@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-/* <v> rounded at <digits> sig. figures, shift left s.t. [1, 10^(1-<min>) )
+/* <v> rounded at <digits> sig. figures, shift left into [1, 10^(1-<min>) )
  * Returns {number of left shift, v}
  * Anyway, (-inf, 0] -> 0, 0
  */
@@ -25,8 +25,6 @@ static auto offset_of(double v, int digits, int min) {
         v /= std::pow(10, digits - 1);
         while (v >= 10 && n > min)
             v /= 10, n--;
-        while (v < 1)
-            v *= 10, n++;
     }
     return std::make_pair(n, v);
 }
