@@ -14,7 +14,9 @@ for (const k in dic) {
 
 const g = (hsh) => dic[hsh] || { r: 'TODO', t: '???' };
 
-const f = (c) => `
+const breaking = (s) => s.replace(/(?=[+\u00b1])/, '<br>');
+
+const print_result = (c) => `
             <td rowspan=2>SFAR</td>
             <td>PSEQ</td>
             <td>${g(`FL@[1,1]-PSEQ-${c}-SFAR`).r}</td>
@@ -66,17 +68,72 @@ ${'```'}
     </thead>
     <tbody>
         <tr>
-            <td rowspan=4>8x8<br>10 mines</td>${f('8-8-T10')}
+            <td rowspan=4>8x8<br>10 mines</td>${print_result('8-8-T10')}
         </tr>
         <tr>
-            <td rowspan=4>9x9<br>10 mines</td>${f('9-9-T10')}
+            <td rowspan=4>9x9<br>10 mines</td>${print_result('9-9-T10')}
         </tr>
         <tr>
-            <td rowspan=4>16x16<br>40 mines</td>${f('16-16-T40')}
+            <td rowspan=4>16x16<br>40 mines</td>${print_result('16-16-T40')}
         </tr>
         <tr>
-            <td rowspan=4>30x16<br>99 mines</td>${f('30-16-T99')}
+            <td rowspan=4>30x16<br>99 mines</td>${print_result('30-16-T99')}
         </tr>
     </tbody>
 </table>
 `);
+
+const print_array = (c, w, h) => {
+    console.log(`
+<table>
+    <thead>
+        <tr>
+            <th></th>`);
+    for (let i = 1; i <= w; i++)
+        console.log(`            <td>${i}</td>`);
+    console.log(`        </tr>
+    </thead>
+    <tbody>`);
+    for (let j = 1; j <= h; j++) {
+        console.log(`        <tr>
+            <th>${j}</th>`);
+        for (let i = 1; i <= w; i++)
+            console.log(`            <td>${breaking(g(`FL@[${i},${j}]-PSEQ-${c}`).r)}
+            <details><pre>./MineSweeperSolver FL@[${i},${j}]-PSEQ-${c} 100000000</pre>
+              Approx. takes ${g(`FL@[${i},${j}]-PSEQ-${c}`).t} to run on an 8-core machine.</details></td>`);
+        console.log(`        </tr>`);
+    }
+    console.log(`    </tbody>
+</table>
+`);
+};
+
+console.log(`
+
+## Winning Rate by First Move
+
+`);
+
+console.log(`### 8x8, 10 mines`);
+console.log(`SFAR`);
+print_array('8-8-T10-SFAR', 8, 8);
+console.log(`SNR`);
+print_array('8-8-T10-SNR', 8, 8);
+
+console.log(`### 9x9, 10 mines`);
+console.log(`SFAR`);
+print_array('9-9-T10-SFAR', 9, 9);
+console.log(`SNR`);
+print_array('9-9-T10-SNR', 9, 9);
+
+console.log(`### 16x16, 40 mines`);
+console.log(`SFAR`);
+print_array('16-16-T40-SFAR', 8, 8);
+console.log(`SNR`);
+print_array('16-16-T40-SNR', 8, 8);
+
+console.log(`### 30x16, 99 mines`);
+console.log(`SFAR`);
+print_array('30-16-T99-SFAR', 15, 8);
+console.log(`SNR`);
+print_array('30-16-T99-SNR', 15, 8);
