@@ -235,11 +235,9 @@ int main(int argc, char *argv[]) {
 #pragma clang diagnostic pop
     }
 
-#ifdef SLURM
-    const auto report_interval = 60; // s
-#else
-    const auto report_interval = 5; // s
-#endif
+    const bool is_tty = isatty(STDERR_FILENO);
+
+    const auto report_interval = is_tty ? 5 : 60; // s
 
     auto total_num = std::atol(argv[2]);
     auto old_received = 0l;
@@ -260,11 +258,7 @@ int main(int argc, char *argv[]) {
                   << timeout << " T, "
                   << strange << " U, "
                   << static_cast<double>(received - old_received) / report_interval << " OP/s"
-#ifdef SLURM
-                  << "\n";
-#else
-                  << "\r";
-#endif
+                  << (is_tty ? "\r" : "\n");
         old_received = received;
     };
 
