@@ -140,7 +140,7 @@ Configuration parse(const char *hsh)
     }
 
     if (st.InitialPositionSpecified)
-        st.Index = (indexI - 1) + (indexJ - 1) * cfg.Width;
+        st.Index = (indexI - 1) + (indexJ - 1) * cfg.Height;
 
     return cfg;
 }
