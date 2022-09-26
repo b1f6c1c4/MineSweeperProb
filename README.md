@@ -127,9 +127,9 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>TODO</td>
+            <td>53.452±0.027%</td>
             <td><details><pre>./MineSweeperSolver FL@[4,4]-PSEQ-D256-30-16-T99-SNR 100000000</pre>
-              Approx. takes ??? to run on an 8-core machine.</details></td>
+              Approx. takes 846 hours to run on an 8-core machine.</details></td>
         </tr>
     </tbody>
 </table>
@@ -664,62 +664,62 @@ SFAR
             <td>71.5565<br>±0.0088%</td>
             <td>71.5888<br>±0.0088%</td>
             <td>71.6216<br>±0.0088%</td>
-            <td>TODO</td>
+            <td>71.6209<br>±0.0088%</td>
         </tr>
         <tr>
             <th>4</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>75.5765<br>±0.0084%</td>
+            <td>74.8762<br>±0.0085%</td>
+            <td>71.5986<br>±0.0088%</td>
+            <td>70.9022<br>±0.0089%</td>
+            <td>70.8374<br>±0.0089%</td>
+            <td>70.8591<br>±0.0089%</td>
+            <td>70.8546<br>±0.0089%</td>
+            <td>70.8593<br>±0.0089%</td>
         </tr>
         <tr>
             <th>5</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>75.4784<br>±0.0084%</td>
+            <td>74.8259<br>±0.0085%</td>
+            <td>71.5707<br>±0.0088%</td>
+            <td>70.8266<br>±0.0089%</td>
+            <td>70.7749<br>±0.0089%</td>
+            <td>70.7982<br>±0.0089%</td>
+            <td>70.7951<br>±0.0089%</td>
+            <td>70.8045<br>±0.0089%</td>
         </tr>
         <tr>
             <th>6</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>75.4959<br>±0.0084%</td>
+            <td>74.9077<br>±0.0085%</td>
+            <td>71.5804<br>±0.0088%</td>
+            <td>70.8446<br>±0.0089%</td>
+            <td>70.7929<br>±0.0089%</td>
+            <td>70.7817<br>±0.0089%</td>
+            <td>70.7857<br>±0.0089%</td>
+            <td>70.7904<br>±0.0089%</td>
         </tr>
         <tr>
             <th>7</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>75.4825<br>±0.0084%</td>
+            <td>74.9121<br>±0.0085%</td>
+            <td>71.6128<br>±0.0088%</td>
+            <td>70.8504<br>±0.0089%</td>
+            <td>70.7979<br>±0.0089%</td>
+            <td>70.7910<br>±0.0089%</td>
+            <td>70.7816<br>±0.0089%</td>
+            <td>70.7844<br>±0.0089%</td>
         </tr>
         <tr>
             <th>8</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>75.4812<br>±0.0084%</td>
+            <td>74.9171<br>±0.0085%</td>
+            <td>71.6201<br>±0.0088%</td>
+            <td>70.8670<br>±0.0089%</td>
+            <td>70.7956<br>±0.0089%</td>
+            <td>70.7854<br>±0.0089%</td>
+            <td>70.7816<br>±0.0089%</td>
+            <td>70.7809<br>±0.0089%</td>
         </tr>
     </tbody>
 </table>
@@ -860,146 +860,146 @@ SFAR
         <tr>
             <th>1</th>
             <td><strong>39.6123<br>±0.0096%</strong></td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>38.753<br>±0.030%</td>
+            <td>37.574<br>±0.030%</td>
+            <td>37.272<br>±0.030%</td>
+            <td>37.251<br>±0.030%</td>
+            <td>37.332<br>±0.030%</td>
+            <td>37.365<br>±0.030%</td>
+            <td>37.361<br>±0.030%</td>
+            <td>37.397<br>±0.030%</td>
+            <td>37.460<br>±0.030%</td>
+            <td>37.413<br>±0.030%</td>
+            <td>37.448<br>±0.030%</td>
+            <td>37.449<br>±0.030%</td>
+            <td>37.423<br>±0.030%</td>
+            <td>37.455<br>±0.030%</td>
         </tr>
         <tr>
             <th>2</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>38.738<br>±0.030%</td>
+            <td>38.054<br>±0.030%</td>
+            <td>38.161<br>±0.030%</td>
+            <td>38.043<br>±0.030%</td>
+            <td>37.956<br>±0.030%</td>
+            <td>38.093<br>±0.030%</td>
+            <td>38.078<br>±0.030%</td>
+            <td>38.107<br>±0.031%</td>
+            <td>38.126<br>±0.030%</td>
+            <td>38.153<br>±0.030%</td>
+            <td>38.129<br>±0.030%</td>
+            <td>38.145<br>±0.030%</td>
+            <td>38.157<br>±0.030%</td>
+            <td>38.171<br>±0.030%</td>
+            <td>38.172<br>±0.031%</td>
         </tr>
         <tr>
             <th>3</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>37.555<br>±0.030%</td>
+            <td>38.148<br>±0.030%</td>
+            <td>36.342<br>±0.030%</td>
+            <td>36.121<br>±0.030%</td>
+            <td>36.081<br>±0.030%</td>
+            <td>36.128<br>±0.030%</td>
+            <td>36.159<br>±0.030%</td>
+            <td>36.207<br>±0.030%</td>
+            <td>36.206<br>±0.030%</td>
+            <td>36.254<br>±0.030%</td>
+            <td>36.227<br>±0.030%</td>
+            <td>36.256<br>±0.030%</td>
+            <td>36.250<br>±0.030%</td>
+            <td>36.232<br>±0.030%</td>
+            <td>36.256<br>±0.030%</td>
         </tr>
         <tr>
             <th>4</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>37.258<br>±0.030%</td>
+            <td>38.012<br>±0.030%</td>
+            <td>36.100<br>±0.030%</td>
+            <td>35.888<br>±0.030%</td>
+            <td>35.812<br>±0.030%</td>
+            <td>35.881<br>±0.030%</td>
+            <td>35.867<br>±0.030%</td>
+            <td>35.899<br>±0.030%</td>
+            <td>35.903<br>±0.030%</td>
+            <td>35.913<br>±0.030%</td>
+            <td>35.918<br>±0.030%</td>
+            <td>35.938<br>±0.030%</td>
+            <td>35.966<br>±0.030%</td>
+            <td>35.940<br>±0.030%</td>
+            <td>35.910<br>±0.030%</td>
         </tr>
         <tr>
             <th>5</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>37.267<br>±0.030%</td>
+            <td>37.952<br>±0.030%</td>
+            <td>36.080<br>±0.030%</td>
+            <td>35.801<br>±0.030%</td>
+            <td>35.783<br>±0.030%</td>
+            <td>35.815<br>±0.030%</td>
+            <td>35.818<br>±0.030%</td>
+            <td>35.859<br>±0.030%</td>
+            <td>35.898<br>±0.030%</td>
+            <td>35.861<br>±0.030%</td>
+            <td>35.885<br>±0.030%</td>
+            <td>35.910<br>±0.030%</td>
+            <td>35.894<br>±0.030%</td>
+            <td>35.897<br>±0.030%</td>
+            <td>35.900<br>±0.030%</td>
         </tr>
         <tr>
             <th>6</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>37.309<br>±0.030%</td>
+            <td>38.048<br>±0.030%</td>
+            <td>36.102<br>±0.030%</td>
+            <td>35.838<br>±0.030%</td>
+            <td>35.800<br>±0.030%</td>
+            <td>35.837<br>±0.030%</td>
+            <td>35.836<br>±0.030%</td>
+            <td>35.856<br>±0.030%</td>
+            <td>35.872<br>±0.030%</td>
+            <td>35.901<br>±0.030%</td>
+            <td>35.881<br>±0.030%</td>
+            <td>35.896<br>±0.030%</td>
+            <td>35.901<br>±0.030%</td>
+            <td>35.912<br>±0.030%</td>
+            <td>35.917<br>±0.030%</td>
         </tr>
         <tr>
             <th>7</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>37.317<br>±0.030%</td>
+            <td>38.035<br>±0.030%</td>
+            <td>36.136<br>±0.030%</td>
+            <td>35.830<br>±0.030%</td>
+            <td>35.852<br>±0.030%</td>
+            <td>35.844<br>±0.030%</td>
+            <td>35.823<br>±0.030%</td>
+            <td>35.823<br>±0.030%</td>
+            <td>35.875<br>±0.030%</td>
+            <td>35.878<br>±0.030%</td>
+            <td>35.880<br>±0.030%</td>
+            <td>35.886<br>±0.030%</td>
+            <td>35.917<br>±0.030%</td>
+            <td>35.894<br>±0.030%</td>
+            <td>35.892<br>±0.030%</td>
         </tr>
         <tr>
             <th>8</th>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>37.317<br>±0.030%</td>
+            <td>38.066<br>±0.030%</td>
+            <td>36.164<br>±0.030%</td>
+            <td>35.864<br>±0.030%</td>
+            <td>35.818<br>±0.030%</td>
+            <td>35.845<br>±0.030%</td>
+            <td>35.842<br>±0.030%</td>
+            <td>35.882<br>±0.030%</td>
+            <td>35.901<br>±0.030%</td>
+            <td>35.871<br>±0.030%</td>
+            <td>35.869<br>±0.030%</td>
+            <td>35.884<br>±0.032%</td>
+            <td>35.897<br>±0.030%</td>
+            <td>35.893<br>±0.030%</td>
+            <td>35.887<br>±0.030%</td>
         </tr>
     </tbody>
 </table>
@@ -1035,15 +1035,15 @@ SNR
             <td>50.0923<br>±0.0098%</td>
             <td>50.3836<br>±0.0098%</td>
             <td>50.0144<br>±0.0098%</td>
+            <td>50.1361<br>±0.0098%</td>
+            <td>50.2154<br>±0.0099%</td>
+            <td>TODO</td>
+            <td>50.229<br>±0.010%</td>
+            <td>50.2545<br>±0.0099%</td>
+            <td>50.255<br>±0.010%</td>
             <td>TODO</td>
             <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>50.276<br>±0.010%</td>
             <td>TODO</td>
         </tr>
         <tr>
@@ -1061,7 +1061,7 @@ SNR
             <td>TODO</td>
             <td>TODO</td>
             <td>TODO</td>
-            <td>TODO</td>
+            <td>51.282<br>±0.010%</td>
             <td>TODO</td>
         </tr>
         <tr>
@@ -1095,7 +1095,7 @@ SNR
             <td>TODO</td>
             <td>52.0996<br>±0.0098%</td>
             <td>TODO</td>
-            <td>TODO</td>
+            <td>52.0869<br>±0.0099%</td>
             <td>TODO</td>
             <td>52.1024<br>±0.0098%</td>
             <td>TODO</td>
@@ -1141,8 +1141,8 @@ SNR
             <td>50.1871<br>±0.0057%</td>
             <td>51.2811<br>±0.0057%</td>
             <td>52.0332<br>±0.0057%</td>
-            <td>52.1444<br>±0.0069%</td>
-            <td>51.3992<br>±0.0069%</td>
+            <td>52.1450<br>±0.0057%</td>
+            <td>51.3985<br>±0.0063%</td>
             <td>51.4722<br>±0.0069%</td>
             <td>51.5044<br>±0.0069%</td>
             <td>51.4442<br>±0.0098%</td>
@@ -1162,7 +1162,7 @@ SNR
             <td>52.0685<br>±0.0098%</td>
             <td>51.317<br>±0.010%</td>
             <td>51.3864<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.4315<br>±0.0098%</td>
             <td>51.3558<br>±0.0098%</td>
             <td>TODO</td>
             <td>51.3716<br>±0.0069%</td>
