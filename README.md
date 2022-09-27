@@ -46,9 +46,9 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>90.3443±0.0099%</td>
+            <td>90.3411±0.0082%</td>
             <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-8-8-T10-SNR 100000000</pre>
-              Approx. takes 333 hours to run on an 8-core machine.</details></td>
+              Approx. takes 283 hours to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=4>9x9<br>10 mines</td>
@@ -100,9 +100,9 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>89.0786±0.0088%</td>
+            <td>89.0796±0.0086%</td>
             <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-16-16-T40-SNR 100000000</pre>
-              Approx. takes 158 hours to run on an 8-core machine.</details></td>
+              Approx. takes 155 hours to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=4>30x16<br>99 mines</td>
@@ -114,9 +114,9 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>40.043±0.014%</td>
+            <td>40.048±0.014%</td>
             <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-30-16-T99-SFAR 100000000</pre>
-              Approx. takes 546 hours to run on an 8-core machine.</details></td>
+              Approx. takes 542 hours to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=2>SNR</td>
@@ -127,9 +127,9 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>53.452±0.027%</td>
+            <td>53.461±0.020%</td>
             <td><details><pre>./MineSweeperSolver FL@[4,4]-PSEQ-D256-30-16-T99-SNR 100000000</pre>
-              Approx. takes 846 hours to run on an 8-core machine.</details></td>
+              Approx. takes 842 hours to run on an 8-core machine.</details></td>
         </tr>
     </tbody>
 </table>
@@ -1041,10 +1041,10 @@ SNR
             <td>50.229<br>±0.010%</td>
             <td>50.2545<br>±0.0099%</td>
             <td>50.255<br>±0.010%</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>50.2624<br>±0.0098%</td>
+            <td>50.2713<br>±0.0098%</td>
             <td>50.276<br>±0.010%</td>
-            <td>TODO</td>
+            <td>50.2801<br>±0.0098%</td>
         </tr>
         <tr>
             <th>2</th>
@@ -1054,15 +1054,15 @@ SNR
             <td>51.8195<br>±0.0098%</td>
             <td>51.0733<br>±0.0098%</td>
             <td>51.2316<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.2887<br>±0.0098%</td>
             <td>51.2470<br>±0.0098%</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>51.2573<br>±0.0099%</td>
+            <td>51.2681<br>±0.0098%</td>
+            <td>51.2644<br>±0.0098%</td>
+            <td>51.2779<br>±0.0098%</td>
+            <td>51.279<br>±0.010%</td>
             <td>51.282<br>±0.010%</td>
-            <td>TODO</td>
+            <td>51.286<br>±0.010%</td>
         </tr>
         <tr>
             <th>3</th>
@@ -1072,15 +1072,15 @@ SNR
             <td>52.6958<br>±0.0098%</td>
             <td>51.8480<br>±0.0098%</td>
             <td>51.9813<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>52.0251<br>±0.0098%</td>
             <td>51.9536<br>±0.0098%</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
-            <td>TODO</td>
+            <td>51.9563<br>±0.0099%</td>
+            <td>51.975<br>±0.010%</td>
+            <td>51.9545<br>±0.0099%</td>
+            <td>51.9672<br>±0.0098%</td>
+            <td>51.9689<br>±0.0098%</td>
             <td>51.9735<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.9696<br>±0.0098%</td>
         </tr>
         <tr>
             <th>4</th>
@@ -1092,13 +1092,13 @@ SNR
             <td>52.1141<br>±0.0098%</td>
             <td>52.1527<br>±0.0098%</td>
             <td>52.0896<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>52.0913<br>±0.0098%</td>
             <td>52.0996<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>52.087<br>±0.010%</td>
             <td>52.0869<br>±0.0099%</td>
-            <td>TODO</td>
+            <td>52.0862<br>±0.0098%</td>
             <td>52.1024<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>52.0926<br>±0.0098%</td>
         </tr>
         <tr>
             <th>5</th>
@@ -1110,13 +1110,13 @@ SNR
             <td>51.3606<br>±0.0098%</td>
             <td>51.4007<br>±0.0098%</td>
             <td>51.3256<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.3406<br>±0.0098%</td>
             <td>51.3497<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.342<br>±0.010%</td>
             <td>51.3401<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.3464<br>±0.0098%</td>
             <td>51.3548<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.3509<br>±0.0098%</td>
         </tr>
         <tr>
             <th>6</th>
@@ -1128,13 +1128,13 @@ SNR
             <td>51.4280<br>±0.0098%</td>
             <td>51.4679<br>±0.0098%</td>
             <td>51.4124<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.4098<br>±0.0098%</td>
             <td>51.4203<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.4035<br>±0.0098%</td>
             <td>51.4114<br>±0.0069%</td>
-            <td>TODO</td>
+            <td>51.4246<br>±0.0098%</td>
             <td>51.4243<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.4109<br>±0.0098%</td>
         </tr>
         <tr>
             <th>7</th>
@@ -1146,9 +1146,9 @@ SNR
             <td>51.4722<br>±0.0069%</td>
             <td>51.5044<br>±0.0069%</td>
             <td>51.4442<br>±0.0098%</td>
-            <td>TODO</td>
+            <td>51.4516<br>±0.0098%</td>
             <td>51.4568<br>±0.0069%</td>
-            <td>TODO</td>
+            <td>51.4482<br>±0.0098%</td>
             <td>51.4519<br>±0.0069%</td>
             <td>TODO</td>
             <td>51.4519<br>±0.0098%</td>
