@@ -51,7 +51,7 @@ A deterministic Minesweeper solver
 
 ${'```'}bash
 sudo pacman -S cmake ninja boost
-cmake -S MineSweeperSolver -B cmake-bulid-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-mnative' -G Ninja
+cmake -S MineSweeperSolver -B cmake-bulid-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-march=native' -G Ninja
 cmake --build cmake-build-release
 ${'```'}
 
