@@ -5,14 +5,15 @@ import fs from 'node:fs';
 const dic = JSON.parse(fs.readFileSync(process.argv[2]));
 
 for (const k in dic) {
-    const t = 1e8 * dic[k].speed / 8 / 60;
+    const t = dic[k].n * dic[k].speed / 8 / 60;
     dic[k] = {
         r: dic[k].rate,
+        n: dic[k].n,
         t: t >= 120 ? Math.round(t / 60) + ' hours' : Math.round(t) + ' minutes',
     };
 }
 
-const g = (hsh) => dic[hsh] || { r: 'TODO', t: '???' };
+const g = (hsh) => dic[hsh] || { r: 'TODO', n: 100000000, t: '???' };
 
 const breaking = (s) => s.replace(/(?=[+\u00b1])/, '<br>');
 
@@ -20,26 +21,26 @@ const print_result = (c, ij) => `
             <td rowspan=2>SFAR</td>
             <td>PSEQ</td>
             <td>${g(`FL@[1,1]-PSEQ-${c}-SFAR`).r}</td>
-            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-${c}-SFAR 100000000</pre>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-${c}-SFAR ${g(`FL@[1,1]-PSEQ-${c}-SFAR`).n}</pre>
               Approx. takes ${g(`FL@[1,1]-PSEQ-${c}-SFAR`).t} to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td>PSEQ-D256</td>
             <td>${g(`FL@[1,1]-PSEQ-D256-${c}-SFAR`).r}</td>
-            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-${c}-SFAR 100000000</pre>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-${c}-SFAR ${g(`FL@[1,1]-PSEQ-D256-${c}-SFAR`).n}</pre>
               Approx. takes ${g(`FL@[1,1]-PSEQ-D256-${c}-SFAR`).t} to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=2>SNR</td>
             <td>PSEQ</td>
             <td>${g(`FL@[${ij}]-PSEQ-${c}-SNR`).r}</td>
-            <td><details><pre>./MineSweeperSolver FL@[${ij}]-PSEQ-${c}-SNR 100000000</pre>
+            <td><details><pre>./MineSweeperSolver FL@[${ij}]-PSEQ-${c}-SNR ${g(`FL@[${ij}]-PSEQ-${c}-SNR`).n}</pre>
               Approx. takes ${g(`FL@[${ij}]-PSEQ-${c}-SNR`).t} to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td>PSEQ-D256</td>
             <td>${g(`FL@[${ij}]-PSEQ-D256-${c}-SNR`).r}</td>
-            <td><details><pre>./MineSweeperSolver FL@[${ij}]-PSEQ-D256-${c}-SNR 100000000</pre>
+            <td><details><pre>./MineSweeperSolver FL@[${ij}]-PSEQ-D256-${c}-SNR ${g(`FL@[${ij}]-PSEQ-D256-${c}-SNR`).n}</pre>
               Approx. takes ${g(`FL@[${ij}]-PSEQ-D256-${c}-SNR`).t} to run on an 8-core machine.</details></td>`;
 
 console.log(`
