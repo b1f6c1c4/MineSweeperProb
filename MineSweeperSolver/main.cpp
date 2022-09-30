@@ -343,8 +343,11 @@ int main(int argc, char *argv[]) {
     close(fd[0]);
     kill(g_monitor, SIGTERM);
     int ws;
+    fin_waitpid_again:
     if (waitpid(g_monitor, &ws, 0) < 0) {
         perror("main/waitpid(3)");
+        if (errno == EINTR)
+            goto fin_waitpid_again;
         exit(3);
     }
 
