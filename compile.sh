@@ -11,7 +11,7 @@ cmake -S MineSweeperSolver -B MineSweeperSolver/cmake-build-native \
 cmake -S MineSweeperSolver -B MineSweeperSolver/cmake-build-avx512 \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-march=skylake-avx512 -static' -G Ninja
 cmake -S MineSweeperSolver -B MineSweeperSolver/cmake-build-amd \
-    -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-march=znver2 -static' -G Ninja
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-march=znver2' -G Ninja
 cmake --build MineSweeperSolver/cmake-build-native
 cmake --build MineSweeperSolver/cmake-build-avx512
 cmake --build MineSweeperSolver/cmake-build-amd
