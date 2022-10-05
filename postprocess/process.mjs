@@ -47,7 +47,7 @@ console.log(`
 # MineSweeperProb
 A deterministic Minesweeper solver
 
-The algorithm is described in the [paper](https://www.aaai.org/ocs/index.php/WS/AAAIW17/paper/viewPDFInterstitial/15091/14775) on AAAI Workshop 2017.
+The algorithm is described in the [paper](https://minesweepergame.com/math/exploring-efficient-strategies-for-minesweeper-2017.pdf) on AAAI Workshop 2017.
 
 ## Build
 
