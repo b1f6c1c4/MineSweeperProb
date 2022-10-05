@@ -2,15 +2,22 @@
 # MineSweeperProb
 A deterministic Minesweeper solver
 
+The algorithm is described in the [paper](https://www.aaai.org/ocs/index.php/WS/AAAIW17/paper/viewPDFInterstitial/15091/14775) on AAAI Workshop 2017.
+
 ## Build
 
 ```bash
-sudo pacman -S cmake ninja boost
+sudo pacman -S cmake ninja boost  # For Arch Linux
 cmake -S MineSweeperSolver -B cmake-bulid-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-march=native' -G Ninja
 cmake --build cmake-build-release
+# To run:
+./cmake-build-release/MineSweeperSolver <config> <number>
 ```
 
-## Winning Rate
+## Performance
+
+- SFAR / Safe first action rule: The first-clicked block is guaranteed no mine
+- SNR / Safe neighbourhood rule: The first-clicked block AND its surrounding blocks are guaranteed no mine
 
 <table>
     <thead>
