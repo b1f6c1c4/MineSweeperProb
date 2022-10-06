@@ -1,193 +1,88 @@
-import React from 'react';
-import MineSweeperSolver from './MineSweeperSolver';
-import Board from './Board';
-import {useEffect, useReducer, useState} from 'react';
-import {Button, ButtonGroup, ProgressBar, Slider, Spinner} from '@blueprintjs/core';
+import React, {useEffect, useState} from 'react';
+import Game from './Game';
 import './App.css';
+import {HTMLSelect, Spinner, Switch} from "@blueprintjs/core";
+import MineSweeperSolver from './MineSweeperSolver';
 
 const moduleLoader = MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' });
 
-function App(props) {
-    const {
-        width,
-        height,
-        totalMines,
-    } = props;
+export default function App(props) {
     const [module, setModule] = useState(undefined);
-    const [gameMgr, setGameMgr] = useState(undefined);
-
-    function startGame(m) {
-        const cfg = m.parse(`FL@[4,4]-PSEQ-D256-${width}-${height}-T${totalMines}-SNR`);
-        m.cache(cfg.width, cfg.height, cfg.totalMines);
-        const mgr = new m.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
-        setGameMgr(mgr);
-        setRate([mgr.bits, mgr.allBits]);
-    }
+    const [cfg, setCfg] = useState({ text: '(select)' });
+    const [isSNR, setIsSNR] = useState(false);
+    const [isDrain, setIsDrain] = useState(false);
 
     useEffect(() => {
         moduleLoader.then((module) => {
             setModule(module);
             module.seed();
-            startGame(module);
         }, console.error);
-    }, [width, height]);
+    }, []);
 
-    const [, forceUpdate] = useReducer(x => x + 1, 0);
-    const [isSettled, setIsSettled] = useState(false);
-    const [isGameOver, setIsGameOver] = useState(false);
-    const [isWon, setIsWon] = useState(false);
-    const [rate, setRate] = useState([1, 1]);
-    const [toOpen, setToOpen] = useState(width * height - totalMines);
-    function onUpdate() {
-        if (!gameMgr.started) {
-            setIsGameOver(true);
-            setIsWon(gameMgr.succeed);
-        } else {
-            gameMgr.solve(module.SolvingState.AUTOMATIC, false);
+    function onSelect(e) {
+        const m = e.currentTarget.value.match(/^(?<w>[0-9]+)-(?<h>[0-9]+)-T(?<m>[0-9]+)$/);
+        if (!m) {
+            setCfg({text: e.currentTarget.value});
+            return;
         }
-        setIsSettled(gameMgr.settled);
-        console.log(gameMgr.bits);
-        setRate([gameMgr.bits, gameMgr.allBits]);
-        setToOpen(gameMgr.toOpen);
-        forceUpdate();
+        setCfg({
+            text: e.currentTarget.value,
+            width: +m.groups['w'],
+            height: +m.groups['h'],
+            totalMines: +m.groups['m'],
+        });
     }
 
-    function onRestart() {
-        setIsSettled(false);
-        setIsGameOver(false);
-        setIsWon(false);
-        setFlagging([]);
-        setRate([1, 1]);
-        setMode(null);
-        setToOpen(width * height - totalMines)
-        if (canceller) {
-            clearTimeout(canceller);
-            setCanceller(undefined);
-        }
-        startGame(module);
+    function onSwitch(e) {
+        setIsSNR(e.currentTarget.checked);
     }
 
-    function onProbe(row, col) {
-        gameMgr.openBlock(col, row);
-        onUpdate();
-    }
-    const [flagging, setFlagging] = useState([]);
-    function onFlag(row, col) {
-        const f = [...flagging];
-        f[col * height + row] ^= true;
-        setFlagging(f);
+    function onSwitchDrain(e) {
+        setIsDrain(e.currentTarget.checked);
     }
 
-    function onStep() {
-        if (!gameMgr.semiAutomaticStep(module.SolvingState.AUTOMATIC, true))
-            gameMgr.automaticStep(module.SolvingState.AUTOMATIC);
-        onUpdate();
-    }
-
-    const [speed, setSpeed] = useState(-1.5);
-    const [mode, setMode] = useState(null);
-    const [canceller, setCanceller] = useState(undefined);
-    function onSemi() {
-        if (mode === null) {
-            setMode('semi');
-            const foo = () => {
-                setCanceller(undefined);
-                const next = gameMgr.semiAutomaticStep(module.SolvingState.AUTOMATIC, true);
-                onUpdate();
-                if (next)
-                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speed)));
-                else
-                    setMode(null);
-            };
-            foo();
-        } else {
-            clearTimeout(canceller);
-            setCanceller(undefined);
-            setMode(null);
-        }
-    }
-    function onAuto() {
-        if (mode === null) {
-            setMode('auto');
-            const foo = () => {
-                setCanceller(undefined);
-                if (!gameMgr.semiAutomaticStep(module.SolvingState.AUTOMATIC, true))
-                    gameMgr.automaticStep(module.SolvingState.AUTOMATIC);
-                onUpdate();
-                if (gameMgr.started)
-                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speed)));
-                else
-                    setMode(null);
-            };
-            foo();
-        } else {
-            clearTimeout(canceller);
-            setCanceller(undefined);
-            setMode(null);
-        }
-    }
-
-    function renderLabel(v) {
-        const y = Math.pow(10, -v);
-        const s = Math.pow(10, Math.ceil(v) + 1);
-        return `${Math.round(y * s) / s}x`;
-    }
+    let strategy = 'FL';
+    if (!isSNR)
+        strategy += '@[1,1]';
+    else if (cfg.width > 20)
+        strategy += '@[4,4]';
+    else
+        strategy += '@[3,3]';
+    strategy += '-PSEQ';
+    if (isDrain)
+        strategy += '-D256';
+    strategy += `-${cfg.width}-${cfg.height}-T${cfg.totalMines}`;
+    if (isSNR)
+        strategy += '-SNR';
+    else
+        strategy += '-SFAR';
 
     return (
-        <div className="App">
-            {gameMgr ? (
-                <Board
-                    width={width}
-                    height={height}
-                    isStarted={isSettled}
-                    isGameOver={isGameOver}
-                    isWon={isWon}
-                    gameMgr={gameMgr}
-                    module={module}
-                    flagging={flagging}
-                    onProbe={onProbe}
-                    onFlag={onFlag}
-                />)
-            : (
+        <div>
+            <HTMLSelect value={cfg.text} onChange={onSelect}>
+                <option>(select)</option>
+                <option>8-8-T10</option>
+                <option>9-9-T10</option>
+                <option>16-16-T40</option>
+                <option>30-16-T99</option>
+            </HTMLSelect>
+            <Switch checked={isSNR} onChange={onSwitch}
+                    labelElement={'Safe First Action / Safe Neighbor Rule'}
+                    innerLabelChecked="SNR" innerLabel="SFAR" />
+            <Switch checked={isDrain} onChange={onSwitchDrain}
+                    labelElement={'Enable D256'}
+                    innerLabelChecked="PSEQ-D256" innerLabel="PSEQ" />
+            {!module ? (
                 <Spinner intent="primary" />
-            )}
-            <div>
-                <p>{`${Math.round(Math.pow(2, rate[0]))} possible solutions`}</p>
-                <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
-                             intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
-                <p>{`${toOpen} / ${width * height - totalMines} blocks left`}</p>
-                <ProgressBar value={1 - toOpen / (width * height - totalMines)}
-                             stripes={!isGameOver}
-                             intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
-                <ButtonGroup>
-                    <Button disabled={!gameMgr || mode != null}
-                            icon="reset" intent="danger"
-                            text="Restart" onClick={onRestart} />
-                    <Button disabled={!gameMgr || isGameOver || mode !== null}
-                            icon="step-forward" intent="primary"
-                            text="Single step" onClick={onStep} />
-                    <Button disabled={!gameMgr || isGameOver || mode === 'auto'}
-                            active={mode === 'semi'}
-                            icon="play" intent="success"
-                            text="Semi-auto" onClick={onSemi} />
-                    <Button disabled={!gameMgr || isGameOver || mode === 'semi'}
-                            active={mode === 'auto'}
-                            icon="fast-forward" intent="warning"
-                            text="Full-auto" onClick={onAuto} />
-                </ButtonGroup>
-                <Slider
-                    min={-2}
-                    max={2}
-                    stepSize={0.1}
-                    labelStepSize={1}
-                    onChange={setSpeed}
-                    labelRenderer={renderLabel}
-                    showTrackFill={false}
-                    value={speed}
-                />
-            </div>
+            ) : cfg.width && (
+                <Game
+                    module={module}
+                    width={cfg.width}
+                    height={cfg.height}
+                    totalMines={cfg.totalMines}
+                    isSNR={isSNR}
+                    strategy={strategy}
+                />)}
         </div>
     );
 }
-
-export default App;
