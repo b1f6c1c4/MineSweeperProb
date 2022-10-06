@@ -11,7 +11,7 @@ class
 {
 public:
     explicit Drainer(const GameMgr &mgr);
-    ~Drainer() override;
+    ~Drainer() = default;
 
     [[nodiscard]] BlockSet GetBestBlocks() const;
     [[nodiscard]] const double *GetBestProbabilities() const;

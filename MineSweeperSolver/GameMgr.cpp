@@ -41,7 +41,7 @@ GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy str
 
 GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
-#define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val));
+#define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val))
     READ(m_AllowWrongGuess);
     READ(BasicStrategy);
     READ(m_TotalWidth);
@@ -248,48 +248,6 @@ void GameMgr::OpenBlock(int x, int y)
     OpenBlock(GetIndex(x, y));
 }
 
-void Largest(BlockSet &bests, std::function<int(int)> fun)
-{
-    if (bests.size() <= 1)
-        return;
-    BlockSet newBests;
-    newBests.push_back(bests.front());
-    auto bestVal = fun(bests.front());
-    for (auto i = 1; i < bests.size(); ++i)
-    {
-        auto p = fun(bests[i]);
-        if (bestVal < p)
-        {
-            bestVal = p;
-            newBests.clear();
-        }
-        if (bestVal <= p)
-            newBests.push_back(bests[i]);
-    }
-    newBests.swap(bests);
-}
-
-void Largest(BlockSet &bests, std::function<double(int)> fun)
-{
-    if (bests.size() <= 1)
-        return;
-    BlockSet newBests;
-    newBests.push_back(bests.front());
-    auto bestVal = fun(bests.front());
-    for (auto i = 1; i < bests.size(); ++i)
-    {
-        auto p = fun(bests[i]);
-        if (bestVal < p)
-        {
-            bestVal = p;
-            newBests.clear();
-        }
-        if (bestVal - std::abs(bestVal) * 1E-8 <= p)
-            newBests.push_back(bests[i]);
-    }
-    newBests.swap(bests);
-}
-
 void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 {
     if (!m_Started)
@@ -369,7 +327,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             m_Preferred.push_back(i);
         }
 
-#define LARGEST(exp) Largest(m_Preferred, std::function<double(Block)>([this](Block blk) { return exp; } ))
+#define LARGEST(exp) Largest(m_Preferred, [this](Block blk) -> double { return exp; } )
 
     for (auto heu : BasicStrategy.DecisionTree)
         switch (heu)
@@ -404,9 +362,9 @@ void GameMgr::OpenOptimalBlocks()
 {
     if (!m_Best.empty())
     {
-        for (auto i = 0; i < m_Best.size(); ++i)
+        for (auto b : m_Best)
         {
-            OpenBlock(m_Best[i]);
+            OpenBlock(b);
             if (!m_Started)
                 break;
         }
@@ -558,7 +516,7 @@ void GameMgr::EnableDrainer()
 
 void GameMgr::Save(std::ostream &sw) const
 {
-#define WRITE(val) sw.write(reinterpret_cast<const char *>(&(val)), sizeof(val));
+#define WRITE(val) sw.write(reinterpret_cast<const char *>(&(val)), sizeof(val))
     WRITE(m_AllowWrongGuess);
     WRITE(BasicStrategy);
     WRITE(m_TotalWidth);

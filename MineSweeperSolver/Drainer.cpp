@@ -68,8 +68,6 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     Drain();
 }
 
-Drainer::~Drainer() {}
-
 BlockSet Drainer::GetBestBlocks() const
 {
     BlockSet set;
@@ -99,7 +97,7 @@ void Drainer::Update()
     macro->Hash();
     BasicDrainer::Update(macro);
 
-    if (m_RootMacro->m_Probs.size())
+    if (!m_RootMacro->m_Probs.empty())
     {
         m_Prob.clear();
         m_Prob.resize(m_Mgr.m_Blocks.size(), -1);
@@ -144,7 +142,7 @@ void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet &bests)
 {
     if (!m_Mgr.BasicStrategy.PruningEnabled)
         return;
-#define LARGEST(exp) Largest(bests, std::function<double(Block)>([macro](Block blk) { return exp; } ))
+#define LARGEST(exp) Largest(bests, [macro](Block blk) -> double { return exp; })
     if (macro->m_Solver->GetTotalStates() <= m_Mgr.BasicStrategy.ExhaustCriterion)
         return;
     for (auto heu : m_Mgr.BasicStrategy.PruningDecisionTree)
@@ -159,6 +157,7 @@ void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet &bests)
         case HeuristicMethod::MaxZerosExp:
         case HeuristicMethod::MaxQuantityExp:
         case HeuristicMethod::MinFrontierDist:
+        default:
             break;
 #else
         case HeuristicMethod::MaxZeroProb:
@@ -176,8 +175,8 @@ void Drainer::HeuristicPruning(MacroSituation *macro, BlockSet &bests)
         case HeuristicMethod::MinFrontierDist:
             LARGEST(-FrontierDist(macro, blk));
             break;
-#endif
         default:
             break;
+#endif
         }
 }

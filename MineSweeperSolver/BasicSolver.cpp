@@ -7,7 +7,7 @@
 
 #define M(x, y) matrix[(x) * height + (y)]
 
-#define CONT_WIDTH(lst, cnt) (cnt == lst.size() - 1 && SHF(m_BlockSets.size()) > 0 ? SHF(m_BlockSets.size()) : CONT_SIZE)
+#define CONT_WIDTH(lst, cnt) ((cnt) == (lst).size() - 1 && SHF(m_BlockSets.size()) > 0 ? SHF(m_BlockSets.size()) : CONT_SIZE)
 
 BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(-1)
 {

@@ -2,7 +2,6 @@
 #include "stdafx.h"
 #include "Solver.h"
 #include <vector>
-#include <functional>
 #include "Strategies.h"
 
 struct
@@ -95,5 +94,48 @@ private:
     [[nodiscard]] int FrontierDist(Block blk) const;
 };
 
-void Largest(BlockSet &bests, std::function<int(Block)> fun);
-void Largest(BlockSet &bests, std::function<double(Block)> fun);
+template <typename F>
+std::enable_if_t<std::is_same_v<std::invoke_result_t<F, Block>, int>, void>
+Largest(BlockSet &bests, const F &fun)
+{
+    if (bests.size() <= 1)
+        return;
+    BlockSet newBests;
+    newBests.push_back(bests.front());
+    auto bestVal = fun(bests.front());
+    for (auto i = 1; i < bests.size(); ++i)
+    {
+        auto p = fun(bests[i]);
+        if (bestVal < p)
+        {
+            bestVal = p;
+            newBests.clear();
+        }
+        if (bestVal <= p)
+            newBests.push_back(bests[i]);
+    }
+    newBests.swap(bests);
+}
+
+template <typename F>
+std::enable_if_t<std::is_same_v<std::invoke_result_t<F, Block>, double>, void>
+Largest(BlockSet &bests, const F &fun)
+{
+    if (bests.size() <= 1)
+        return;
+    BlockSet newBests;
+    newBests.push_back(bests.front());
+    auto bestVal = fun(bests.front());
+    for (auto i = 1; i < bests.size(); ++i)
+    {
+        auto p = fun(bests[i]);
+        if (bestVal < p)
+        {
+            bestVal = p;
+            newBests.clear();
+        }
+        if (bestVal - std::abs(bestVal) * 1E-8 <= p)
+            newBests.push_back(bests[i]);
+    }
+    newBests.swap(bests);
+}
