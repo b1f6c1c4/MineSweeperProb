@@ -118,6 +118,12 @@ protected:
     std::vector<double> m_Probability;
     double m_TotalStates;
 
+    /* IN set1: an arbitrary set of blocks
+     * OUT sets1: sets[i] = num of shared blocks b/w <set1> and m_BlockSets[i]
+     * OUT mines: number of confirmed mines in <set1>
+     *
+     * Note: <sets1> does NOT include confirmed mines NOR confirmed blanks.
+     */
     void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
 private:
     BlockSet m_Reduce_Temp;

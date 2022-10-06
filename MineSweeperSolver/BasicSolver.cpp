@@ -272,12 +272,12 @@ void BasicSolver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &
     for (auto blk : set1)
     {
         auto v = m_SetIDs[blk];
-        if (v == -1)
+        if (v == -1) // confirmed mine
         {
             ++mines;
             continue;
         }
-        if (v == -2)
+        if (v == -2) // confirmed blank
             continue;
         ++sets1[m_SetIDs[blk]];
     }

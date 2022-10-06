@@ -80,7 +80,7 @@ private:
     bool m_IsSNR;
     bool m_Settled, m_Started, m_Succeed;
     std::vector<BlockProperty> m_Blocks;
-    std::vector<BlockSet> m_BlocksR;
+    std::vector<BlockSet> m_BlocksR; // each block's neighbor
     int m_ToOpen, m_WrongGuesses;
     Solver *m_Solver;
     double m_AllBits;

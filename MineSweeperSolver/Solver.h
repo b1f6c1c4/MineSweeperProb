@@ -42,19 +42,33 @@ private:
     static void Merge(const std::vector<double> &from, std::vector<double> &to);
     void Add(std::vector<double> &from, const std::vector<double> &cases);
 
-    DistCondQParameters PackParameters(const BlockSet &set, Block blk, int &min) const;
+    /* Prepare for distribution computation
+     *
+     * IN set: neighbor of <blk>
+     * IN blk: which block to consider
+     * OUT min: number of confirmed mines in <set>
+     */
+    [[nodiscard]] DistCondQParameters PackParameters(const BlockSet &set, Block blk, int &min) const;
 
+    /* Compute <par>.m_Halves */
     void GetHalves(DistCondQParameters &par) const;
+    /* Actually compute the distribution */
     void EnumerateSolutions(DistCondQParameters &par) const;
 
-    DistCondQParameters *TryGetCache(DistCondQParameters &&par, std::function<bool(const DistCondQParameters &)> pre);
-    const DistCondQParameters &ZCondQ(DistCondQParameters &&par);
-    const DistCondQParameters &DistCondQ(DistCondQParameters &&par);
-    const DistCondQParameters &UCondQ(DistCondQParameters &&par);
+    [[nodiscard]] DistCondQParameters *TryGetCache(DistCondQParameters &&par, std::function<bool(const DistCondQParameters &)> pre);
+
+    /* <par>.m_Result[0] = P(blk.degree == 0) */
+    [[nodiscard]] const DistCondQParameters &ZCondQ(DistCondQParameters &&par);
+    /* <par>.m_Result[i] = P(blk.degree == i) */
+    [[nodiscard]] const DistCondQParameters &DistCondQ(DistCondQParameters &&par);
+    /* <par>.m_Result[i] = P(blk.degree == i), and compute 3 auxiliary metrics */
+    [[nodiscard]] const DistCondQParameters &UCondQ(DistCondQParameters &&par);
     void ClearDistCondQCache();
 };
 
-/* Distribution of the degree of a block, conditioned
+/* Distribution of the degree of a block
+ *
+ * Note: This class only stores data; computation happens in class Solver
  */
 class
     DistCondQParameters
@@ -63,19 +77,35 @@ public:
     DistCondQParameters(DistCondQParameters &&other) noexcept;
     DistCondQParameters(Block set2ID, int length);
 
+    // [i] = num of shared blocks b/w the block's neighbor and m_BlockSets[i]
     std::vector<int> Sets1;
-    int Set2ID;
-    int Length;
-    size_t m_Hash;
+    int Set2ID; // id such that m_BlockSets[<Set2ID>] contains the block
+    int Length; // sum of <sets1>
 
+    /* Note 1: as long as Sets1 and Set2ID are same,
+     * identical distribution is guaranteed.
+     * Note 2: Sets1, Set2ID, Length are all immutable.
+     */
+    size_t m_Hash;
     size_t Hash();
 
+    /* List of ids that m_BlockSets[<m_Halves[i]>] is split in two halves
+     * by the block's neighbor: one half is of size Sets1[<m_Halves[i]>]
+     */
     std::vector<int> m_Halves;
     std::vector<std::vector<Solution>> m_Solutions;
     std::vector<double> m_States;
 
+    /* The probability of each individual degree number */
     std::vector<double> m_Result;
+
+    /* These data are only set by UCondQ
+     * m_Probability: E(<at-least-one-safe-block>)
+     * m_Expectation: E(<number-of-safe-block>)
+     * m_UpperBound: E(1 - <minimal-mine-prob-across-the-board>)
+     */
     double m_Probability, m_Expectation, m_UpperBound;
+
     double m_TotalStates;
 
     friend bool operator==(const DistCondQParameters &lhs, const DistCondQParameters &rhs);
