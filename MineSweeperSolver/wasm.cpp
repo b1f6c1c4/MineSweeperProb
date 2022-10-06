@@ -72,6 +72,20 @@ EMSCRIPTEN_BINDINGS(mws) {
         .function("automatic", &GameMgr::Automatic)
         .function("enableDrainer", &GameMgr::EnableDrainer)
         .function("openOptimalBlocks", &GameMgr::OpenOptimalBlocks)
+        .property("totalWidth", &GameMgr::GetTotalWidth)
+        .property("totalHeight", &GameMgr::GetTotalHeight)
+        .property("totalMines", &GameMgr::GetTotalMines)
+        .property("toOpen", &GameMgr::GetToOpen)
+        .property("wrongGuesses", &GameMgr::GetWrongGuesses)
+        .property("started", &GameMgr::GetStarted)
+        .property("succeed", &GameMgr::GetSucceed)
+        .property("bits", &GameMgr::GetBits)
+        .property("allBits", &GameMgr::GetAllBits)
+        .function("blockPropertyOf", &GameMgr::GetBlockProperty)
+        .function("blockProbabilityOf", &GameMgr::GetBlockProbability)
+        .function("inferredStatusOf", &GameMgr::GetInferredStatus)
+        .property("bestBlocks", &GameMgr::GetBestBlockList)
+        .property("preferredBlocks", &GameMgr::GetPreferredBlockList)
         ;
 }
 

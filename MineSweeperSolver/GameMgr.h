@@ -48,8 +48,10 @@ public:
 
     const Block *GetBestBlocks() const;
     size_t GetBestBlockCount() const;
+    const BlockSet &GetBestBlockList() const;
     const Block *GetPreferredBlocks() const;
     size_t GetPreferredBlockCount() const;
+    const BlockSet &GetPreferredBlockList() const;
 
     void OpenBlock(int x, int y);
 

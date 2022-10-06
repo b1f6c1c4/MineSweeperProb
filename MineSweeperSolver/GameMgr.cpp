@@ -208,6 +208,11 @@ size_t GameMgr::GetBestBlockCount() const
     return m_Best.size();
 }
 
+const BlockSet &GameMgr::GetBestBlockList() const
+{
+    return m_Best;
+}
+
 const Block *GameMgr::GetPreferredBlocks() const
 {
     if (m_Preferred.empty())
@@ -218,6 +223,11 @@ const Block *GameMgr::GetPreferredBlocks() const
 size_t GameMgr::GetPreferredBlockCount() const
 {
     return m_Preferred.size();
+}
+
+const BlockSet &GameMgr::GetPreferredBlockList() const
+{
+    return m_Preferred;
 }
 
 void GameMgr::OpenBlock(int x, int y)
