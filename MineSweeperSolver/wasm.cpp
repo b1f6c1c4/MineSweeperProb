@@ -19,6 +19,10 @@ using namespace emscripten;
 
 int main() { }
 
+void seed() {
+    SeedEngine();
+}
+
 auto parse(const std::string &str) {
     return parse(str.c_str());
 }
@@ -28,6 +32,9 @@ void cache(int w, int h, int m) {
 }
 
 EMSCRIPTEN_BINDINGS(mws) {
+    function("seed", &seed);
+    function("parse", static_cast<Configuration (*)(const std::string &)>(&parse));
+    function("cache", static_cast<void (*)(int, int, int)>(&cache));
     class_<Strategy>("Strategy")
         .property("initialPositionSpecified", &Strategy::InitialPositionSpecified)
         .property("index", &Strategy::Index)
@@ -46,8 +53,6 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("totalMines", &Configuration::TotalMines)
         .property("isSNR", &Configuration::IsSNR)
         ;
-    function("parse", static_cast<Configuration (*)(const std::string &)>(&parse));
-    function("cache", static_cast<void (*)(int, int, int)>(&cache));
     enum_<BlockStatus>("BlockStatus")
         .value("UNKNOWN", BlockStatus::Unknown)
         .value("MINE", BlockStatus::Mine)
@@ -62,6 +67,15 @@ EMSCRIPTEN_BINDINGS(mws) {
         .value("DRAINED", SolvingState::Drained)
         .value("AUTOMATIC", SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic)
         ;
+    class_<BlockProperty>("BlockProperty")
+        .property("index", &BlockProperty::Index)
+        .property("x", &BlockProperty::X)
+        .property("y", &BlockProperty::Y)
+        .property("degree", &BlockProperty::Degree)
+        .property("isOpen", &BlockProperty::IsOpen)
+        .property("hasMine", &BlockProperty::IsMine)
+        ;
+    register_vector<Block>("BlockSet");
     class_<GameMgr>("GameMgr")
         .constructor<int, int, int, bool, Strategy, bool>()
         .function("openBlock", static_cast<void (GameMgr::*)(int, int)>(&GameMgr::OpenBlock))

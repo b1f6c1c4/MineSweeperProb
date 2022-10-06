@@ -85,26 +85,32 @@ span.flag {
 }
 
 td.blk-safe {
-  border-color: gold !important;
+  border-color: #ffd702 !important;
 }
 
 td.blk-dangerous {
-  border-color: #f82929 !important;
+  border-color: #f82960 !important;
 }
 
 td.blk-best {
   border-color: gold;
   background-color: gold;
-  background-image: linear-gradient(135deg, #ffda16, #e7c100);
+  background-image: linear-gradient(135deg, #ffda16, #e7c100) !important;
 }
 
 td.blk-preferred {
-  border-color: #cccccc;
-  background-color: #cccccc;
-  background-image: linear-gradient(135deg, #eaeaea, #8f8f8f);
+  border-color: #fbff90;
+  background-color: #fbff90;
+  background-image: linear-gradient(135deg, #ffef89, #cbff7d) !important;
 }
 
 span.bad-flag {
   font-weight: bold;
   text-decoration: line-through;
+}
+
+td.blk-won {
+  border-color: #07a907;
+  background-color: #09b722;
+  background-image: linear-gradient(135deg, #3bec4b, #22a414);
 }
