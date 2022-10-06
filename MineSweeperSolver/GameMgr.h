@@ -36,6 +36,7 @@ public:
     int GetTotalMines() const;
     int GetToOpen() const;
     int GetWrongGuesses() const;
+    bool GetSettled() const;
     bool GetStarted() const;
     bool GetSucceed() const;
     double GetBits() const;
@@ -59,7 +60,7 @@ public:
 
     void OpenOptimalBlocks();
 
-    bool SemiAutomaticStep(SolvingState maxDepth);
+    bool SemiAutomaticStep(SolvingState maxDepth, bool single);
     bool SemiAutomatic(SolvingState maxDepth);
     void AutomaticStep(SolvingState maxDepth);
     void Automatic();

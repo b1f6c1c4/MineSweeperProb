@@ -156,6 +156,11 @@ int GameMgr::GetWrongGuesses() const
     return m_WrongGuesses;
 }
 
+bool GameMgr::GetSettled() const
+{
+    return m_Settled;
+}
+
 bool GameMgr::GetStarted() const
 {
     return m_Started;
@@ -409,7 +414,7 @@ void GameMgr::OpenOptimalBlocks()
     OpenBlock(blk);
 }
 
-bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
+bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single)
 {
     if (!m_Started)
         return false;
@@ -438,6 +443,8 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth)
 #ifndef NDEBUG
         flag = true;
 #endif
+        if (single)
+            break;
         if (m_Started)
             continue;
         break;
@@ -450,7 +457,7 @@ bool GameMgr::SemiAutomatic(SolvingState maxDepth)
 {
     if (!m_Started)
         return false;
-    while (SemiAutomaticStep(maxDepth)) { }
+    while (SemiAutomaticStep(maxDepth, false)) { }
     return m_Started;
 }
 
@@ -458,6 +465,12 @@ void GameMgr::AutomaticStep(SolvingState maxDepth)
 {
     if (!m_Started)
         return;
+
+    if (!m_Settled && BasicStrategy.InitialPositionSpecified)
+    {
+        OpenBlock(BasicStrategy.Index);
+        return;
+    }
 
     Solve(maxDepth, true);
     OpenOptimalBlocks();

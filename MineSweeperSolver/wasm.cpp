@@ -65,7 +65,7 @@ EMSCRIPTEN_BINDINGS(mws) {
         .value("PROBABILITY", SolvingState::Probability)
         .value("HEURISTIC", SolvingState::Heuristic)
         .value("DRAINED", SolvingState::Drained)
-        .value("AUTOMATIC", SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic)
+        .value("AUTOMATIC", SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic | SolvingState::Drained)
         ;
     class_<BlockProperty>("BlockProperty")
         .property("index", &BlockProperty::Index)
@@ -91,6 +91,7 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("totalMines", &GameMgr::GetTotalMines)
         .property("toOpen", &GameMgr::GetToOpen)
         .property("wrongGuesses", &GameMgr::GetWrongGuesses)
+        .property("settled", &GameMgr::GetSettled)
         .property("started", &GameMgr::GetStarted)
         .property("succeed", &GameMgr::GetSucceed)
         .property("bits", &GameMgr::GetBits)
