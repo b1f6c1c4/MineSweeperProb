@@ -100,7 +100,7 @@ MacroSituation::~MacroSituation()
 size_t MacroSituation::Hash()
 {
     if (m_Degrees.empty())
-        return m_Hash = m_BestProb < 0.5 ? 0x0000000000000000 : 0xffffffffffffffff;
+        return m_Hash = m_BestProb < 0.5 ? 0zu : ~0zu;
 
     size_t hash = 5381;
     for (auto d : m_Degrees)

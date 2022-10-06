@@ -1,9 +1,12 @@
 #include "BinomialHelper.h"
 #include <vector>
+
+#ifndef __EMSCRIPTEN__
 #include "boost/thread/shared_mutex.hpp"
 #include "boost/thread/lock_types.hpp"
-
 static boost::shared_mutex mtx;
+#endif // __EMSCRIPTEN__
+
 static std::vector<std::vector<double>> BinomialCoeff;
 
 extern "C" void CacheBinomials(int n, int m)
@@ -19,6 +22,7 @@ extern "C" void CacheBinomials(int n, int m)
         m = n / 2;
 
     {
+#ifndef __EMSCRIPTEN__
         boost::shared_lock<boost::shared_mutex> lock(mtx);
         boost::unique_lock<boost::shared_mutex> writeLock(mtx, boost::defer_lock);
 
@@ -31,6 +35,12 @@ extern "C" void CacheBinomials(int n, int m)
             writeLock.lock(); \
         } \
     } while (false)
+
+#else // __EMSCRIPTEN__
+
+#define UPGRADE do { } while (false)
+
+#endif // __EMSCRIPTEN__
 
         if (BinomialCoeff.empty())
         {
@@ -76,7 +86,9 @@ extern "C" void CacheBinomials(int n, int m)
 
 double Binomial(int n, int m)
 {
+#ifndef __EMSCRIPTEN__
     boost::shared_lock<boost::shared_mutex> lock(mtx, boost::defer_lock);
+#endif // __EMSCRIPTEN__
 
     if (n < 0)
         return double(0);
@@ -89,6 +101,8 @@ double Binomial(int n, int m)
 
     auto mm = m <= n / 2 ? m : n - m;
 
+#ifndef __EMSCRIPTEN__
     lock.lock();
+#endif // __EMSCRIPTEN__
     return BinomialCoeff[n - 1][mm - 1];
 }

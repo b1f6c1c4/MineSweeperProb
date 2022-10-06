@@ -26,9 +26,7 @@ FetchContent_Declare(json
         GIT_TAG v3.11.2)
 FetchContent_MakeAvailable(json)
 
-find_package(Boost 1.80.0 REQUIRED)
-
-add_executable(MineSweeperSolver
+add_library(mws OBJECT
         BasicDrainer.cpp
         BasicSolver.cpp
         BinomialHelper.cpp
@@ -36,8 +34,16 @@ add_executable(MineSweeperSolver
         GameMgr.cpp
         random.cpp
         Solver.cpp
-        facade.cpp
-        main.cpp)
-target_link_libraries(MineSweeperSolver PRIVATE boost_thread)
-target_link_libraries(MineSweeperSolver PRIVATE pthread)
-target_link_libraries(MineSweeperSolver PRIVATE nlohmann_json::nlohmann_json)
+        facade.cpp)
+
+if(EMSCRIPTEN)
+    add_executable(MineSweeperSolver wasm.cpp)
+else()
+    find_package(Boost 1.80.0 REQUIRED)
+    add_executable(MineSweeperSolver main.cpp)
+    target_link_libraries(MineSweeperSolver PRIVATE mws)
+    target_link_libraries(MineSweeperSolver PRIVATE nlohmann_json::nlohmann_json)
+    target_link_libraries(MineSweeperSolver PRIVATE boost_thread)
+    target_link_libraries(MineSweeperSolver PRIVATE pthread)
+endif()
+
