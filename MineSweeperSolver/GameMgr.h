@@ -53,6 +53,7 @@ public:
     const Block *GetPreferredBlocks() const;
     size_t GetPreferredBlockCount() const;
     const BlockSet &GetPreferredBlockList() const;
+    const std::vector<double> &GetBestProbabilityList() const;
 
     void OpenBlock(int x, int y);
 

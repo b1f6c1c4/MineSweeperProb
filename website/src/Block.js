@@ -13,6 +13,7 @@ export default function Block(props) {
         isPreferred,
         isSafe,
         isDangerous,
+        isDrain,
         row,
         col,
         onProbe,
@@ -43,15 +44,24 @@ export default function Block(props) {
         else if (isDangerous)
             tdClass += ' blk-dangerous';
         else if (probability !== null) {
-            const r = Math.round(0xf8 * probability + 0x09 * (1 - probability));
-            const g = Math.round(0x29 * probability + 0xb7 * (1 - probability));
-            const b = Math.round(0x29 * probability + 0x22 * (1 - probability));
-            tdStyle.backgroundImage = `linear-gradient(135deg, rgb(${r}, ${g}, ${b}), #d2d2d2 40%)`;
+            if (!isDrain) {
+                const r = Math.round(0xf8 * probability + 0x09 * (1 - probability));
+                const g = Math.round(0x29 * probability + 0xb7 * (1 - probability));
+                const b = Math.round(0x29 * probability + 0x22 * (1 - probability));
+                tdStyle.backgroundImage = `linear-gradient(135deg, rgb(${r}, ${g}, ${b}), #d2d2d2 40%)`;
+            } else {
+                const r = Math.round(0xf8 * probability + 0x7b * (1 - probability));
+                const g = Math.round(0x29 * probability + 0x68 * (1 - probability));
+                const b = Math.round(0x29 * probability + 0xee * (1 - probability));
+                tdStyle.backgroundImage = `linear-gradient(45deg, rgb(${r}, ${g}, ${b}), transparent 100%)`;
+            }
         }
         if (isBest)
             tdClass += ' blk-best';
         if (isPreferred)
             tdClass += ' blk-preferred';
+        if (isDrain)
+            tdClass += ' blk-drain';
     } else {
         if (isFlagged && !hasMine) {
             spanClass = 'flag bad-flag';

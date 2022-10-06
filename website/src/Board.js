@@ -27,13 +27,18 @@ export default function Board(props) {
         for (let i = 0; i < set.size(); i++)
             preferred[set.get(i)] = true;
     }
+    const drain = gameMgr.bestProbabilityList;
 
     for (let i = 0; i < height; i++) {
         const row = [];
         for (let j = 0; j < width; j++) {
             const property = gameMgr.blockPropertyOf(j, i);
             const infer = gameMgr.inferredStatusOf(j, i);
-            const prob = gameMgr.blockProbabilityOf(j, i);
+            let prob = gameMgr.blockProbabilityOf(j, i);
+            if (drain.size())
+                prob = 1 - drain.get(j * height + i);
+            if (!isStarted)
+                prob = null;
             // Note: do NOT use {...property} as it won't work for getters
             row.push(<Block key={j}
                             row={i}
@@ -42,13 +47,14 @@ export default function Board(props) {
                             isWon={isWon}
                             degree={property.degree}
                             isOpen={property.isOpen}
-                            isFlagged={flagging[i * width + j]}
+                            isFlagged={flagging[j * height + i]}
                             hasMine={property.hasMine}
                             isBest={best[j * height + i]}
                             isPreferred={preferred[j * height + i]}
                             isSafe={infer === module.BlockStatus.BLANK}
                             isDangerous={infer === module.BlockStatus.MINE}
-                            probability={isStarted ? prob : null}
+                            isDrain={!!drain.size()}
+                            probability={prob}
                             onProbe={onProbe}
                             onFlag={onFlag}
             />);

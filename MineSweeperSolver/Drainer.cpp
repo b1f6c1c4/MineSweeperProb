@@ -84,6 +84,11 @@ const double *Drainer::GetBestProbabilities() const
     return &*m_Prob.begin();
 }
 
+const std::vector<double> &Drainer::GetBestProbabilityList() const
+{
+    return m_Prob;
+}
+
 void Drainer::Update()
 {
     auto macro = new MacroSituation();

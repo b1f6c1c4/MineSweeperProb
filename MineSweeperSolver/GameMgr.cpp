@@ -235,6 +235,14 @@ const BlockSet &GameMgr::GetPreferredBlockList() const
     return m_Preferred;
 }
 
+const std::vector<double> &GameMgr::GetBestProbabilityList() const
+{
+    static std::vector<double> empty{};
+    if (!m_Drainer)
+        return empty;
+    return m_Drainer->GetBestProbabilityList();
+}
+
 void GameMgr::OpenBlock(int x, int y)
 {
     OpenBlock(GetIndex(x, y));

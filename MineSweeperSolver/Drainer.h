@@ -13,6 +13,7 @@ public:
 
     BlockSet GetBestBlocks() const;
     const double *GetBestProbabilities() const;
+    const std::vector<double> &GetBestProbabilityList() const;
 
     void Update();
 protected:

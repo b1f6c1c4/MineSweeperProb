@@ -11,17 +11,24 @@ function App(props) {
     const {
         width,
         height,
+        totalMines,
     } = props;
     const [module, setModule] = useState(undefined);
     const [gameMgr, setGameMgr] = useState(undefined);
+
+    function startGame(m) {
+        const cfg = m.parse(`FL@[4,4]-PSEQ-D256-${width}-${height}-T${totalMines}-SNR`);
+        m.cache(cfg.width, cfg.height, cfg.totalMines);
+        const mgr = new m.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
+        setGameMgr(mgr);
+        setRate([mgr.bits, mgr.allBits]);
+    }
+
     useEffect(() => {
         moduleLoader.then((module) => {
             setModule(module);
             module.seed();
-            const cfg = module.parse('FL@[4,4]-PSEQ-30-16-T99-SNR');
-            module.cache(cfg.width, cfg.height, cfg.totalMines);
-            const mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
-            setGameMgr(mgr);
+            startGame(module);
         }, console.error);
     }, [width, height]);
 
@@ -29,16 +36,19 @@ function App(props) {
     const [isSettled, setIsSettled] = useState(false);
     const [isGameOver, setIsGameOver] = useState(false);
     const [isWon, setIsWon] = useState(false);
-    const [rate, setRate] = useState(0);
+    const [rate, setRate] = useState([1, 1]);
+    const [toOpen, setToOpen] = useState(width * height - totalMines);
     function onUpdate() {
-        setRate(1 - gameMgr.bits / gameMgr.allBits);
-        setIsSettled(gameMgr.settled);
         if (!gameMgr.started) {
             setIsGameOver(true);
             setIsWon(gameMgr.succeed);
         } else {
             gameMgr.solve(module.SolvingState.AUTOMATIC, false);
         }
+        setIsSettled(gameMgr.settled);
+        console.log(gameMgr.bits);
+        setRate([gameMgr.bits, gameMgr.allBits]);
+        setToOpen(gameMgr.toOpen);
         forceUpdate();
     }
 
@@ -47,16 +57,14 @@ function App(props) {
         setIsGameOver(false);
         setIsWon(false);
         setFlagging([]);
-        setRate(0);
+        setRate([1, 1]);
         setMode(null);
+        setToOpen(width * height - totalMines)
         if (canceller) {
             clearTimeout(canceller);
             setCanceller(undefined);
         }
-        const cfg = module.parse('FL@[4,4]-PSEQ-30-16-T99-SNR');
-        module.cache(cfg.width, cfg.height, cfg.totalMines);
-        const mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
-        setGameMgr(mgr);
+        startGame(module);
     }
 
     function onProbe(row, col) {
@@ -66,7 +74,7 @@ function App(props) {
     const [flagging, setFlagging] = useState([]);
     function onFlag(row, col) {
         const f = [...flagging];
-        f[row * width + col] ^= true;
+        f[col * height + row] ^= true;
         setFlagging(f);
     }
 
@@ -144,8 +152,13 @@ function App(props) {
                 <Spinner intent="primary" />
             )}
             <div>
-                <ProgressBar value={rate} stripes={!isGameOver}
-                    intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
+                <p>{`${Math.round(Math.pow(2, rate[0]))} possible solutions`}</p>
+                <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
+                             intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
+                <p>{`${toOpen} / ${width * height - totalMines} blocks left`}</p>
+                <ProgressBar value={1 - toOpen / (width * height - totalMines)}
+                             stripes={!isGameOver}
+                             intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
                 <ButtonGroup>
                     <Button disabled={!gameMgr || mode != null}
                             icon="reset" intent="danger"

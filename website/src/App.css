@@ -114,3 +114,8 @@ td.blk-won {
   background-color: #09b722;
   background-image: linear-gradient(135deg, #3bec4b, #22a414);
 }
+
+td.blk-drain {
+  border-color: mediumslateblue;
+  border-style: dashed;
+}

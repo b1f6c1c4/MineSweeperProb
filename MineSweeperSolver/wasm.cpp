@@ -76,6 +76,7 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("hasMine", &BlockProperty::IsMine)
         ;
     register_vector<Block>("BlockSet");
+    register_vector<double>("VectorDouble");
     class_<GameMgr>("GameMgr")
         .constructor<int, int, int, bool, Strategy, bool>()
         .function("openBlock", static_cast<void (GameMgr::*)(int, int)>(&GameMgr::OpenBlock))
@@ -101,83 +102,6 @@ EMSCRIPTEN_BINDINGS(mws) {
         .function("inferredStatusOf", &GameMgr::GetInferredStatus)
         .property("bestBlocks", &GameMgr::GetBestBlockList)
         .property("preferredBlocks", &GameMgr::GetPreferredBlockList)
+        .property("bestProbabilityList", &GameMgr::GetBestProbabilityList)
         ;
 }
-
-/*
-struct GameStatus
-{
-    int TotalWidth, TotalHeight, TotalBlocks, TotalMines;
-    bool Started, Succeed;
-    double Bits, AllBits;
-    int ToOpen, WrongGuesses;
-
-    const BlockProperty *BlockProperties;
-    const BlockStatus *InferredStatus;
-    const double *Probabilities;
-    const double *DrainProbabilities;
-
-    int BestBlockCount;
-    const Block *BestBlocks;
-    int PreferredBlockCount;
-    const Block *PreferredBlocks;
-};
-
-extern "C" DLL_API GameMgr *CreateGameMgrFromFile(const wchar_t *filename)
-{
-    std::ifstream sr(filename, std::ios::binary);
-    auto mgr = new GameMgr(sr);
-    sr.close();
-    return mgr;
-}
-
-extern "C" DLL_API void SaveGameMgrToFile(GameMgr *mgr, const wchar_t *filename)
-{
-    std::ofstream sw(filename, std::ios::binary);
-    mgr->Save(sw);
-    sw.close();
-}
-
-extern "C" DLL_API GameStatus *GetGameStatus(GameMgr *mgr)
-{
-    auto st = new GameStatus;
-
-#define ST(name) st->name = mgr->Get##name();
-    ST(TotalWidth);
-    ST(TotalHeight);
-    ST(TotalMines);
-    ST(Started);
-    ST(Succeed);
-    ST(Bits);
-    ST(AllBits);
-    ST(ToOpen);
-    ST(WrongGuesses);
-    ST(BlockProperties);
-    ST(BestBlockCount);
-    ST(BestBlocks);
-    ST(PreferredBlockCount);
-    ST(PreferredBlocks);
-
-    st->TotalBlocks = st->TotalWidth * st->TotalHeight;
-    st->InferredStatus = mgr->GetSolver().GetBlockStatuses();
-    st->Probabilities = mgr->GetSolver().GetProbabilities();
-    if (mgr->GetDrainer() != nullptr)
-#include "stdafx.h"
-#include "GameMgr.h"
-#include "random.h"
-#include "Drainer.h"
-#include <fstream>
-        st->DrainProbabilities = mgr->GetDrainer()->GetBestProbabilities();
-    else
-        st->DrainProbabilities = nullptr;
-
-    return st;
-}
-
-extern "C" DLL_API void ReleaseGameStatus(GameStatus *status)
-{
-    if (status != nullptr)
-        delete status;
-}
-
-*/
