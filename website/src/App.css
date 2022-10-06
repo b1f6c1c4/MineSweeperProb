@@ -2,37 +2,109 @@
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+table.board {
+  table-layout: fixed;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+table.board * {
+  margin: 0;
+  padding: 0;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+table.board tr {
+  line-height: 5mm;
 }
 
-.App-link {
-  color: #61dafb;
+td.blk {
+  width: 5mm;
+  height: 5mm;
+  overflow: visible;
+  border-spacing: 0;
+  font-family: monospace;
+  font-size: 6mm;
+  border: 3px solid #b0b0b0;
+  background-color: #d2d2d2;
+  position: relative;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+td.blk span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -40%);
+}
+
+td.blk-open {
+  border: 3px solid #eeeeee;
+  background-color: #f3f3f3;
+  font-weight: bold;
+}
+
+span.num-1 {
+  color: #0301f0;
+}
+
+span.num-2 {
+  color: #098703;
+}
+
+span.num-3 {
+  color: #e30200;
+}
+
+span.num-4 {
+  color: #00006e;
+}
+
+span.num-5 {
+  color: #650101;
+}
+
+span.num-6 {
+  color: #0c7f74;
+}
+
+span.num-7 {
+  color: #000000;
+}
+
+span.num-8 {
+  color: #787878;
+}
+
+td.blk-dead {
+  background-color: red;
+  border-color: black;
+  color: black;
+}
+
+span.flag {
+  color: #cb4444;
+  font-size: 4mm;
+  transform: translate(-50%, -45%);
+}
+
+td.blk-safe {
+  border-color: gold !important;
+}
+
+td.blk-dangerous {
+  border-color: #f82929 !important;
+}
+
+td.blk-best {
+  border-color: gold;
+  background-color: gold;
+  background-image: linear-gradient(135deg, #ffda16, #e7c100);
+}
+
+td.blk-preferred {
+  border-color: #cccccc;
+  background-color: #cccccc;
+  background-image: linear-gradient(135deg, #eaeaea, #8f8f8f);
+}
+
+span.bad-flag {
+  font-weight: bold;
+  text-decoration: line-through;
 }

@@ -1,5 +1,6 @@
 import './App.css';
 import MineSweeperSolver from './MineSweeperSolver';
+import Board from './Board';
 
 MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' }).then(async (Module) => {
   console.log(Module);
@@ -8,11 +9,10 @@ MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' }).then(async (Mo
 function App() {
   return (
     <div className="App">
-      <header className="App-header">
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-      </header>
+        <Board
+            width={30}
+            height={16}
+        ></Board>
     </div>
   );
 }
