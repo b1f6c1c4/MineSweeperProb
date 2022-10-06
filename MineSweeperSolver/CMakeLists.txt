@@ -38,12 +38,13 @@ add_library(mws OBJECT
 
 if(EMSCRIPTEN)
     add_executable(MineSweeperSolver wasm.cpp)
+    target_link_libraries(MineSweeperSolver PRIVATE embind)
 else()
     find_package(Boost 1.80.0 REQUIRED)
     add_executable(MineSweeperSolver main.cpp)
-    target_link_libraries(MineSweeperSolver PRIVATE mws)
     target_link_libraries(MineSweeperSolver PRIVATE nlohmann_json::nlohmann_json)
     target_link_libraries(MineSweeperSolver PRIVATE boost_thread)
     target_link_libraries(MineSweeperSolver PRIVATE pthread)
 endif()
 
+target_link_libraries(MineSweeperSolver PRIVATE mws)
