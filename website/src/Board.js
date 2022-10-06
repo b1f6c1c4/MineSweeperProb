@@ -1,4 +1,5 @@
-import Block from "./Block";
+import React from 'react';
+import Block from './Block';
 
 export default function Board(props) {
     const {
