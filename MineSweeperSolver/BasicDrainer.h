@@ -46,13 +46,16 @@ private:
 bool operator==(const MacroSituation &lhs, const MacroSituation &rhs);
 bool operator!=(const MacroSituation &lhs, const MacroSituation &rhs);
 
+/* Exhaustively enumerate all individually possible solutions (MicroSituation)
+ * and group by degree numbers (MacroSituation).
+ */
 class
     BasicDrainer
 {
 public:
     virtual ~BasicDrainer();
 
-    double GetBestProb() const;
+    [[nodiscard]] double GetBestProb() const;
 protected:
     BasicDrainer();
     std::vector<BlockSet> m_BlocksR;

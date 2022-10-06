@@ -6,6 +6,11 @@
 
 class DistCondQParameters;
 
+/* Compute some heuristic information about blocks that helps break the tie when can't decide next move.
+ *
+ * These pieces of information are obtained by intersecting a block's neighbor
+ * against a certain solved probability model to predict the degree of a block.
+ */
 class
     Solver : public BasicSolver
 {
@@ -13,18 +18,18 @@ public:
     explicit Solver(size_t count);
     Solver(size_t count, int mines);
     Solver(const Solver &other);
-    ~Solver();
+    ~Solver() override;
 
     bool Solve(SolvingState maxDepth, bool shortcut) override;
 
-    const DistCondQParameters &GetDistInfo(const BlockSet &set, Block blk, int &min);
+    [[nodiscard]] const DistCondQParameters &GetDistInfo(const BlockSet &set, Block blk, int &min);
 
-    double ZeroCondQ(const BlockSet &set, Block blk);
-    double ZerosCondQ(const BlockSet &set, Block blk);
-    double ZerosECondQ(const BlockSet &set, Block blk);
-    double UpperBoundCondQ(const BlockSet &set, Block blk);
-    const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
-    double QuantityCondQ(const BlockSet &set, Block blk);
+    [[nodiscard]] double ZeroCondQ(const BlockSet &set, Block blk);
+    [[nodiscard]] double ZerosCondQ(const BlockSet &set, Block blk);
+    [[nodiscard]] double ZerosECondQ(const BlockSet &set, Block blk);
+    [[nodiscard]] double UpperBoundCondQ(const BlockSet &set, Block blk);
+    [[nodiscard]] const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
+    [[nodiscard]] double QuantityCondQ(const BlockSet &set, Block blk);
 
     friend class Drainer;
 private:
@@ -49,11 +54,13 @@ private:
     void ClearDistCondQCache();
 };
 
+/* Distribution of the degree of a block, conditioned
+ */
 class
     DistCondQParameters
 {
 public:
-    DistCondQParameters(DistCondQParameters &&other);
+    DistCondQParameters(DistCondQParameters &&other) noexcept;
     DistCondQParameters(Block set2ID, int length);
 
     std::vector<int> Sets1;

@@ -17,6 +17,9 @@ struct
 
 class Drainer;
 
+/* Bookkeeping the gaming process, store mine locations, report degree information to solvers.
+ * Use information from BasicSolver/Solver/Drainer to open corresponding blocks.
+ */
 class
     GameMgr
 {
@@ -28,32 +31,32 @@ public:
     Strategy BasicStrategy;
 
     Solver &GetSolver();
-    const Solver &GetSolver() const;
-    const Drainer *GetDrainer() const;
+    [[nodiscard]] const Solver &GetSolver() const;
+    [[nodiscard]] const Drainer *GetDrainer() const;
 
-    int GetTotalWidth() const;
-    int GetTotalHeight() const;
-    int GetTotalMines() const;
-    int GetToOpen() const;
-    int GetWrongGuesses() const;
-    bool GetSettled() const;
-    bool GetStarted() const;
-    bool GetSucceed() const;
-    double GetBits() const;
-    double GetAllBits() const;
+    [[nodiscard]] int GetTotalWidth() const;
+    [[nodiscard]] int GetTotalHeight() const;
+    [[nodiscard]] int GetTotalMines() const;
+    [[nodiscard]] int GetToOpen() const;
+    [[nodiscard]] int GetWrongGuesses() const;
+    [[nodiscard]] bool GetSettled() const;
+    [[nodiscard]] bool GetStarted() const;
+    [[nodiscard]] bool GetSucceed() const;
+    [[nodiscard]] double GetBits() const;
+    [[nodiscard]] double GetAllBits() const;
 
-    const BlockProperty &GetBlockProperty(int x, int y) const;
-    const BlockProperty *GetBlockProperties() const;
-    double GetBlockProbability(int x, int y) const;
-    BlockStatus GetInferredStatus(int x, int y) const;
+    [[nodiscard]] const BlockProperty &GetBlockProperty(int x, int y) const;
+    [[nodiscard]] const BlockProperty *GetBlockProperties() const;
+    [[nodiscard]] double GetBlockProbability(int x, int y) const;
+    [[nodiscard]] BlockStatus GetInferredStatus(int x, int y) const;
 
-    const Block *GetBestBlocks() const;
-    size_t GetBestBlockCount() const;
-    const BlockSet &GetBestBlockList() const;
-    const Block *GetPreferredBlocks() const;
-    size_t GetPreferredBlockCount() const;
-    const BlockSet &GetPreferredBlockList() const;
-    const std::vector<double> &GetBestProbabilityList() const;
+    [[nodiscard]] const Block *GetBestBlocks() const;
+    [[nodiscard]] size_t GetBestBlockCount() const;
+    [[nodiscard]] const BlockSet &GetBestBlockList() const;
+    [[nodiscard]] const Block *GetPreferredBlocks() const;
+    [[nodiscard]] size_t GetPreferredBlockCount() const;
+    [[nodiscard]] const BlockSet &GetPreferredBlockList() const;
+    [[nodiscard]] const std::vector<double> &GetBestProbabilityList() const;
 
     void OpenBlock(int x, int y);
 
@@ -84,12 +87,12 @@ private:
     BlockSet m_Best, m_Preferred;
     Drainer *m_Drainer;
 
-    int GetIndex(int x, int y) const;
+    [[nodiscard]] int GetIndex(int x, int y) const;
 
     void SettleMines(int initID);
     void OpenBlock(int id);
 
-    int FrontierDist(Block blk) const;
+    [[nodiscard]] int FrontierDist(Block blk) const;
 };
 
 void Largest(BlockSet &bests, std::function<int(Block)> fun);

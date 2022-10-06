@@ -64,6 +64,16 @@ typedef size_t Container;
 
 struct Solution;
 
+/* Determine which blocks must have mines, which blocks must not have mines.
+ * It may also compute the probability of having a mine.
+ *
+ * Five possible strategies are applied:
+ * 1. Reduce: check each constraint
+ * 2. Overlap: check each 2 constraints
+ * 3. Probability: divide the board into finite sets, solve the matrix
+ * 4. Heuristic: <implemented in class Solver>
+ * 5. Drain: <implemented in class Drainer>
+ */
 class
     BasicSolver
 {
@@ -75,20 +85,28 @@ public:
 
     int CanOpenForSure;
 
-    BlockStatus GetBlockStatus(Block block) const;
-    const BlockStatus *GetBlockStatuses() const;
-    double GetProbability(Block block) const;
-    const double *GetProbabilities() const;
-    double GetTotalStates() const;
-    const std::vector<BlockSet> &GetBlockSets() const;
-    const std::vector<Solution> &GetSolutions() const;
+    [[nodiscard]] BlockStatus GetBlockStatus(Block block) const;
+    [[nodiscard]] const BlockStatus *GetBlockStatuses() const;
+    [[nodiscard]] double GetProbability(Block block) const;
+    [[nodiscard]] const double *GetProbabilities() const;
+    [[nodiscard]] double GetTotalStates() const;
+    [[nodiscard]] const std::vector<BlockSet> &GetBlockSets() const;
+    [[nodiscard]] const std::vector<Solution> &GetSolutions() const;
 
     void AddRestrain(Block blk, bool isMine);
     void AddRestrain(const BlockSet &set, int mines);
+    /* maxDepth: what kinds of computation is enabled
+     * shortcut == true: return immediately if any CanOpenForSure is found
+     * shortcut == false: compute everything
+     * return == true: found anything NEW to be open
+     */
     virtual bool Solve(SolvingState maxDepth, bool shortcut);
 
     friend class Drainer;
 protected:
+    /* SolvingState::Stale is asserted when anything NEW is found.
+     * SolvingState::<other> are used to indicated what have been solved.
+     */
     SolvingState m_State;
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;

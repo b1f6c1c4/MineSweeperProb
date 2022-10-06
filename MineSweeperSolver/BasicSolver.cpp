@@ -190,6 +190,7 @@ bool BasicSolver::Solve(SolvingState maxDepth, bool shortcut)
 
     m_Solutions.clear();
 
+    // 1. Compute iteratively: (Reduce+ Overlap)+
     while (true)
     {
         while ((m_State & SolvingState::Reduce) == SolvingState::Stale)
@@ -213,6 +214,8 @@ bool BasicSolver::Solve(SolvingState maxDepth, bool shortcut)
 
     if ((m_State & SolvingState::Probability) == SolvingState::Probability)
         return true;
+
+    // 2. Compute Probability using Gauss elimination
 
     m_State |= SolvingState::Probability;
 

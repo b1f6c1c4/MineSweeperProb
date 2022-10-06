@@ -317,7 +317,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
                 throw std::runtime_error("blank is not blank");
             break;
         case BlockStatus::Unknown:
-        default: 
+        default:
             break;
         }
 #endif

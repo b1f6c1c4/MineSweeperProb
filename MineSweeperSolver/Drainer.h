@@ -4,16 +4,18 @@
 
 class GameMgr;
 
+/* Find the location of optimal next move, based on Macro/MicroSituation list.
+ */
 class
     Drainer : public BasicDrainer
 {
 public:
     explicit Drainer(const GameMgr &mgr);
-    ~Drainer();
+    ~Drainer() override;
 
-    BlockSet GetBestBlocks() const;
-    const double *GetBestProbabilities() const;
-    const std::vector<double> &GetBestProbabilityList() const;
+    [[nodiscard]] BlockSet GetBestBlocks() const;
+    [[nodiscard]] const double *GetBestProbabilities() const;
+    [[nodiscard]] const std::vector<double> &GetBestProbabilityList() const;
 
     void Update();
 protected:

@@ -372,7 +372,7 @@ void Solver::ClearDistCondQCache()
     m_DistCondQCache.clear();
 }
 
-DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Halves(std::move(other.m_Halves)), m_Result(std::move(other.m_Result)), m_Probability(other.m_Probability), m_Expectation(other.m_Expectation), m_UpperBound(other.m_UpperBound), m_TotalStates(other.m_TotalStates) {}
+DistCondQParameters::DistCondQParameters(DistCondQParameters &&other) noexcept : Sets1(std::move(other.Sets1)), Set2ID(other.Set2ID), Length(other.Length), m_Hash(other.m_Hash), m_Halves(std::move(other.m_Halves)), m_Result(std::move(other.m_Result)), m_Probability(other.m_Probability), m_Expectation(other.m_Expectation), m_UpperBound(other.m_UpperBound), m_TotalStates(other.m_TotalStates) {}
 
 DistCondQParameters::DistCondQParameters(Block set2ID, int length) : Set2ID(set2ID), Length(length), m_Hash(Hash()), m_Probability(NAN), m_Expectation(NAN), m_UpperBound(NAN), m_TotalStates(NAN) {}
 
