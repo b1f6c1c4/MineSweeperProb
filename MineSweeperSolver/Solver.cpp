@@ -126,6 +126,10 @@ void Solver::EnumerateSolutions(DistCondQParameters &par) const
     par.m_Solutions.resize(par.Length + 1);
 
     std::vector<int> stack, lb, ub;
+#ifndef NDEBUG
+    if (m_Solutions.empty())
+        throw std::runtime_error("m_Solution is empty when trying to enumerate dist");
+#endif
     for (auto &solution : m_Solutions)
     {
         if (par.Set2ID > 0 && m_BlockSets[par.Set2ID].size() == solution.Dist[par.Set2ID])

@@ -104,7 +104,7 @@ public:
 
     friend class Drainer;
 protected:
-    /* SolvingState::Stale is asserted when anything NEW is found.
+    /* SolvingState::Stale (=0) is used when anything NEW is found.
      * SolvingState::<other> are used to indicated what have been solved.
      */
     SolvingState m_State;

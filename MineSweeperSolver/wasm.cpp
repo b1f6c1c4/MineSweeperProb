@@ -65,7 +65,8 @@ EMSCRIPTEN_BINDINGS(mws) {
         .value("PROBABILITY", SolvingState::Probability)
         .value("HEURISTIC", SolvingState::Heuristic)
         .value("DRAINED", SolvingState::Drained)
-        .value("AUTOMATIC", SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic | SolvingState::Drained)
+        .value("SEMI", SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability)
+        .value("AUTO", SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic | SolvingState::Drained)
         ;
     class_<BlockProperty>("BlockProperty")
         .property("index", &BlockProperty::Index)

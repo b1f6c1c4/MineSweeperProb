@@ -471,7 +471,7 @@ void GameMgr::Automatic()
         else if (!BasicStrategy.HeuristicEnabled)
             OpenBlock(RandomInteger(m_Blocks.size()));
 
-    if (st == SolvingState::Stale)
+    if (st == SolvingState::Stale) // Passive Logic
     {
         if (!BasicStrategy.HeuristicEnabled)
         {
@@ -481,6 +481,7 @@ void GameMgr::Automatic()
 
         while (m_Started)
         {
+            // All open blocks are preferred
             for (auto i = 0; i < m_Blocks.size(); ++i)
             {
                 if (m_Blocks[i].IsOpen)
@@ -490,7 +491,7 @@ void GameMgr::Automatic()
             OpenOptimalBlocks();
         }
     }
-    else
+    else // Anything more than passive
         while (m_Started)
         {
             SemiAutomatic(st);

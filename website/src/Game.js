@@ -34,7 +34,7 @@ export default function Game(props) {
             setIsGameOver(true);
             setIsWon(gameMgr.succeed);
         } else {
-            gameMgr.solve(module.SolvingState.AUTOMATIC, false);
+            gameMgr.solve(module.SolvingState.AUTO, false);
         }
         setIsSettled(gameMgr.settled);
         console.log(gameMgr.bits);
@@ -70,8 +70,8 @@ export default function Game(props) {
     }
 
     function onStep() {
-        if (!gameMgr.semiAutomaticStep(module.SolvingState.AUTOMATIC, true))
-            gameMgr.automaticStep(module.SolvingState.AUTOMATIC);
+        if (!gameMgr.semiAutomaticStep(module.SolvingState.SEMI, true))
+            gameMgr.automaticStep(module.SolvingState.AUTO);
         onUpdate();
     }
 
@@ -83,7 +83,7 @@ export default function Game(props) {
             setMode('semi');
             const foo = () => {
                 setCanceller(undefined);
-                const next = gameMgr.semiAutomaticStep(module.SolvingState.AUTOMATIC, true);
+                const next = gameMgr.semiAutomaticStep(module.SolvingState.SEMI, true);
                 onUpdate();
                 if (next)
                     setCanceller(setTimeout(foo, Math.pow(10, 3 + speed)));
@@ -102,9 +102,7 @@ export default function Game(props) {
             setMode('auto');
             const foo = () => {
                 setCanceller(undefined);
-                if (!gameMgr.semiAutomaticStep(module.SolvingState.AUTOMATIC, true))
-                    gameMgr.automaticStep(module.SolvingState.AUTOMATIC);
-                onUpdate();
+                onStep();
                 if (gameMgr.started)
                     setCanceller(setTimeout(foo, Math.pow(10, 3 + speed)));
                 else
