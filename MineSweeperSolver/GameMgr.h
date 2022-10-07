@@ -66,7 +66,7 @@ public:
     bool SemiAutomaticStep(SolvingState maxDepth, bool single);
     bool SemiAutomatic(SolvingState maxDepth);
     void AutomaticStep(SolvingState maxDepth);
-    void Automatic();
+    void Automatic(bool drain = true);
 
     void EnableDrainer();
 

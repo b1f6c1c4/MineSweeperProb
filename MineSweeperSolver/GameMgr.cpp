@@ -442,7 +442,7 @@ void GameMgr::AutomaticStep(SolvingState maxDepth)
     OpenOptimalBlocks();
 }
 
-void GameMgr::Automatic()
+void GameMgr::Automatic(bool drain)
 {
     SolvingState st;
     switch (BasicStrategy.Logic)
@@ -502,7 +502,10 @@ void GameMgr::Automatic()
                 break;
             }
 
-            AutomaticStep(st | SolvingState::Heuristic | SolvingState::Drained);
+            if (drain)
+                AutomaticStep(st | SolvingState::Heuristic | SolvingState::Drained);
+            else
+                AutomaticStep(st | SolvingState::Heuristic);
         }
 }
 

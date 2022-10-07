@@ -166,3 +166,7 @@ td.blk-drain {
 .control .bp4-form-content:has(> .bp4-slider) {
   padding: 0 20px;
 }
+
+.control pre {
+  margin: auto;
+}

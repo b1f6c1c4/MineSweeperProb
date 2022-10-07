@@ -10,7 +10,6 @@ export default function App(props) {
     const [module, setModule] = useState(undefined);
     const [cfg, setCfg] = useState({ text: '(select)' });
     const [isSNR, setIsSNR] = useState(false);
-    const [isDrain, setIsDrain] = useState(false);
 
     useEffect(() => {
         moduleLoader.then((module) => {
@@ -43,10 +42,6 @@ export default function App(props) {
         setIsSNR(e.currentTarget.checked);
     }
 
-    function onSwitchDrain(e) {
-        setIsDrain(e.currentTarget.checked);
-    }
-
     let strategy = 'FL';
     if (!isSNR)
         strategy += '@[1,1]';
@@ -55,8 +50,7 @@ export default function App(props) {
     else
         strategy += '@[3,3]';
     strategy += '-PSEQ';
-    if (isDrain)
-        strategy += '-D256';
+    strategy += '-D256';
     let config = strategy + `-${cfg.width}-${cfg.height}-T${cfg.totalMines}`;
     if (isSNR)
         config += '-SNR';
@@ -75,9 +69,6 @@ export default function App(props) {
             <Switch checked={isSNR} onChange={onSwitch}
                     labelElement={'Safe First Action / Safe Neighbor Rule'}
                     innerLabelChecked="SNR" innerLabel="SFAR" />
-            <Switch checked={isDrain} onChange={onSwitchDrain}
-                    labelElement={'Enable D256'}
-                    innerLabelChecked="PSEQ-D256" innerLabel="PSEQ" />
             {!module ? (
                 <Spinner intent="primary" />
             ) : cfg.width && (

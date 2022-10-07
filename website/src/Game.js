@@ -26,28 +26,15 @@ export default function Game(props) {
     const gameMgrRef = useRef(gameMgr);
     gameMgrRef.current = gameMgr;
 
-    // could be inside setTimeout
-    function startGame() {
-        const cfg = module.parse(config);
-        module.cache(cfg.width, cfg.height, cfg.totalMines);
-        const mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
-        setGameMgr(mgr);
-        setRate([mgr.bits, mgr.allBits]);
-        setToOpen(width * height - totalMines);
-        return () => {
-            setGameMgr(undefined);
-            mgr.delete();
-        };
-    }
-
-    useEffect(startGame, [config]);
-
     const [isAutoRestart, setIsAutoRestart] = useState(false);
     const isAutoRestartRef = useRef(isAutoRestart);
     isAutoRestartRef.current = isAutoRestart;
     const [isAutoFlag, setIsAutoFlag] = useState(true);
     const isAutoFlagRef = useRef(isAutoFlag);
     isAutoFlagRef.current = isAutoFlag;
+    const [isDrain, setIsDrain] = useState(false);
+    const isDrainRef = useRef(isDrain);
+    isDrainRef.current = isDrain;
     const [enableAI, setEnableAI] = useState(true);
 
     const [, forceUpdate] = useReducer(x => x + 1, 0);
@@ -76,10 +63,14 @@ export default function Game(props) {
 
     // could be inside setTimeout
     function onUpdate() {
+        setToOpen(gameMgrRef.current.toOpen);
         if (!gameMgrRef.current.started) {
             setIsGameOver(true);
             setIsWon(gameMgrRef.current.succeed);
             setHasBest(false);
+            setIsSettled(true);
+            if (gameMgrRef.current.succeed)
+                setRate([0, gameMgrRef.current.allBits]);
             if (isAutoRestartRef.current)
                 setTimeout(() => {
                     // just in case the user cancels during the period
@@ -87,7 +78,13 @@ export default function Game(props) {
                         onRestart();
                 }, 1500);
         } else {
-            gameMgrRef.current.solve(module.SolvingState.AUTO, false);
+            if (isDrainRef.current)
+                gameMgrRef.current.solve(module.SolvingState.AUTO, false);
+            else
+                gameMgrRef.current.solve(module.SolvingState.HEUR, false);
+            setHasBest(!!gameMgrRef.current.bestBlocks.size());
+            setIsSettled(gameMgrRef.current.settled);
+            setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
         }
         if (enableAI && isAutoFlagRef.current) {
             const next = flaggingRef.current;
@@ -108,10 +105,6 @@ export default function Game(props) {
             setFlagging(next);
             setTotalFlagged(tf);
         }
-        setHasBest(!!gameMgrRef.current.bestBlocks.size());
-        setIsSettled(gameMgrRef.current.settled);
-        setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
-        setToOpen(gameMgrRef.current.toOpen);
         forceUpdate();
     }
 
@@ -123,20 +116,33 @@ export default function Game(props) {
         setIsWon(false);
         setFlagging([]);
         setTotalFlagged(0);
-        setRate([1, 1]);
         setHasBest(false);
-        setToOpen(width * height - totalMines)
         if (cancellerRef.current) {
             clearTimeout(cancellerRef.current);
             setCanceller(undefined);
         }
         setMode(null);
-        startGame(module);
+        const cfg = module.parse(config);
+        module.cache(cfg.width, cfg.height, cfg.totalMines);
+        const mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
+        setGameMgr(mgr);
+        setRate([mgr.bits, mgr.allBits]);
+        setToOpen(width * height - totalMines);
         if (m === 'auto')
             setTimeout(onAuto, 500);
         else if (m === 'auto-all')
             setTimeout(onAutoAll, 500);
     }
+
+    useEffect(() => {
+        onRestart();
+        return () => {
+            if (gameMgrRef.current) {
+                gameMgrRef.current.delete();
+                setGameMgr(undefined);
+            }
+        };
+    }, [config]);
 
     function onProbe(row, col) {
         gameMgr.openBlock(col, row);
@@ -157,8 +163,12 @@ export default function Game(props) {
 
     // could be inside setTimeout
     function onStep() {
-        if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true))
-            gameMgrRef.current.automaticStep(module.SolvingState.AUTO);
+        if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true)) {
+            if (isDrainRef.current)
+                gameMgrRef.current.automaticStep(module.SolvingState.AUTO);
+            else
+                gameMgrRef.current.automaticStep(module.SolvingState.HEUR);
+        }
         onUpdate();
     }
 
@@ -211,7 +221,7 @@ export default function Game(props) {
 
     // could be inside setTimeout
     function onAutoAll() {
-        gameMgrRef.current.automatic();
+        gameMgrRef.current.automatic(isDrainRef.current);
         if (isAutoRestartRef.current)
             setMode('auto-all');
         onUpdate();
@@ -237,6 +247,10 @@ export default function Game(props) {
         setEnableAI(e.currentTarget.checked);
     }
 
+    function onSwitchDrain(e) {
+        setIsDrain(e.currentTarget.checked);
+    }
+
     function roundDigits(v) {
         const av = Math.abs(v);
         if (av >= 0.0001 && av < 100000)
@@ -246,6 +260,8 @@ export default function Game(props) {
         const rv = Math.round(av / scale * 10) / 10;
         return `${Math.sign(v) < 0 ? '-' : ''}${rv}e${shift}`;
     }
+
+    const isReady = gameMgr && gameMgr.totalWidth === width && gameMgr.totalHeight === height;
 
     return (
         <div className="game-container">
@@ -260,7 +276,7 @@ export default function Game(props) {
                     isStarted={isSettled}
                     isGameOver={isGameOver}
                     isWon={isWon}
-                    gameMgr={gameMgr}
+                    gameMgr={isReady && gameMgr}
                     module={module}
                     flagging={flagging}
                     onProbe={onProbe}
@@ -299,7 +315,11 @@ export default function Game(props) {
                         alignIndicator={Alignment.RIGHT} />
                 <Collapse isOpen={enableAI} keepChildrenMounted>
                     <h3>AI Control</h3>
-                    <pre>{strategy}</pre>
+                    <Switch checked={isDrain} onChange={onSwitchDrain}
+                            labelElement={'Exhaustive'} disabled={mode !== null}
+                            innerLabelChecked="PSEQ-D256" innerLabel="PSEQ"
+                            alignIndicator={Alignment.RIGHT} />
+                    <pre>{isDrain ? strategy : strategy.replace('-D256', '')}</pre>
                     <Switch checked={isAutoFlag} onChange={onSwitchFlag}
                             labelElement={'Auto-flag'}
                             innerLabelChecked="on" innerLabel="off"
