@@ -17,21 +17,23 @@ export default function Board(props) {
 
     const body = [];
     const best = [], preferred = [];
-    {
-        const set = gameMgr.bestBlocks;
+    if (gameMgr) {
+        let set = gameMgr.bestBlocks;
         for (let i = 0; i < set.size(); i++)
             best[set.get(i)] = true;
-    }
-    {
-        const set = gameMgr.preferredBlocks;
+        set = gameMgr.preferredBlocks;
         for (let i = 0; i < set.size(); i++)
             preferred[set.get(i)] = true;
     }
-    const drain = gameMgr.bestProbabilityList;
+    const drain = gameMgr && gameMgr.bestProbabilityList;
 
     for (let i = 0; i < height; i++) {
         const row = [];
         for (let j = 0; j < width; j++) {
+            if (!gameMgr) {
+                row.push(<Block key={j} />)
+                continue;
+            }
             const property = gameMgr.blockPropertyOf(j, i);
             const infer = gameMgr.inferredStatusOf(j, i);
             let prob = gameMgr.blockProbabilityOf(j, i);

@@ -111,6 +111,10 @@ td.blk-won {
   background-image: linear-gradient(135deg, #3bec4b, #22a414);
 }
 
+td.blk-won span.flag {
+  color: white;
+}
+
 td.blk-drain {
   border-color: mediumslateblue;
   border-style: dashed;

@@ -1,6 +1,16 @@
 import React, {useEffect, useReducer, useRef, useState} from 'react';
 import Board from './Board';
-import {Button, ButtonGroup, ProgressBar, Slider, Switch} from '@blueprintjs/core';
+import {
+    Button,
+    ButtonGroup,
+    Card,
+    ControlGroup,
+    Elevation,
+    FormGroup,
+    ProgressBar,
+    Slider,
+    Switch
+} from '@blueprintjs/core';
 
 export default function Game(props) {
     const {
@@ -29,6 +39,9 @@ export default function Game(props) {
     const [isAutoRestart, setIsAutoRestart] = useState(false);
     const isAutoRestartRef = useRef(isAutoRestart);
     isAutoRestartRef.current = isAutoRestart;
+    const [isAutoFlag, setIsAutoFlag] = useState(true);
+    const isAutoFlagRef = useRef(isAutoFlag);
+    isAutoFlagRef.current = isAutoFlag;
 
     const [, forceUpdate] = useReducer(x => x + 1, 0);
     const [isSettled, setIsSettled] = useState(false);
@@ -36,8 +49,14 @@ export default function Game(props) {
     const [isWon, setIsWon] = useState(false);
     const [rate, setRate] = useState([1, 1]);
     const [toOpen, setToOpen] = useState(width * height - totalMines);
+    const [hasBest, setHasBest] = useState(false);
 
     const [flagging, setFlagging] = useState([]);
+    const flaggingRef = useRef(flagging);
+    flaggingRef.current = flagging;
+    const [totalFlagged, setTotalFlagged] = useState(0);
+    const totalFlaggedRef = useRef(totalFlagged);
+    totalFlaggedRef.current = totalFlagged;
     const [speed, setSpeed] = useState(-1.5);
     const speedRef = useRef(speed);
     speedRef.current = speed;
@@ -53,6 +72,7 @@ export default function Game(props) {
         if (!gameMgrRef.current.started) {
             setIsGameOver(true);
             setIsWon(gameMgrRef.current.succeed);
+            setHasBest(false);
             if (isAutoRestartRef.current)
                 setTimeout(() => {
                     // just in case the user cancels during the period
@@ -62,6 +82,26 @@ export default function Game(props) {
         } else {
             gameMgrRef.current.solve(module.SolvingState.AUTO, false);
         }
+        if (isAutoFlagRef.current) {
+            const next = flaggingRef.current;
+            let tf = totalFlaggedRef.current;
+            for (let i = 0; i < height; i++)
+                for (let j = 0; j < width; j++) {
+                    if (gameMgrRef.current.inferredStatusOf(j, i) === module.BlockStatus.MINE)
+                        if (!next[j * height + i]) {
+                            next[j * height + i] = true;
+                            tf++;
+                        }
+                    if (gameMgrRef.current.blockPropertyOf(j, i).isOpen)
+                        if (next[j * height + i]) {
+                            delete next[j * height + i];
+                            tf--;
+                        }
+                }
+            setFlagging(next);
+            setTotalFlagged(tf);
+        }
+        setHasBest(!!gameMgrRef.current.bestBlocks.size());
         setIsSettled(gameMgrRef.current.settled);
         setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
         setToOpen(gameMgrRef.current.toOpen);
@@ -75,7 +115,9 @@ export default function Game(props) {
         setIsGameOver(false);
         setIsWon(false);
         setFlagging([]);
+        setTotalFlagged(0);
         setRate([1, 1]);
+        setHasBest(false);
         setToOpen(width * height - totalMines)
         if (cancellerRef.current) {
             clearTimeout(cancellerRef.current);
@@ -96,7 +138,13 @@ export default function Game(props) {
 
     function onFlag(row, col) {
         const f = [...flagging];
-        f[col * height + row] ^= true;
+        if (f[col * height + row]) {
+            delete f[col * height + row];
+            setTotalFlagged(totalFlagged - 1);
+        } else {
+            f[col * height + row] ^= true;
+            setTotalFlagged(totalFlagged + 1);
+        }
         setFlagging(f);
     }
 
@@ -174,9 +222,18 @@ export default function Game(props) {
             setMode(null);
     }
 
+    function onSwitchFlag(e) {
+        setIsAutoFlag(e.currentTarget.checked);
+    }
+
     return (
         <div>
-            {gameMgr && (
+            <Card elevation={Elevation.TWO}>
+                <div>
+                <p>{`${totalFlagged} / ${totalMines} mines flagged`}</p>
+                <ProgressBar value={totalFlagged / totalMines} stripes={!isGameOver}
+                             intent={(isGameOver && !isWon) ? 'danger' : 'warning'} />
+                </div>
                 <Board
                     width={width}
                     height={height}
@@ -188,51 +245,71 @@ export default function Game(props) {
                     flagging={flagging}
                     onProbe={onProbe}
                     onFlag={onFlag}
-                />)}
-            <div>
+                />
+                <div>
                 <p>{`${Math.round(Math.pow(2, rate[0]))} possible solutions`}</p>
                 <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
                              intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
                 <p>{`${toOpen} / ${width * height - totalMines} blocks left`}</p>
                 <ProgressBar value={1 - toOpen / (width * height - totalMines)}
                              stripes={!isGameOver}
-                             intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
-                <ButtonGroup>
-                    <Button disabled={!gameMgr || mode != null}
-                            icon="reset" intent="danger"
-                            text="Restart" onClick={onRestart} />
-                    <Button disabled={!gameMgr || isGameOver || mode !== null}
-                            icon="hand-up" intent="primary"
-                            text="Single step" onClick={onStep} />
-                    <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi')}
-                            active={mode === 'semi'}
-                            icon="play" intent="success"
-                            text="Semi-auto" onClick={onSemi} />
-                    <Button disabled={!gameMgr || isGameOver || mode !== null}
-                            icon="fast-forward" intent="success"
-                            onClick={onSemiAll} />
-                    <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
-                            active={mode === 'auto'}
-                            icon="fast-forward" intent="warning"
-                            text="Full-auto" onClick={onAuto} />
-                    <Button disabled={!gameMgr || isGameOver || mode !== null}
-                            icon="lightning" intent="warning"
-                            onClick={onAutoAll} />
+                             intent={(isGameOver && !isWon) ? 'danger' : 'primary'} />
+                </div>
+            </Card>
+            <FormGroup label="Game Control">
+                <ControlGroup>
+                    <ButtonGroup>
+                        <Button disabled={!gameMgr || mode != null}
+                                icon="reset" intent="danger"
+                                text="Restart" onClick={onRestart} />
+                    </ButtonGroup>
                     <Switch checked={isAutoRestart} onChange={onSwitch}
                             labelElement={'Auto-restart'}
                             innerLabelChecked="on" innerLabel="off" />
+                </ControlGroup>
+            </FormGroup>
+            <FormGroup label="AI Control">
+                <ButtonGroup>
+                    <Button disabled={!gameMgr || isGameOver || mode !== null}
+                            icon="hand-up" intent="primary"
+                            text="Single step" onClick={onStep} />
                 </ButtonGroup>
-                <Slider
-                    min={-2}
-                    max={2}
-                    stepSize={0.1}
-                    labelStepSize={1}
-                    onChange={setSpeed}
-                    labelRenderer={renderLabel}
-                    showTrackFill={false}
-                    value={speed}
-                />
-            </div>
+                <ControlGroup>
+                    <ButtonGroup>
+                        <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi') || !hasBest}
+                                active={mode === 'semi'}
+                                icon="play" intent="success"
+                                text="Semi-auto" onClick={onSemi} />
+                        <Button disabled={!gameMgr || isGameOver || mode !== null || !hasBest}
+                                icon="fast-forward" intent="success"
+                                onClick={onSemiAll} />
+                    </ButtonGroup>
+                    <ButtonGroup>
+                        <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
+                                active={mode === 'auto'}
+                                icon="fast-forward" intent="warning"
+                                text="Full-auto" onClick={onAuto} />
+                        <Button disabled={!gameMgr || isGameOver || mode !== null}
+                                icon="lightning" intent="warning"
+                                onClick={onAutoAll} />
+                    </ButtonGroup>
+                </ControlGroup>
+                <ControlGroup>
+                    <Slider
+                        min={-2}
+                        max={2}
+                        stepSize={0.1}
+                        labelStepSize={1}
+                        onChange={setSpeed}
+                        labelRenderer={renderLabel}
+                        showTrackFill={false}
+                        value={speed}
+                    />
+                </ControlGroup>
+                <Switch checked={isAutoFlag} onChange={onSwitchFlag}
+                        labelElement={'Auto-flag'}
+                        innerLabelChecked="on" innerLabel="off" />
+            </FormGroup>
         </div>
     );
 }
