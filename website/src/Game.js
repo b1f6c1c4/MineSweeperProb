@@ -1,7 +1,6 @@
-import React from 'react';
+import React, {useEffect, useReducer, useRef, useState} from 'react';
 import Board from './Board';
-import {useEffect, useReducer, useState} from 'react';
-import {Button, ButtonGroup, ProgressBar, Slider} from '@blueprintjs/core';
+import {Button, ButtonGroup, ProgressBar, Slider, Switch} from '@blueprintjs/core';
 
 export default function Game(props) {
     const {
@@ -12,16 +11,24 @@ export default function Game(props) {
         strategy,
     } = props;
     const [gameMgr, setGameMgr] = useState(undefined);
+    const gameMgrRef = useRef(gameMgr);
+    gameMgrRef.current = gameMgr;
 
+    // could be inside setTimeout
     function startGame() {
         const cfg = module.parse(strategy);
         module.cache(cfg.width, cfg.height, cfg.totalMines);
         const mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
         setGameMgr(mgr);
         setRate([mgr.bits, mgr.allBits]);
+        setToOpen(width * height - totalMines);
     }
 
     useEffect(startGame, [strategy]);
+
+    const [isAutoRestart, setIsAutoRestart] = useState(false);
+    const isAutoRestartRef = useRef(isAutoRestart);
+    isAutoRestartRef.current = isAutoRestart;
 
     const [, forceUpdate] = useReducer(x => x + 1, 0);
     const [isSettled, setIsSettled] = useState(false);
@@ -29,64 +36,87 @@ export default function Game(props) {
     const [isWon, setIsWon] = useState(false);
     const [rate, setRate] = useState([1, 1]);
     const [toOpen, setToOpen] = useState(width * height - totalMines);
+
+    const [flagging, setFlagging] = useState([]);
+    const [speed, setSpeed] = useState(-1.5);
+    const speedRef = useRef(speed);
+    speedRef.current = speed;
+    const [mode, setMode] = useState(null);
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
+    const [canceller, setCanceller] = useState(undefined);
+    const cancellerRef = useRef(canceller);
+    cancellerRef.current = canceller;
+
+    // could be inside setTimeout
     function onUpdate() {
-        if (!gameMgr.started) {
+        if (!gameMgrRef.current.started) {
             setIsGameOver(true);
-            setIsWon(gameMgr.succeed);
+            setIsWon(gameMgrRef.current.succeed);
+            if (isAutoRestartRef.current)
+                setTimeout(() => {
+                    // just in case the user cancels during the period
+                    if (isAutoRestartRef.current)
+                        onRestart();
+                }, 1500);
         } else {
-            gameMgr.solve(module.SolvingState.AUTO, false);
+            gameMgrRef.current.solve(module.SolvingState.AUTO, false);
         }
-        setIsSettled(gameMgr.settled);
-        console.log(gameMgr.bits);
-        setRate([gameMgr.bits, gameMgr.allBits]);
-        setToOpen(gameMgr.toOpen);
+        setIsSettled(gameMgrRef.current.settled);
+        setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
+        setToOpen(gameMgrRef.current.toOpen);
         forceUpdate();
     }
 
+    // could be inside setTimeout
     function onRestart() {
+        const m = modeRef.current;
         setIsSettled(false);
         setIsGameOver(false);
         setIsWon(false);
         setFlagging([]);
         setRate([1, 1]);
-        setMode(null);
         setToOpen(width * height - totalMines)
-        if (canceller) {
-            clearTimeout(canceller);
+        if (cancellerRef.current) {
+            clearTimeout(cancellerRef.current);
             setCanceller(undefined);
         }
+        setMode(null);
         startGame(module);
+        if (m === 'auto')
+            setTimeout(onAuto, 500);
+        else if (m === 'auto-all')
+            setTimeout(onAutoAll, 500);
     }
 
     function onProbe(row, col) {
         gameMgr.openBlock(col, row);
         onUpdate();
     }
-    const [flagging, setFlagging] = useState([]);
+
     function onFlag(row, col) {
         const f = [...flagging];
         f[col * height + row] ^= true;
         setFlagging(f);
     }
 
+    // could be inside setTimeout
     function onStep() {
-        if (!gameMgr.semiAutomaticStep(module.SolvingState.SEMI, true))
-            gameMgr.automaticStep(module.SolvingState.AUTO);
+        if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true))
+            gameMgrRef.current.automaticStep(module.SolvingState.AUTO);
         onUpdate();
     }
 
-    const [speed, setSpeed] = useState(-1.5);
-    const [mode, setMode] = useState(null);
-    const [canceller, setCanceller] = useState(undefined);
     function onSemi() {
         if (mode === null) {
             setMode('semi');
+            // could be inside setTimeout
             const foo = () => {
                 setCanceller(undefined);
-                const next = gameMgr.semiAutomaticStep(module.SolvingState.SEMI, true);
+                const next = gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true);
                 onUpdate();
                 if (next)
-                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speed)));
+                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speedRef.current)));
                 else
                     setMode(null);
             };
@@ -97,29 +127,51 @@ export default function Game(props) {
             setMode(null);
         }
     }
+
+    function onSemiAll() {
+        gameMgr.semiAutomatic(module.SolvingState.SEMI);
+        onUpdate();
+    }
+
+    // could be inside setTimeout
     function onAuto() {
-        if (mode === null) {
+        if (modeRef.current === null) {
             setMode('auto');
+            // could be inside setTimeout
             const foo = () => {
                 setCanceller(undefined);
                 onStep();
-                if (gameMgr.started)
-                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speed)));
-                else
+                if (gameMgrRef.current.started)
+                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speedRef.current)));
+                else if (!isAutoRestartRef.current)
                     setMode(null);
             };
             foo();
         } else {
-            clearTimeout(canceller);
+            clearTimeout(cancellerRef.current);
             setCanceller(undefined);
             setMode(null);
         }
+    }
+
+    // could be inside setTimeout
+    function onAutoAll() {
+        gameMgrRef.current.automatic();
+        if (isAutoRestartRef.current)
+            setMode('auto-all');
+        onUpdate();
     }
 
     function renderLabel(v) {
         const y = Math.pow(10, -v);
         const s = Math.pow(10, Math.ceil(v) + 1);
         return `${Math.round(y * s) / s}x`;
+    }
+
+    function onSwitch(e) {
+        setIsAutoRestart(e.currentTarget.checked);
+        if (isGameOver && !e.currentTarget.checked)
+            setMode(null);
     }
 
     return (
@@ -150,16 +202,25 @@ export default function Game(props) {
                             icon="reset" intent="danger"
                             text="Restart" onClick={onRestart} />
                     <Button disabled={!gameMgr || isGameOver || mode !== null}
-                            icon="step-forward" intent="primary"
+                            icon="hand-up" intent="primary"
                             text="Single step" onClick={onStep} />
-                    <Button disabled={!gameMgr || isGameOver || mode === 'auto'}
+                    <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi')}
                             active={mode === 'semi'}
                             icon="play" intent="success"
                             text="Semi-auto" onClick={onSemi} />
-                    <Button disabled={!gameMgr || isGameOver || mode === 'semi'}
+                    <Button disabled={!gameMgr || isGameOver || mode !== null}
+                            icon="fast-forward" intent="success"
+                            onClick={onSemiAll} />
+                    <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
                             active={mode === 'auto'}
                             icon="fast-forward" intent="warning"
                             text="Full-auto" onClick={onAuto} />
+                    <Button disabled={!gameMgr || isGameOver || mode !== null}
+                            icon="lightning" intent="warning"
+                            onClick={onAutoAll} />
+                    <Switch checked={isAutoRestart} onChange={onSwitch}
+                            labelElement={'Auto-restart'}
+                            innerLabelChecked="on" innerLabel="off" />
                 </ButtonGroup>
                 <Slider
                     min={-2}
