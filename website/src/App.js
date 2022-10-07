@@ -16,6 +16,12 @@ export default function App(props) {
         moduleLoader.then((module) => {
             setModule(module);
             module.seed();
+            setCfg({
+                text: '8-8-T10',
+                width: 8,
+                height: 8,
+                totalMines: 10,
+            });
         }, console.error);
     }, []);
 
@@ -51,14 +57,14 @@ export default function App(props) {
     strategy += '-PSEQ';
     if (isDrain)
         strategy += '-D256';
-    strategy += `-${cfg.width}-${cfg.height}-T${cfg.totalMines}`;
+    let config = strategy + `-${cfg.width}-${cfg.height}-T${cfg.totalMines}`;
     if (isSNR)
-        strategy += '-SNR';
+        config += '-SNR';
     else
-        strategy += '-SFAR';
+        config += '-SFAR';
 
     return (
-        <div>
+        <div className="App">
             <HTMLSelect value={cfg.text} onChange={onSelect}>
                 <option>(select)</option>
                 <option>8-8-T10</option>
@@ -82,6 +88,7 @@ export default function App(props) {
                     totalMines={cfg.totalMines}
                     isSNR={isSNR}
                     strategy={strategy}
+                    config={config}
                 />)}
         </div>
     );

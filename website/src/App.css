@@ -1,5 +1,6 @@
 table.board {
   table-layout: fixed;
+  margin: auto;
 }
 
 table.board * {
@@ -118,4 +119,50 @@ td.blk-won span.flag {
 td.blk-drain {
   border-color: mediumslateblue;
   border-style: dashed;
+}
+
+.game-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.game {
+  width: fit-content;
+  min-width: 300px;
+}
+
+.centering {
+  margin: auto;
+}
+
+.control {
+  width: fit-content;
+  min-width: 230px;
+}
+
+.control .bp4-form-group.bp4-inline {
+  justify-content: space-between;
+}
+
+.control > h3 {
+  margin-top: 0;
+}
+
+.control .bp4-control-group.bp4-vertical {
+  align-items: stretch;
+}
+
+.control .bp4-control-group.bp4-vertical .bp4-button-group {
+  width: 100%;
+}
+
+.control .bp4-button-group .bp4-button.growing {
+  flex-grow: 1;
+}
+
+.control .bp4-form-content:has(> .bp4-slider) {
+  padding: 0 20px;
 }

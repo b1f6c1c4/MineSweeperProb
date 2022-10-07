@@ -1,9 +1,10 @@
 import React, {useEffect, useReducer, useRef, useState} from 'react';
 import Board from './Board';
 import {
+    Alignment,
     Button,
     ButtonGroup,
-    Card,
+    Card, Collapse,
     ControlGroup,
     Elevation,
     FormGroup,
@@ -19,6 +20,7 @@ export default function Game(props) {
         height,
         totalMines,
         strategy,
+        config,
     } = props;
     const [gameMgr, setGameMgr] = useState(undefined);
     const gameMgrRef = useRef(gameMgr);
@@ -26,15 +28,19 @@ export default function Game(props) {
 
     // could be inside setTimeout
     function startGame() {
-        const cfg = module.parse(strategy);
+        const cfg = module.parse(config);
         module.cache(cfg.width, cfg.height, cfg.totalMines);
         const mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
         setGameMgr(mgr);
         setRate([mgr.bits, mgr.allBits]);
         setToOpen(width * height - totalMines);
+        return () => {
+            setGameMgr(undefined);
+            mgr.delete();
+        };
     }
 
-    useEffect(startGame, [strategy]);
+    useEffect(startGame, [config]);
 
     const [isAutoRestart, setIsAutoRestart] = useState(false);
     const isAutoRestartRef = useRef(isAutoRestart);
@@ -42,6 +48,7 @@ export default function Game(props) {
     const [isAutoFlag, setIsAutoFlag] = useState(true);
     const isAutoFlagRef = useRef(isAutoFlag);
     isAutoFlagRef.current = isAutoFlag;
+    const [enableAI, setEnableAI] = useState(true);
 
     const [, forceUpdate] = useReducer(x => x + 1, 0);
     const [isSettled, setIsSettled] = useState(false);
@@ -82,7 +89,7 @@ export default function Game(props) {
         } else {
             gameMgrRef.current.solve(module.SolvingState.AUTO, false);
         }
-        if (isAutoFlagRef.current) {
+        if (enableAI && isAutoFlagRef.current) {
             const next = flaggingRef.current;
             let tf = totalFlaggedRef.current;
             for (let i = 0; i < height; i++)
@@ -226,14 +233,27 @@ export default function Game(props) {
         setIsAutoFlag(e.currentTarget.checked);
     }
 
+    function onSwitchAI(e) {
+        setEnableAI(e.currentTarget.checked);
+    }
+
+    function roundDigits(v) {
+        const av = Math.abs(v);
+        if (av >= 0.0001 && av < 100000)
+            return '' + Math.round(v);
+        const shift = Math.floor(Math.log10(v));
+        const scale = Math.pow(10, shift);
+        const rv = Math.round(av / scale * 10) / 10;
+        return `${Math.sign(v) < 0 ? '-' : ''}${rv}e${shift}`;
+    }
+
     return (
-        <div>
-            <Card elevation={Elevation.TWO}>
-                <div>
-                <p>{`${totalFlagged} / ${totalMines} mines flagged`}</p>
-                <ProgressBar value={totalFlagged / totalMines} stripes={!isGameOver}
-                             intent={(isGameOver && !isWon) ? 'danger' : 'warning'} />
-                </div>
+        <div className="game-container">
+            <Card elevation={Elevation.TWO} className="game">
+                <FormGroup label={`${totalFlagged} / ${totalMines} mines flagged`}>
+                    <ProgressBar value={totalFlagged / totalMines} stripes={!isGameOver}
+                                 intent={(isGameOver && !isWon) ? 'danger' : 'warning'} />
+                </FormGroup>
                 <Board
                     width={width}
                     height={height}
@@ -245,71 +265,87 @@ export default function Game(props) {
                     flagging={flagging}
                     onProbe={onProbe}
                     onFlag={onFlag}
+                    enableAI={enableAI}
                 />
-                <div>
-                <p>{`${Math.round(Math.pow(2, rate[0]))} possible solutions`}</p>
-                <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
-                             intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
-                <p>{`${toOpen} / ${width * height - totalMines} blocks left`}</p>
-                <ProgressBar value={1 - toOpen / (width * height - totalMines)}
-                             stripes={!isGameOver}
-                             intent={(isGameOver && !isWon) ? 'danger' : 'primary'} />
-                </div>
+                <br />
+                <Collapse isOpen={enableAI}>
+                    <FormGroup label={`${roundDigits(Math.pow(2, rate[0]))} possible solutions`}>
+                        <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
+                                     intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
+                    </FormGroup>
+                </Collapse>
+                <FormGroup label={`${toOpen} / ${width * height - totalMines} blocks left`}>
+                    <ProgressBar value={1 - toOpen / (width * height - totalMines)}
+                                 stripes={!isGameOver}
+                                 intent={(isGameOver && !isWon) ? 'danger' : 'primary'} />
+                </FormGroup>
             </Card>
-            <FormGroup label="Game Control">
-                <ControlGroup>
-                    <ButtonGroup>
-                        <Button disabled={!gameMgr || mode != null}
-                                icon="reset" intent="danger"
+            <Card elevation={Elevation.TWO} className="control">
+                <h3>Game Control</h3>
+                <FormGroup label="Game" inline>
+                    <ButtonGroup className="centering">
+                        <Button disabled={!gameMgr || mode != null} rightIcon="refresh"
+                                intent={isGameOver ? isWon ? 'success' : 'danger' : undefined}
                                 text="Restart" onClick={onRestart} />
                     </ButtonGroup>
-                    <Switch checked={isAutoRestart} onChange={onSwitch}
-                            labelElement={'Auto-restart'}
-                            innerLabelChecked="on" innerLabel="off" />
-                </ControlGroup>
-            </FormGroup>
-            <FormGroup label="AI Control">
-                <ButtonGroup>
-                    <Button disabled={!gameMgr || isGameOver || mode !== null}
-                            icon="hand-up" intent="primary"
-                            text="Single step" onClick={onStep} />
-                </ButtonGroup>
-                <ControlGroup>
-                    <ButtonGroup>
-                        <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi') || !hasBest}
-                                active={mode === 'semi'}
-                                icon="play" intent="success"
-                                text="Semi-auto" onClick={onSemi} />
-                        <Button disabled={!gameMgr || isGameOver || mode !== null || !hasBest}
-                                icon="fast-forward" intent="success"
-                                onClick={onSemiAll} />
-                    </ButtonGroup>
-                    <ButtonGroup>
-                        <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
-                                active={mode === 'auto'}
-                                icon="fast-forward" intent="warning"
-                                text="Full-auto" onClick={onAuto} />
-                        <Button disabled={!gameMgr || isGameOver || mode !== null}
-                                icon="lightning" intent="warning"
-                                onClick={onAutoAll} />
-                    </ButtonGroup>
-                </ControlGroup>
-                <ControlGroup>
-                    <Slider
-                        min={-2}
-                        max={2}
-                        stepSize={0.1}
-                        labelStepSize={1}
-                        onChange={setSpeed}
-                        labelRenderer={renderLabel}
-                        showTrackFill={false}
-                        value={speed}
-                    />
-                </ControlGroup>
-                <Switch checked={isAutoFlag} onChange={onSwitchFlag}
-                        labelElement={'Auto-flag'}
-                        innerLabelChecked="on" innerLabel="off" />
-            </FormGroup>
+                </FormGroup>
+                <Switch checked={isAutoRestart} onChange={onSwitch}
+                        labelElement={'Auto-restart'}
+                        innerLabelChecked="on" innerLabel="off"
+                        alignIndicator={Alignment.RIGHT} />
+                <Switch checked={enableAI} onChange={onSwitchAI}
+                        labelElement={'Enable AI'} disabled={mode !== null}
+                        innerLabelChecked="on" innerLabel="off"
+                        alignIndicator={Alignment.RIGHT} />
+                <Collapse isOpen={enableAI} keepChildrenMounted>
+                    <h3>AI Control</h3>
+                    <pre>{strategy}</pre>
+                    <Switch checked={isAutoFlag} onChange={onSwitchFlag}
+                            labelElement={'Auto-flag'}
+                            innerLabelChecked="on" innerLabel="off"
+                            alignIndicator={Alignment.RIGHT} />
+                    <ControlGroup vertical>
+                        <ButtonGroup>
+                            <Button disabled={!gameMgr || isGameOver || mode !== null}
+                                    icon="hand-up" intent="primary" className="growing"
+                                    text="Single step" onClick={onStep} />
+                        </ButtonGroup>
+                    </ControlGroup>
+                    <br />
+                    <FormGroup label="Speed">
+                        <Slider
+                            min={-2}
+                            max={2}
+                            stepSize={0.1}
+                            labelStepSize={1}
+                            onChange={setSpeed}
+                            labelRenderer={renderLabel}
+                            showTrackFill={false}
+                            value={speed}
+                        />
+                    </FormGroup>
+                    <ControlGroup vertical>
+                        <ButtonGroup>
+                            <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi') || !hasBest}
+                                    active={mode === 'semi'}
+                                    icon="play" intent="success" className="growing"
+                                    text="Semi-auto" onClick={onSemi} />
+                            <Button disabled={!gameMgr || isGameOver || mode !== null || !hasBest}
+                                    icon="fast-forward" intent="success"
+                                    onClick={onSemiAll} />
+                        </ButtonGroup>
+                        <ButtonGroup>
+                            <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
+                                    active={mode === 'auto'}
+                                    icon="fast-forward" intent="warning" className="growing"
+                                    text="Full-auto" onClick={onAuto} />
+                            <Button disabled={!gameMgr || isGameOver || mode !== null}
+                                    icon="lightning" intent="warning"
+                                    onClick={onAutoAll} />
+                        </ButtonGroup>
+                    </ControlGroup>
+                </Collapse>
+            </Card>
         </div>
     );
 }
