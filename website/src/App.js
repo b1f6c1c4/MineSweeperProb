@@ -1,7 +1,17 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useReducer, useState} from 'react';
 import Game from './Game';
 import './App.css';
-import {HTMLSelect, Spinner, Switch} from "@blueprintjs/core";
+import {
+    Alignment,
+    Button, ButtonGroup,
+    Card,
+    ControlGroup,
+    Elevation,
+    FormGroup,
+    HTMLSelect,
+    Spinner,
+    Switch
+} from "@blueprintjs/core";
 import MineSweeperSolver from './MineSweeperSolver';
 
 const moduleLoader = MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' });
@@ -10,17 +20,12 @@ export default function App(props) {
     const [module, setModule] = useState(undefined);
     const [cfg, setCfg] = useState({ text: '(select)' });
     const [isSNR, setIsSNR] = useState(false);
+    const [isStarted, toggleStart] = useReducer(x => !x, false);
 
     useEffect(() => {
         moduleLoader.then((module) => {
             setModule(module);
             module.seed();
-            setCfg({
-                text: '8-8-T10',
-                width: 8,
-                height: 8,
-                totalMines: 10,
-            });
         }, console.error);
     }, []);
 
@@ -57,30 +62,64 @@ export default function App(props) {
     else
         config += '-SFAR';
 
+    if (isStarted)
+        return (
+            <Game
+                module={module}
+                width={cfg.width}
+                height={cfg.height}
+                totalMines={cfg.totalMines}
+                isSNR={isSNR}
+                strategy={strategy}
+                config={config}
+                onStop={toggleStart}
+            />);
+
     return (
-        <div className="App">
-            <HTMLSelect value={cfg.text} onChange={onSelect}>
-                <option>(select)</option>
-                <option>8-8-T10</option>
-                <option>9-9-T10</option>
-                <option>16-16-T40</option>
-                <option>30-16-T99</option>
-            </HTMLSelect>
-            <Switch checked={isSNR} onChange={onSwitch}
-                    labelElement={'Safe First Action / Safe Neighbor Rule'}
-                    innerLabelChecked="SNR" innerLabel="SFAR" />
-            {!module ? (
-                <Spinner intent="primary" />
-            ) : cfg.width && (
-                <Game
-                    module={module}
-                    width={cfg.width}
-                    height={cfg.height}
-                    totalMines={cfg.totalMines}
-                    isSNR={isSNR}
-                    strategy={strategy}
-                    config={config}
-                />)}
-        </div>
+        <>
+            <Card elevation={Elevation.TWO} className="control">
+                <h3>Showcase Playground</h3>
+                <FormGroup label="Board" inline>
+                    <HTMLSelect value={cfg.text} onChange={onSelect}>
+                        <option>(select)</option>
+                        <option>8-8-T10</option>
+                        <option>9-9-T10</option>
+                        <option>16-16-T40</option>
+                        <option>30-16-T99</option>
+                    </HTMLSelect>
+                </FormGroup>
+                <Switch checked={isSNR} onChange={onSwitch}
+                        labelElement={'Rule'}
+                        innerLabelChecked="SNR" innerLabel="SFAR"
+                        alignIndicator={Alignment.RIGHT} />
+                {!isSNR && (<>
+                    <h4>Single First Action Rule</h4>
+                    <p>Your first click is guaranteed to be safe.
+                        This is the default behavior for the old Microsoft Minesweeper game
+                        as well as many competitive Minesweeper games.</p>
+                </>)}
+                {isSNR && (<>
+                    <h4>Single Neighborhood Rule</h4>
+                    <p>Your first click is guaranteed to be safe.
+                        Furthermore, all immediate neighbors of your first click is also safe.
+                        This is the default behavior for newer Microsoft Minesweeper.</p>
+                </>)}
+                <br />
+                <ControlGroup vertical>
+                    {module ? (
+                        <ButtonGroup>
+                            <Button disabled={!cfg.width} icon="play" className="growing"
+                                    intent="primary" text="Play" onClick={toggleStart} />
+                        </ButtonGroup>
+                    ) : (
+                        <Spinner intent="primary" />
+                    )}
+                </ControlGroup>
+            </Card>
+            <Card elevation={Elevation.THREE} className="intro">
+                <h1>Introduction</h1>
+                <p></p>
+            </Card>
+        </>
     );
 }

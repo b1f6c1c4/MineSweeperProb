@@ -21,6 +21,7 @@ export default function Game(props) {
         totalMines,
         strategy,
         config,
+        onStop,
     } = props;
     const [gameMgr, setGameMgr] = useState(undefined);
     const gameMgrRef = useRef(gameMgr);
@@ -264,47 +265,19 @@ export default function Game(props) {
     const isReady = gameMgr && gameMgr.totalWidth === width && gameMgr.totalHeight === height;
 
     return (
-        <div className="game-container">
-            <Card elevation={Elevation.TWO} className="game">
-                <FormGroup label={`${totalFlagged} / ${totalMines} mines flagged`}>
-                    <ProgressBar value={totalFlagged / totalMines} stripes={!isGameOver}
-                                 intent={(isGameOver && !isWon) ? 'danger' : 'warning'} />
-                </FormGroup>
-                <Board
-                    width={width}
-                    height={height}
-                    isStarted={isSettled}
-                    isGameOver={isGameOver}
-                    isWon={isWon}
-                    gameMgr={isReady && gameMgr}
-                    module={module}
-                    flagging={flagging}
-                    onProbe={onProbe}
-                    onFlag={onFlag}
-                    enableAI={enableAI}
-                />
-                <br />
-                <Collapse isOpen={enableAI}>
-                    <FormGroup label={`${roundDigits(Math.pow(2, rate[0]))} possible solutions`}>
-                        <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
-                                     intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
-                    </FormGroup>
-                </Collapse>
-                <FormGroup label={`${toOpen} / ${width * height - totalMines} blocks left`}>
-                    <ProgressBar value={1 - toOpen / (width * height - totalMines)}
-                                 stripes={!isGameOver}
-                                 intent={(isGameOver && !isWon) ? 'danger' : 'primary'} />
-                </FormGroup>
-            </Card>
+        <>
             <Card elevation={Elevation.TWO} className="control">
                 <h3>Game Control</h3>
-                <FormGroup label="Game" inline>
-                    <ButtonGroup className="centering">
+                <ControlGroup vertical>
+                    <ButtonGroup>
+                        <Button disabled={!gameMgr || mode != null} icon="cross"
+                                className="growing" text="Close" onClick={onStop} />
                         <Button disabled={!gameMgr || mode != null} rightIcon="refresh"
                                 intent={isGameOver ? isWon ? 'success' : 'danger' : undefined}
-                                text="Restart" onClick={onRestart} />
+                                className="growing" text="Restart" onClick={onRestart} />
                     </ButtonGroup>
-                </FormGroup>
+                </ControlGroup>
+                <br />
                 <Switch checked={isAutoRestart} onChange={onSwitch}
                         labelElement={'Auto-restart'}
                         innerLabelChecked="on" innerLabel="off"
@@ -366,6 +339,37 @@ export default function Game(props) {
                     </ControlGroup>
                 </Collapse>
             </Card>
-        </div>
+            <Card elevation={Elevation.TWO} className="game">
+                <FormGroup label={`${totalFlagged} / ${totalMines} mines flagged`}>
+                    <ProgressBar value={totalFlagged / totalMines} stripes={!isGameOver}
+                                 intent={(isGameOver && !isWon) ? 'danger' : 'warning'} />
+                </FormGroup>
+                <Board
+                    width={width}
+                    height={height}
+                    isStarted={isSettled}
+                    isGameOver={isGameOver}
+                    isWon={isWon}
+                    gameMgr={isReady && gameMgr}
+                    module={module}
+                    flagging={flagging}
+                    onProbe={onProbe}
+                    onFlag={onFlag}
+                    enableAI={enableAI}
+                />
+                <br />
+                <Collapse isOpen={enableAI}>
+                    <FormGroup label={`${roundDigits(Math.pow(2, rate[0]))} possible solutions`}>
+                        <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
+                                     intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
+                    </FormGroup>
+                </Collapse>
+                <FormGroup label={`${toOpen} / ${width * height - totalMines} blocks left`}>
+                    <ProgressBar value={1 - toOpen / (width * height - totalMines)}
+                                 stripes={!isGameOver}
+                                 intent={(isGameOver && !isWon) ? 'danger' : 'primary'} />
+                </FormGroup>
+            </Card>
+        </>
     );
 }
