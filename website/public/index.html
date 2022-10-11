@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <link rel="preload" as="fetch" href="%PUBLIC_URL%/MineSweeperSolver.wasm" crossorigin="anonymous" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
@@ -35,6 +36,92 @@
     <main id="root">
       <article class=".bp4-card .bp4-elevation-2">
         <h2>Introduction</h2>
+        <p>Welcome to <code>MineSweeperProb</code>, <em>the</em> ultimate AI for Minesweeper video game.</p>
+        <section id="minesweeper-basics">
+          <h3>1. Minesweeper Basics (if you don't known it)</h3>
+          <p>A rectangle board consists of <code>n</code>-by-<code>m</code> blocks.
+             <code>t</code> mines are hidden behind the blocks, at most one mine per block.
+             The player clicks on a block to open it. If that block contains a mine, game over;
+             otherwise, the plays knows the total number of mines in the opened block's immediate neighbor.
+             If there are zero mines around, the system will uncover all immediate neighbors automatically.
+             The player can take advantage of these information and open more and more blocks,
+             until they win the game when all non-mine blocks have been opened.
+          <p>First click is guaranteed <em>not</em> to hit a mine. Furthermore, if playing
+             under the <code>SNR</code> rule, the first block has zero mines around.</p>
+          <p>Right click a block to flag the block as "mine". However, it won't change the game play,
+             only helping you memorize the location of mines.</p>
+        </section>
+        <section id="competitive-minesweeper">
+          <h3>2. Competitive Minesweeper</h3>
+          <p>Human players compete on how fast one completes a game, ignoring failures;
+             AI players compete on how much games they can complete, minimizing failures.</p>
+          <p>Thus, human players can, and actually should, take risks by randomly clicking some blocks
+             when they can't decide which is the optimal next move; but AI players must minimize such risk.</p>
+        </section>
+        <section id="why-minesweeper-ai-is-hard">
+          <h3>3. Why Minesweeper AI is hard</h3>
+          <p>Theoretical <a href="https://web.mat.bham.ac.uk/R.W.Kaye/minesw/ASE2003.pdf">studies</a> have found that,
+             the problem of determining whether a block has a mine is NP-Complete.</p>
+          <p>However, in practice, a reasonable Minesweeper game can be solved instantly for consistency.
+             Thanks to modern computer software and hardware, one can instantly know which
+             block(s) is(are) safe to open in a game.</p>
+          <p>Nevertheless, a fully-fledge Minesweeper AI needs to tackle not only which block is safe,
+             but also make the correct choices when all mines are <em>not</em> safe to open.
+             Indeed, being able to make a <em>smart</em> choice under pressure (i.e. no safety guarantee)
+             is what makes an AI outstanding, not just functioning.</p>
+        </section>
+        <section id="glossary">
+          <h3>4. Glossary</h3>
+          <p>SFAR (Safe First Action Rule): The system ensures that a player's first click will not hit a mine.</p>
+          <p>SNR (Safe Neighborhood Rule): The system ensures that neither a player's first click nor its immediate neighbor will contain a mine.
+             In another word, the first click will definitely uncover a block of degree 0.</p>
+          <p>Degree (of a block): The number of mines in the block's immediate neighbor blocks.</p>
+          <p>Safe block: A block can be proven <em>not</em> to contain a mine.</p>
+          <p>Lethal block: A block can be proven to contain a mine.</p>
+          <p>Trivial situation: There is at least one safe block on the whole board.</p>
+          <p>Non-trivial situation: There is no safe block on the whole board.</p>
+        </section>
+        <section id="the-first-move">
+          <h3>5. The First Move</h3>
+          <p>Although the first click is guaranteed not to hit a mine, due to the lack of degree information
+             at the beginning of the game, the first move deserves special consideration.<p>
+          <p>Our independent research have found the best move for some common board sizes: (counting starts at 1)<p>
+          <table>
+            <thead>
+              <tr><th>Board</th><th>Mines</th><td>SFAR</td><td>SNR</td></tr>
+            </thead>
+            <tbody>
+              <tr><th>8 x 8</th><th>10</th><td>1,1</td><td>3,3</td></tr>
+              <tr><th>9 x 9</th><th>10</th><td>1,1</td><td>3,3</td></tr>
+              <tr><th>16 x 16</th><th>40</th><td>1,1</td><td>3,3</td></tr>
+              <tr><th>30 x 16</th><th>99</th><td>1,1</td><td>4,4</td></tr>
+            </tbody>
+          </table>
+        </section>
+        <section id="discovery-of-safe-and-lethal-blocks">
+          <h3>Discovery of Safe and Lethal Blocks</h3>
+          <p><code>MineSweeperProb</code> employs a 3-tier frame to find safe and lethal blocks.
+             If it can find a safe block using a simpler method, it will not invoke a more complex method to save time.</p>
+          <ol>
+            <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L509" target="_blank"><code>Reduce</code></a>: If an open block's degree equals to known lethal blocks, all surrounding unknowns are safe.
+               Similarly, if an open block's degree minus known lethals equals to unknown blocks, all such unknowns are lethal.</li>
+            <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L591" target="_blank"><code>Overlap</code></a>: If two open blocks' neighbors share some blocks, these blocks are subject to multiple constraints and might be safe or lethal.</li>
+            <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L228" target="_blank"><code>Probability</code></a>: For all open blocks that have undecided neighbors, list equations using degree info and solve them.</li>
+          </ol>
+          <p>The last one <code>Probability</code> sounds very complex and slow, but in reality there could be many ways to simplify:</p>
+          <ul>
+            <li>If a number of blocks are topologically indistinguishable (i.e. are neighbor of the same sets of open blocks,) 
+                they can be <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L99" target="_blank">treated</a> as a whole large piece by counting how many mines are among them.</li>
+            <li>Instead of recompute, dynamically split and <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L469" target="_blank">merge</a> such block sets as the game goes.</li>
+            <li>Use <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L695" target="_blank">Gauss</a> elimination to greatly reduce the dimension of search space.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Heuristic</h3>
+        </section>
+        <section>
+          <h3>Exhaustive Search</h3>
+        </section>
       </article>
       <aside class=".bp4-card .bp4-elevation-2" id="playground">
         <h3>Playground</h3>
@@ -44,7 +131,7 @@
       </aside>
     </main>
     <footer>
-      <p>Copyright (C) 2015-2022 b1f6c1c4</p>
+      <pre>Copyright (C) 2015-2022 b1f6c1c4</pre>
     </footer>
   </body>
 </html>
