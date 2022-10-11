@@ -2,9 +2,8 @@ import React, {useEffect, useState} from 'react';
 import Game from './Game';
 import './App.css';
 import {HTMLSelect, Spinner, Switch} from "@blueprintjs/core";
-import MineSweeperSolver from './MineSweeperSolver';
 
-const moduleLoader = MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' });
+const moduleLoader = window.Module({ locateFile: () => 'MineSweeperSolver.wasm' });
 
 export default function App(props) {
     const [module, setModule] = useState(undefined);
