@@ -21,7 +21,7 @@ export default function Game(props) {
         setRate([mgr.bits, mgr.allBits]);
     }
 
-    useEffect(startGame, [strategy]);
+    useEffect(startGame, [module, strategy]);
 
     const [, forceUpdate] = useReducer(x => x + 1, 0);
     const [isSettled, setIsSettled] = useState(false);

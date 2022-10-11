@@ -25,6 +25,7 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>MineSweeperProb</title>
+    <link rel="stylesheet" href="%PUBLIC_URL%/index.css" />
     <script defer src="%PUBLIC_URL%/MineSweeperSolver.js"></script>
   </head>
   <body>
@@ -37,7 +38,9 @@
       </article>
       <aside class=".bp4-card .bp4-elevation-2" id="playground">
         <h3>Playground</h3>
+        <div class="lds-ring" id="loader"><div></div><div></div><div></div><div></div></div>
         <noscript>You need to enable JavaScript to use the playground.</noscript>
+        <script>document.getElementById('loader').style.display = 'block';</script>
       </aside>
     </main>
     <footer>
