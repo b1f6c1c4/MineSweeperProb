@@ -12,9 +12,8 @@ import {
     Spinner,
     Switch
 } from "@blueprintjs/core";
-import MineSweeperSolver from './MineSweeperSolver';
 
-const moduleLoader = MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' });
+const moduleLoader = window.MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' });
 
 export default function App(props) {
     const [module, setModule] = useState(undefined);

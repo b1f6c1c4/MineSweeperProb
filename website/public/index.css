@@ -1,0 +1,111 @@
+html, body {
+    padding: 0;
+    margin: 0;
+}
+
+header {
+    background-color: #88628c;
+    background-image: linear-gradient(172deg, black, transparent);
+    margin: 0 0 20px 0;
+    display: flex;
+    padding: 18px;
+    gap: 20px;
+}
+
+@media(max-width: 400px) {
+    header {
+        padding: 8px;
+        gap: 10px;
+    }
+}
+
+header p {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+header h1 {
+    margin: 0;
+    color: #f9f8ff;
+}
+
+header em {
+    background-image: linear-gradient(95deg, #b2aab3 12px, #f8e2fc 33px);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    padding: 0 5px;
+    margin: 0 -5px;
+}
+
+header a {
+    color: white;
+    text-decoration: underline;
+}
+
+header a:hover {
+    color: #e552ec;
+    text-decoration: underline;
+}
+
+#root {
+    display: flex;
+    flex-direction: row-reverse;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 0 20px;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.lds-ring {
+  display: none;
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: auto;
+}
+.lds-ring div {
+  box-sizing: border-box;
+  display: block;
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  margin: 8px;
+  border: 8px solid #31f;
+  border-radius: 50%;
+  animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  border-color: #31f transparent transparent transparent;
+}
+.lds-ring div:nth-child(1) {
+  animation-delay: -0.45s;
+}
+.lds-ring div:nth-child(2) {
+  animation-delay: -0.3s;
+}
+.lds-ring div:nth-child(3) {
+  animation-delay: -0.15s;
+}
+@keyframes lds-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

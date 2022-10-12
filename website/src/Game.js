@@ -143,7 +143,7 @@ export default function Game(props) {
                 setGameMgr(undefined);
             }
         };
-    }, [config]);
+    }, [onRestart, config]);
 
     function onProbe(row, col) {
         gameMgr.openBlock(col, row);
