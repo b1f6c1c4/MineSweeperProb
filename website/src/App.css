@@ -2,15 +2,6 @@
 @import "~@blueprintjs/core/lib/css/blueprint.css";
 @import "~@blueprintjs/icons/lib/css/blueprint-icons.css";
 
-.intro {
-  margin: 0 8px 0 0;
-  flex-grow: 1;
-}
-
-.intro h1 {
-  margin-top: 0;
-}
-
 table.board {
   table-layout: fixed;
   margin: auto;
@@ -143,17 +134,8 @@ td.blk-drain {
   margin: auto;
 }
 
-.control {
-  width: fit-content;
-  min-width: 230px;
-}
-
 .control .bp4-form-group.bp4-inline {
   justify-content: space-between;
-}
-
-.control > h3 {
-  margin-top: 0;
 }
 
 .control .bp4-control-group.bp4-vertical {

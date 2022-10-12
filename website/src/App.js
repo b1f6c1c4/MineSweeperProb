@@ -61,6 +61,8 @@ export default function App(props) {
     else
         config += '-SFAR';
 
+    document.getElementById('intro').hidden = isStarted;
+
     if (isStarted)
         return (
             <Game
@@ -75,50 +77,44 @@ export default function App(props) {
             />);
 
     return (
-        <>
-            <Card elevation={Elevation.TWO} className="control">
-                <h3>Showcase Playground</h3>
-                <FormGroup label="Board" inline>
-                    <HTMLSelect value={cfg.text} onChange={onSelect}>
-                        <option>(select)</option>
-                        <option>8-8-T10</option>
-                        <option>9-9-T10</option>
-                        <option>16-16-T40</option>
-                        <option>30-16-T99</option>
-                    </HTMLSelect>
-                </FormGroup>
-                <Switch checked={isSNR} onChange={onSwitch}
-                        labelElement={'Rule'}
-                        innerLabelChecked="SNR" innerLabel="SFAR"
-                        alignIndicator={Alignment.RIGHT} />
-                {!isSNR && (<>
-                    <h4>Single First Action Rule</h4>
-                    <p>Your first click is guaranteed to be safe.
-                        This is the default behavior for the old Microsoft Minesweeper game
-                        as well as many competitive Minesweeper games.</p>
+        <Card elevation={Elevation.TWO} className="control">
+            <h3>Showcase & Playground</h3>
+            <FormGroup label="Board" inline>
+                <HTMLSelect value={cfg.text} onChange={onSelect}>
+                    <option>(select)</option>
+                    <option>8-8-T10</option>
+                    <option>9-9-T10</option>
+                    <option>16-16-T40</option>
+                    <option>30-16-T99</option>
+                </HTMLSelect>
+            </FormGroup>
+            <Switch checked={isSNR} onChange={onSwitch}
+            labelElement={'Rule'}
+            innerLabelChecked="SNR" innerLabel="SFAR"
+            alignIndicator={Alignment.RIGHT} />
+            {!isSNR && (<>
+                <h4>Single First Action Rule</h4>
+                <p>Your first click is guaranteed to be safe.
+                This is the default behavior for the old Microsoft Minesweeper game
+                as well as many competitive Minesweeper games.</p>
                 </>)}
                 {isSNR && (<>
                     <h4>Single Neighborhood Rule</h4>
                     <p>Your first click is guaranteed to be safe.
-                        Furthermore, all immediate neighbors of your first click is also safe.
-                        This is the default behavior for newer Microsoft Minesweeper.</p>
-                </>)}
-                <br />
-                <ControlGroup vertical>
-                    {module ? (
-                        <ButtonGroup>
-                            <Button disabled={!cfg.width} icon="play" className="growing"
-                                    intent="primary" text="Play" onClick={toggleStart} />
-                        </ButtonGroup>
-                    ) : (
-                        <Spinner intent="primary" />
-                    )}
-                </ControlGroup>
-            </Card>
-            <Card elevation={Elevation.THREE} className="intro">
-                <h1>Introduction</h1>
-                <p></p>
-            </Card>
-        </>
+                    Furthermore, all immediate neighbors of your first click is also safe.
+                    This is the default behavior for newer Microsoft Minesweeper.</p>
+                    </>)}
+                    <br />
+                    <ControlGroup vertical>
+                        {module ? (
+                            <ButtonGroup>
+                                <Button disabled={!cfg.width} icon="play" className="growing"
+                                intent="primary" text="Play" onClick={toggleStart} />
+                            </ButtonGroup>
+                        ) : (
+                            <Spinner intent="primary" />
+                        )}
+                        </ControlGroup>
+                    </Card>
     );
 }

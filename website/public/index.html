@@ -37,12 +37,12 @@
       </p>
       <h1>MineSweeperProb: <wbr><em>The</em>&nbsp;MineSweeper&nbsp;AI.</h1>
     </header>
-    <main id="root">
-      <article class=".bp4-card .bp4-elevation-2">
+    <main>
+      <article class="bp4-card bp4-elevation-3" id="intro">
         <h2>Introduction</h2>
         <p>Welcome to <code>MineSweeperProb</code>, <em>the</em> ultimate AI for Minesweeper video game.</p>
         <section id="minesweeper-basics">
-          <h3>1. Minesweeper Basics (if you don't known it)</h3>
+          <h3>1. Minesweeper Basics (if you don't know it)</h3>
           <p>A rectangle board consists of <code>n</code>-by-<code>m</code> blocks.
              <code>t</code> mines are hidden behind the blocks, at most one mine per block.
              The player clicks on a block to open it. If that block contains a mine, game over;
@@ -127,22 +127,14 @@
           <h3>Exhaustive Search</h3>
         </section>
       </article>
-      <aside class=".bp4-card .bp4-elevation-2" id="playground">
-        <h3>Playground</h3>
-        <div class="lds-ring" id="loader"><div></div><div></div><div></div><div></div></div>
-        <noscript>You need to enable JavaScript to use the playground.</noscript>
-        <script>document.getElementById('loader').style.display = 'block';</script>
-      </aside>
+      <div id="playground-root" class="sticky">
+        <aside class="bp4-card bp4-elevation-2 control">
+          <h3>Showcase &amp; Playground</h3>
+          <div class="lds-ring" id="loader"><div></div><div></div><div></div><div></div></div>
+          <noscript>You need to enable JavaScript to use the playground.</noscript>
+          <script>document.getElementById('loader').style.display = 'block';</script>
+        </aside>
+      </div>
     </main>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
-
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
-
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
   </body>
 </html>
