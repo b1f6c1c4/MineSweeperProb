@@ -320,11 +320,11 @@ export default function Game(props) {
                         alignIndicator={Alignment.RIGHT} />
                 <Collapse isOpen={enableAI} keepChildrenMounted>
                     <h3>AI Control</h3>
+                    <pre>{isDrain ? strategy : strategy.replace('-D256', '')}</pre>
                     <Switch checked={isDrain} onChange={onSwitchDrain}
                             labelElement={'Exhaustive'} disabled={mode !== null}
                             innerLabelChecked="PSEQ-D256" innerLabel="PSEQ"
                             alignIndicator={Alignment.RIGHT} />
-                    <pre>{isDrain ? strategy : strategy.replace('-D256', '')}</pre>
                     <Switch checked={isAutoFlag} onChange={onSwitchFlag}
                             labelElement={'Auto-flag'}
                             innerLabelChecked="on" innerLabel="off"

@@ -41,6 +41,8 @@
       <article class="bp4-card bp4-elevation-3" id="intro">
         <h2>Introduction</h2>
         <p>Welcome to <code>MineSweeperProb</code>, <em>the</em> ultimate AI for Minesweeper video game.</p>
+        <p>Read the following introduction for how the AI works, or explore our
+           <a href="#playground-root">online AI showcase / Minesweeper playground</a>.</p>
         <section id="minesweeper-basics">
           <h3>1. Minesweeper Basics (if you don't know it)</h3>
           <p>A rectangle board consists of <code>n</code>-by-<code>m</code> blocks.
@@ -69,7 +71,7 @@
           <p>However, in practice, a reasonable Minesweeper game can be solved instantly for consistency.
              Thanks to modern computer software and hardware, one can instantly know which
              block(s) is(are) safe to open in a game.</p>
-          <p>Nevertheless, a fully-fledge Minesweeper AI needs to tackle not only which block is safe,
+          <p>Nevertheless, a fully-fledged Minesweeper AI needs to tackle not only which block is safe,
              but also make the correct choices when all mines are <em>not</em> safe to open.
              Indeed, being able to make a <em>smart</em> choice under pressure (i.e. no safety guarantee)
              is what makes an AI outstanding, not just functioning.</p>
@@ -103,29 +105,61 @@
           </table>
         </section>
         <section id="discovery-of-safe-and-lethal-blocks">
-          <h3>Discovery of Safe and Lethal Blocks</h3>
+          <h3>6. Discovery of Safe and Lethal Blocks</h3>
           <p><code>MineSweeperProb</code> employs a 3-tier frame to find safe and lethal blocks.
              If it can find a safe block using a simpler method, it will not invoke a more complex method to save time.</p>
           <ol>
-            <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L509" target="_blank"><code>Reduce</code></a>: If an open block's degree equals to known lethal blocks, all surrounding unknowns are safe.
+            <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L512" target="_blank"><code>Reduce</code></a>: If an open block's degree equals to known lethal blocks, all surrounding unknowns are safe.
                Similarly, if an open block's degree minus known lethals equals to unknown blocks, all such unknowns are lethal.</li>
-            <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L591" target="_blank"><code>Overlap</code></a>: If two open blocks' neighbors share some blocks, these blocks are subject to multiple constraints and might be safe or lethal.</li>
+            <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L594" target="_blank"><code>Overlap</code></a>: If two open blocks' neighbors share some blocks, these blocks are subject to multiple constraints and might be safe or lethal.</li>
             <li><a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L228" target="_blank"><code>Probability</code></a>: For all open blocks that have undecided neighbors, list equations using degree info and solve them.</li>
           </ol>
           <p>The last one <code>Probability</code> sounds very complex and slow, but in reality there could be many ways to simplify:</p>
           <ul>
             <li>If a number of blocks are topologically indistinguishable (i.e. are neighbor of the same sets of open blocks,) 
                 they can be <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L99" target="_blank">treated</a> as a whole large piece by counting how many mines are among them.</li>
-            <li>Instead of recompute, dynamically split and <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L469" target="_blank">merge</a> such block sets as the game goes.</li>
-            <li>Use <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L695" target="_blank">Gauss</a> elimination to greatly reduce the dimension of search space.</li>
+            <li>Instead of recompute, dynamically split and <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L472" target="_blank">merge</a> such block sets as the game goes.</li>
+            <li>Use <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L698" target="_blank">Gauss</a> elimination to greatly reduce the dimension of search space.</li>
           </ul>
         </section>
-        <section>
-          <h3>Heuristic</h3>
+        <section id="dealing-with-non-trivial-situation">
+          <h3>7. Dealing with Non-Trivial Situation</h3>
+          <p><em><code>P</code></em>: In the not-so-rare situation that no safe blocks can be found,
+             the most straightforward strategy is to choose a block with minimal probability of containing a mine.
+             This strategy is called <code>P</code>, and our code computing such probability is found
+             <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/BasicSolver.cpp#L871">here</a>.</p>
+          <p><em><code>S</code></em>: When multiple blocks share the same minimal probability of mine, some AIs just give up and randomly choose.
+             However, it is <em>crucial</em> in Minesweeper gameplay to make a best-effort move even under such adversity.
+             Here we have <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/Solver.cpp#L278"><code>S</code></a> strategy: choose a block that, upon clicked, possesses the highest chance to
+             lead to a successful discovery of a safe block.</p>
+          <p><em><code>E</code></em>: When there are still multiple choices, we (strategy
+            <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/GameMgr.cpp#L345"><code>E</code></a>) maximize the mathematical expectation of the number of safe blocks.</p>
+          <p><em><code>Q</code></em>: Finally, we reach a situation that safe blocks might be infeasible or too risky to achieve.
+            In this situation, <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/Solver.cpp#L62"><code>Q</code></a>
+            strategy comes to rescue by maximizing the information entropy received
+            from the discrete distribution of degree info on the block.</p>
+          <p>In summary, we apply <code>P</code>, and then <code>S</code>, then <code>E</code> and <code>Q</code>.
+             We call this combined strategy <em><code>PSEQ</code></em> for short.</p>
+          <p>Note: This is not a complete list of possible strategies. Please refer to the
+            <a href="https://minesweepergame.com/math/exploring-efficient-strategies-for-minesweeper-2017.pdf">research paper</a>
+            for more information.</p>
         </section>
-        <section>
-          <h3>Exhaustive Search</h3>
+        <section id="optional-exhaustive-search-for-optimal-solution">
+          <h3>8. Optional: Exhaustive Search for Optimal Solution</h3>
+          <p>Although <code>PSEQ</code> strategy is helpful for many non-trivial situations,
+             it becomes less effective as you approach to the end of the game, where there are so
+             few blocks left open that one can easily exhaustively predict what will happen
+             if you click some blocks.</p>
+          <p>When configured to enable this Exhaustive Search functionality (<em><code>PSEQ-D256</code></em>),
+             near the end of the game (usually when fewer than 256 possible solutions left) it will attempt to
+             <a href="https://github.com/b1f6c1c4/MineSweeperProb/blob/cmake/MineSweeperSolver/Drainer.cpp">enumerate</a>
+             all possible block click sequences and their interactions with all the possible solutions
+             in order to find the absolutely optimal block to click.</p>
+          <p>This function comes with some cost - the one-off computation might take several minutes to finish.
+             Please be patient and <em>not</em> to refresh the page.</p>
         </section>
+        <p style="font-weight: bold">Ready for seeing the AI in action? <a href="#playground-root">Enter the online AI showcase</a>
+           (to the right of this page.)</p>
       </article>
       <div id="playground-root" class="sticky">
         <aside class="bp4-card bp4-elevation-2 control">

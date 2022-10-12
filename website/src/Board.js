@@ -41,7 +41,7 @@ export default function Board(props) {
             const infer = enableAI ? gameMgr.inferredStatusOf(j, i) : module.BlockStatus.UNKNOWN;
             let prob = null;
             if (enableAI) {
-                gameMgr.blockProbabilityOf(j, i);
+                prob = gameMgr.blockProbabilityOf(j, i);
                 if (drain.size())
                     prob = 1 - drain.get(j * height + i);
                 if (!isStarted)
