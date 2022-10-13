@@ -53,9 +53,9 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>90.3411±0.0082%</td>
-            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-8-8-T10-SNR 50000000</pre>
-              Approx. takes 141 hours to run on an 8-core machine.</details></td>
+            <td>90.3448±0.0058%</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-8-8-T10-SNR 100000000</pre>
+              Approx. takes 231 hours to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=4>9x9<br>10 mines</td>
@@ -107,23 +107,23 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>89.0796±0.0086%</td>
-            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-16-16-T40-SNR 50000000</pre>
-              Approx. takes 78 hours to run on an 8-core machine.</details></td>
+            <td>89.0757±0.0061%</td>
+            <td><details><pre>./MineSweeperSolver FL@[3,3]-PSEQ-D256-16-16-T40-SNR 100000000</pre>
+              Approx. takes 122 hours to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=4>30x16<br>99 mines</td>
             <td rowspan=2>SFAR</td>
             <td>PSEQ</td>
-            <td>39.6155±0.0068%</td>
-            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-30-16-T99-SFAR 201000000</pre>
+            <td>39.6158±0.0068%</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-30-16-T99-SFAR 200000000</pre>
               Approx. takes 15 hours to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>40.048±0.014%</td>
-            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-30-16-T99-SFAR 50000000</pre>
-              Approx. takes 271 hours to run on an 8-core machine.</details></td>
+            <td>40.0468±0.0096%</td>
+            <td><details><pre>./MineSweeperSolver FL@[1,1]-PSEQ-D256-30-16-T99-SFAR 100000000</pre>
+              Approx. takes 537 hours to run on an 8-core machine.</details></td>
         </tr>
         <tr>
             <td rowspan=2>SNR</td>
@@ -134,9 +134,9 @@ cmake --build cmake-build-release
         </tr>
         <tr>
             <td>PSEQ-D256</td>
-            <td>53.452±0.014%</td>
-            <td><details><pre>./MineSweeperSolver FL@[4,4]-PSEQ-D256-30-16-T99-SNR 50000000</pre>
-              Approx. takes 405 hours to run on an 8-core machine.</details></td>
+            <td>53.4502±0.0098%</td>
+            <td><details><pre>./MineSweeperSolver FL@[4,4]-PSEQ-D256-30-16-T99-SNR 100000000</pre>
+              Approx. takes 812 hours to run on an 8-core machine.</details></td>
         </tr>
     </tbody>
 </table>
@@ -866,7 +866,7 @@ SFAR
     <tbody>
         <tr>
             <th>1</th>
-            <td><strong>39.6155<br>±0.0068%</strong></td>
+            <td><strong>39.6158<br>±0.0068%</strong></td>
             <td>38.7505<br>±0.0095%</td>
             <td>37.5650<br>±0.0095%</td>
             <td>37.2672<br>±0.0095%</td>
@@ -891,7 +891,7 @@ SFAR
             <td>37.9725<br>±0.0095%</td>
             <td>38.0739<br>±0.0095%</td>
             <td>38.0853<br>±0.0095%</td>
-            <td>38.0988<br>±0.0095%</td>
+            <td>38.0979<br>±0.0095%</td>
             <td>38.1258<br>±0.0095%</td>
             <td>38.1355<br>±0.0095%</td>
             <td>38.1410<br>±0.0095%</td>
