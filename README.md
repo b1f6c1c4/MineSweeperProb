@@ -1,6 +1,7 @@
-
 # MineSweeperProb
 A deterministic Minesweeper solver
+
+**Click [here](https://minesweeper.b1f6c1c4.info) for online demo & technical details.**
 
 The algorithm is described in the [paper](https://minesweepergame.com/math/exploring-efficient-strategies-for-minesweeper-2017.pdf) on AAAI Workshop 2017.
 
