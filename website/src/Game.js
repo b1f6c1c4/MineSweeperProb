@@ -165,10 +165,11 @@ export default function Game(props) {
             case undefined: // <empty>
             case 'E':
             case 'M':
-                ov[id] = 0;
+            case 0:
+                ov[id] = 1;
                 break;
             case 8:
-                ov[id] = 0;
+                ov[id] = 1;
                 break;
             default:
                 ov[id]++;
@@ -185,6 +186,9 @@ export default function Game(props) {
             case null:
                 return;
             case undefined: // <empty>
+                ov[id] = 0;
+                break;
+            case 0:
                 ov[id] = 'M';
                 break;
             case 'M':
@@ -343,10 +347,12 @@ export default function Game(props) {
     return (
         <>
             <Card elevation={Elevation.TWO} className="game">
-                <FormGroup label={`${totalFlagged} / ${totalMines} mines flagged`}>
-                    <ProgressBar value={totalFlagged / totalMines} stripes={!isGameOver}
-                                 intent={(isGameOver && !isWon) ? 'danger' : 'warning'} />
-                </FormGroup>
+                {!isExternal && (
+                    <FormGroup label={`${totalFlagged} / ${totalMines} mines flagged`}>
+                        <ProgressBar value={totalFlagged / totalMines} stripes={!isGameOver}
+                                     intent={(isGameOver && !isWon) ? 'danger' : 'warning'} />
+                    </FormGroup>
+                    )}
                 <Board
                     width={width}
                     height={height}
@@ -368,11 +374,13 @@ export default function Game(props) {
                                      intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
                     </FormGroup>
                 </Collapse>
-                <FormGroup label={`${toOpen} / ${width * height - totalMines} blocks left`}>
-                    <ProgressBar value={1 - toOpen / (width * height - totalMines)}
-                                 stripes={!isGameOver}
-                                 intent={(isGameOver && !isWon) ? 'danger' : 'primary'} />
-                </FormGroup>
+                {!isExternal && (
+                    <FormGroup label={`${toOpen} / ${width * height - totalMines} blocks left`}>
+                        <ProgressBar value={1 - toOpen / (width * height - totalMines)}
+                                     stripes={!isGameOver}
+                                     intent={(isGameOver && !isWon) ? 'danger' : 'primary'} />
+                    </FormGroup>
+                    )}
             </Card>
             <Card elevation={Elevation.TWO} className="control">
                 <h3>Game Control</h3>
