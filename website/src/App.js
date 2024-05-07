@@ -84,18 +84,26 @@ export default function App(props) {
 
     const ready = cfg.text !== '(select)' && cfg.width && cfg.height && cfg.totalMines;
 
-    if (isStarted)
-        return (
-            <Game
-                module={module}
-                width={cfg.width}
-                height={cfg.height}
-                totalMines={cfg.totalMines}
-                isSNR={isSNR}
-                strategy={strategy}
-                config={config}
-                onStop={toggleStart}
-            />);
+    if (isStarted) {
+        if (isExternal && cfg.text === '(dynamic)') {
+            return (
+                <pre>TODO</pre>
+            );
+        } else {
+            return (
+                <Game
+                    module={module}
+                    isExternal={isExternal}
+                    width={cfg.width}
+                    height={cfg.height}
+                    totalMines={cfg.totalMines}
+                    isSNR={isSNR}
+                    strategy={strategy}
+                    config={config}
+                    onStop={toggleStart}
+                />);
+        }
+    }
 
     return (
         <Card elevation={Elevation.TWO} className="control">

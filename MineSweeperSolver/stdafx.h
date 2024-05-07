@@ -10,7 +10,12 @@
 #include <string>
 
 #ifndef NDEBUG
-#define ASSERT(val) do { if (!(val)) throw std::runtime_error("oops"); } while (false)
+#define STRINGIZE_DETAIL(x) #x
+#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+#define ASSERT(val) do { \
+    if (!(val)) \
+        throw std::runtime_error("assert failure at " __FILE__ " line " STRINGIZE(__LINE__)); \
+    } while (false)
 #else
 #define ASSERT(val)
 #endif

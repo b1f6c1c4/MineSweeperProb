@@ -81,6 +81,7 @@ EMSCRIPTEN_BINDINGS(mws) {
     register_vector<double>("VectorDouble");
     class_<GameMgr>("GameMgr")
         .constructor<int, int, int, bool, Strategy, bool>()
+        .constructor<int, int, int, Strategy>()
         .function("openBlock", static_cast<void (GameMgr::*)(int, int)>(&GameMgr::OpenBlock))
         .function("solve", &GameMgr::Solve)
         .function("semiAutomaticStep", &GameMgr::SemiAutomaticStep)
@@ -100,6 +101,8 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("bits", &GameMgr::GetBits)
         .property("allBits", &GameMgr::GetAllBits)
         .function("blockPropertyOf", &GameMgr::GetBlockProperty)
+        .function("setBlockDegree", &GameMgr::SetBlockDegree)
+        .function("setBlockMine", &GameMgr::SetBlockMine)
         .function("blockProbabilityOf", &GameMgr::GetBlockProbability)
         .function("inferredStatusOf", &GameMgr::GetInferredStatus)
         .property("bestBlocks", &GameMgr::GetBestBlockList)

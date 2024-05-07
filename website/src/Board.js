@@ -10,6 +10,7 @@ export default function Board(props) {
         isWon,
         flagging,
         module,
+        overlay,
         onProbe,
         onFlag,
         enableAI,
@@ -47,16 +48,19 @@ export default function Board(props) {
                 if (!isStarted)
                     prob = null;
             }
+            const o = overlay[j * height + i];
+            const xo = o !== null && o >= 0 && o <= 8;
             // Note: do NOT use {...property} as it won't work for getters
             row.push(<Block key={j}
                             row={i}
                             col={j}
                             isGameOver={isGameOver}
                             isWon={isWon}
-                            degree={property.degree}
-                            isOpen={property.isOpen}
+                            degree={xo ? o : property.degree}
+                            isOpen={o !== null && o !== undefined || property.isOpen}
                             isFlagged={flagging[j * height + i]}
-                            hasMine={property.hasMine}
+                            isEFlagged={o === 'E' || property.degree === -1}
+                            hasMine={property.hasMine || o === 'M'}
                             isBest={best[j * height + i]}
                             isPreferred={preferred[j * height + i]}
                             isSafe={infer === module.BlockStatus.BLANK}

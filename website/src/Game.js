@@ -16,6 +16,7 @@ import {
 export default function Game(props) {
     const {
         module,
+        isExternal,
         width,
         height,
         totalMines,
@@ -45,6 +46,12 @@ export default function Game(props) {
     const [rate, setRate] = useState([1, 1]);
     const [toOpen, setToOpen] = useState(width * height - totalMines);
     const [hasBest, setHasBest] = useState(false);
+
+    // <empty>: mutable; null: immutable;
+    // 0~8: degree to be assigned; 'M': must be mine, 'E': must no mine
+    const [overlay, setOverlay] = useState([]);
+    const overlayRef = useRef(overlay);
+    overlayRef.current = overlay;
 
     const [flagging, setFlagging] = useState([]);
     const flaggingRef = useRef(flagging);
@@ -115,6 +122,7 @@ export default function Game(props) {
         setIsSettled(false);
         setIsGameOver(false);
         setIsWon(false);
+        setOverlay([]);
         setFlagging([]);
         setTotalFlagged(0);
         setHasBest(false);
@@ -125,7 +133,9 @@ export default function Game(props) {
         setMode(null);
         const cfg = module.parse(config);
         module.cache(cfg.width, cfg.height, cfg.totalMines);
-        const mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
+        const mgr = isExternal
+            ? new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg)
+            : new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
         setGameMgr(mgr);
         setRate([mgr.bits, mgr.allBits]);
         setToOpen(width * height - totalMines);
@@ -146,6 +156,49 @@ export default function Game(props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [config]);
 
+    function onRotate(row, col) {
+        const ov = [...overlay];
+        const id = col * height + row;
+        switch (overlay[id]) {
+            case null:
+                return;
+            case undefined: // <empty>
+            case 'E':
+            case 'M':
+                ov[id] = 0;
+                break;
+            case 8:
+                ov[id] = 0;
+                break;
+            default:
+                ov[id]++;
+                break;
+        }
+        setOverlay(ov);
+        setEnableAI(false);
+    }
+
+    function onUnRotate(row, col) {
+        const ov = [...overlay];
+        const id = col * height + row;
+        switch (ov[id]) {
+            case null:
+                return;
+            case undefined: // <empty>
+                ov[id] = 'M';
+                break;
+            case 'M':
+                ov[id] = 'E';
+                break;
+            case 'E':
+            default:
+                delete ov[id];
+                break;
+        }
+        setOverlay(ov);
+        setEnableAI(false);
+    }
+
     function onProbe(row, col) {
         gameMgr.openBlock(col, row);
         onUpdate();
@@ -165,11 +218,33 @@ export default function Game(props) {
 
     // could be inside setTimeout
     function onStep() {
-        if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true)) {
-            if (isDrainRef.current)
-                gameMgrRef.current.automaticStep(module.SolvingState.AUTO);
-            else
-                gameMgrRef.current.automaticStep(module.SolvingState.HEUR);
+        const ss = isDrainRef.current ? module.SolvingState.AUTO : module.SolvingState.HEUR;
+        if (isExternal) {
+            overlayRef.current.forEach((v, i) => {
+                const row = i % height;
+                const col = (i - row) / height;
+                switch (v) {
+                    case 'M':
+                        gameMgrRef.current.setBlockMine(col, row, true);
+                        break;
+                    case 'E':
+                        gameMgrRef.current.setBlockMine(col, row, false);
+                        break;
+                    case null:
+                    case undefined:
+                        break;
+                    default:
+                        gameMgrRef.current.setBlockDegree(col, row, v);
+                        break;
+                }
+            });
+            setOverlay(overlayRef.current.map((v) => v === undefined ? v : null));
+            gameMgrRef.current.solve(ss, false);
+            setEnableAI(true);
+        } else {
+            if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true)) {
+                gameMgrRef.current.automaticStep(ss);
+            }
         }
         onUpdate();
     }
@@ -280,9 +355,10 @@ export default function Game(props) {
                     isWon={isWon}
                     gameMgr={isReady && gameMgr}
                     module={module}
+                    overlay={overlay}
                     flagging={flagging}
-                    onProbe={onProbe}
-                    onFlag={onFlag}
+                    onProbe={isExternal ? onRotate : onProbe}
+                    onFlag={isExternal ? onUnRotate : onFlag}
                     enableAI={enableAI}
                 />
                 <br />
@@ -309,67 +385,78 @@ export default function Game(props) {
                                 className="growing" text="Restart" onClick={onRestart} />
                     </ButtonGroup>
                 </ControlGroup>
-                <br />
-                <Switch checked={isAutoRestart} onChange={onSwitch}
-                        labelElement={'Auto-restart'}
-                        innerLabelChecked="on" innerLabel="off"
-                        alignIndicator={Alignment.RIGHT} />
-                <Switch checked={enableAI} onChange={onSwitchAI}
-                        labelElement={'Enable AI'} disabled={mode !== null}
-                        innerLabelChecked="on" innerLabel="off"
-                        alignIndicator={Alignment.RIGHT} />
-                <Collapse isOpen={enableAI} keepChildrenMounted>
+                {!isExternal && (<>
+                    <br />
+                    <Switch checked={isAutoRestart} onChange={onSwitch}
+                            labelElement={'Auto-restart'}
+                            innerLabelChecked="on" innerLabel="off"
+                            alignIndicator={Alignment.RIGHT} />
+                    <Switch checked={enableAI} onChange={onSwitchAI}
+                            labelElement={'Enable AI'} disabled={mode !== null}
+                            innerLabelChecked="on" innerLabel="off"
+                            alignIndicator={Alignment.RIGHT} />
+                    </>)}
+                <Collapse isOpen={enableAI || isExternal} keepChildrenMounted>
                     <h3>AI Control</h3>
                     <pre>{isDrain ? strategy : strategy.replace('-D256', '')}</pre>
                     <Switch checked={isDrain} onChange={onSwitchDrain}
                             labelElement={'Exhaustive'} disabled={mode !== null}
                             innerLabelChecked="PSEQ-D256" innerLabel="PSEQ"
                             alignIndicator={Alignment.RIGHT} />
-                    <Switch checked={isAutoFlag} onChange={onSwitchFlag}
-                            labelElement={'Auto-flag'}
-                            innerLabelChecked="on" innerLabel="off"
-                            alignIndicator={Alignment.RIGHT} />
+                    {!isExternal && (
+                        <Switch checked={isAutoFlag} onChange={onSwitchFlag}
+                                labelElement={'Auto-flag'}
+                                innerLabelChecked="on" innerLabel="off"
+                                alignIndicator={Alignment.RIGHT} />
+                        )}
                     <ControlGroup vertical>
                         <ButtonGroup>
-                            <Button disabled={!gameMgr || isGameOver || mode !== null}
+                            <Button disabled={!gameMgr || isGameOver || mode !== null || (isExternal && enableAI)}
                                     icon="hand-up" intent="primary" className="growing"
-                                    text="Single step" onClick={onStep} />
+                                    text={isExternal ? 'Solve' : 'Single step'}
+                                    onClick={onStep} />
                         </ButtonGroup>
                     </ControlGroup>
-                    <br />
-                    <FormGroup label="Speed">
-                        <Slider
-                            min={-2}
-                            max={2}
-                            stepSize={0.1}
-                            labelStepSize={1}
-                            onChange={setSpeed}
-                            labelRenderer={renderLabel}
-                            showTrackFill={false}
-                            value={speed}
-                        />
-                    </FormGroup>
-                    <ControlGroup vertical>
-                        <ButtonGroup>
-                            <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi') || !hasBest}
-                                    active={mode === 'semi'}
-                                    icon="play" intent="success" className="growing"
-                                    text="Semi-auto" onClick={onSemi} />
-                            <Button disabled={!gameMgr || isGameOver || mode !== null || !hasBest}
-                                    icon="fast-forward" intent="success"
-                                    onClick={onSemiAll} />
-                        </ButtonGroup>
-                        <ButtonGroup>
-                            <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
-                                    active={mode === 'auto'}
-                                    icon="fast-forward" intent="warning" className="growing"
-                                    text="Full-auto" onClick={onAuto} />
-                            <Button disabled={!gameMgr || isGameOver || mode !== null}
-                                    icon="lightning" intent="warning"
-                                    onClick={onAutoAll} />
-                        </ButtonGroup>
-                    </ControlGroup>
+                    {!isExternal && (<>
+                        <br />
+                        <FormGroup label="Speed">
+                            <Slider
+                                min={-2}
+                                max={2}
+                                stepSize={0.1}
+                                labelStepSize={1}
+                                onChange={setSpeed}
+                                labelRenderer={renderLabel}
+                                showTrackFill={false}
+                                value={speed}
+                            />
+                        </FormGroup>
+                        <ControlGroup vertical>
+                            <ButtonGroup>
+                                <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi') || !hasBest}
+                                        active={mode === 'semi'}
+                                        icon="play" intent="success" className="growing"
+                                        text="Semi-auto" onClick={onSemi} />
+                                <Button disabled={!gameMgr || isGameOver || mode !== null || !hasBest}
+                                        icon="fast-forward" intent="success"
+                                        onClick={onSemiAll} />
+                            </ButtonGroup>
+                            <ButtonGroup>
+                                <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
+                                        active={mode === 'auto'}
+                                        icon="fast-forward" intent="warning" className="growing"
+                                        text="Full-auto" onClick={onAuto} />
+                                <Button disabled={!gameMgr || isGameOver || mode !== null}
+                                        icon="lightning" intent="warning"
+                                        onClick={onAutoAll} />
+                            </ButtonGroup>
+                        </ControlGroup>
+                        </>)}
                 </Collapse>
+                {isExternal && (<>
+                    <h4>External Mode</h4>
+                    <p>Use left mouse click to indicate the degree of each block. Use right click to toggle between 'e' (assumed not to have mine) and 'M' (assumed to have mine.) Once you click Solve, you <strong>cannot</strong> edit existing degrees.</p>
+                    </>)}
             </Card>
         </>
     );

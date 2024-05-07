@@ -5,43 +5,33 @@
 #include <iostream>
 #include <utility>
 
-GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
         m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
     else
         m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
-
-    m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
-    m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
-
-    for (auto i = 0; i < m_TotalWidth; ++i)
-        for (auto j = 0; j < m_TotalHeight; ++j)
-        {
-            m_Blocks.emplace_back();
-            m_BlocksR.emplace_back();
-            auto &blk = m_Blocks.back();
-            auto &blkR = m_BlocksR.back();
-            blk.Index = GetIndex(i, j);
-            blk.X = i;
-            blk.Y = j;
-            blk.IsOpen = false;
-            blk.IsMine = false;
-            blkR.reserve(8);
-            for (auto di = -1; di <= 1; ++di)
-                if (i + di >= 0 && i + di < m_TotalWidth)
-                    for (auto dj = -1; dj <= 1; ++dj)
-                        if (j + dj >= 0 && j + dj < m_TotalHeight)
-                            if (di != 0 || dj != 0)
-                                blkR.push_back(GetIndex(i + di, j + dj));
-        }
-
+    GenerateBlocksR();
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+{
+    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || m_TotalMines == -1)
+        m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+    else
+        m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
+    GenerateBlocksR();
+    if (m_TotalMines == -1)
+        m_AllBits = m_TotalWidth * m_TotalHeight;
+    else
+        m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
+}
+
+GameMgr::GameMgr(std::istream &sr) : m_IsExternal(false), m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val))
+    READ(m_IsExternal);
     READ(m_AllowWrongGuess);
     READ(BasicStrategy);
     READ(m_TotalWidth);
@@ -53,34 +43,12 @@ GameMgr::GameMgr(std::istream &sr) : m_AllowWrongGuess(false), m_TotalWidth(0), 
     READ(m_ToOpen);
     READ(m_WrongGuesses);
 
-    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
+    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || !m_TotalMines)
         m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
     else
         m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
 
-    m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
-    m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
-
-    for (auto i = 0; i < m_TotalWidth; ++i)
-        for (auto j = 0; j < m_TotalHeight; ++j)
-        {
-            m_Blocks.emplace_back();
-            m_BlocksR.emplace_back();
-            auto &blk = m_Blocks.back();
-            auto &blkR = m_BlocksR.back();
-            blk.Index = GetIndex(i, j);
-            blk.X = i;
-            blk.Y = j;
-            blk.IsOpen = false;
-            blk.IsMine = false;
-            blkR.reserve(8);
-            for (auto di = -1; di <= 1; ++di)
-                if (i + di >= 0 && i + di < m_TotalWidth)
-                    for (auto dj = -1; dj <= 1; ++dj)
-                        if (j + dj >= 0 && j + dj < m_TotalHeight)
-                            if (di != 0 || dj != 0)
-                                blkR.push_back(GetIndex(i + di, j + dj));
-        }
+    GenerateBlocksR();
 
     if (m_Settled)
     {
@@ -186,6 +154,32 @@ const BlockProperty &GameMgr::GetBlockProperty(int x, int y) const
     return m_Blocks[GetIndex(x, y)];
 }
 
+const BlockProperty &GameMgr::SetBlockDegree(int x, int y, int degree)
+{
+    if (!m_IsExternal)
+        throw std::runtime_error("only external games can be modified");
+    auto id = GetIndex(x, y);
+    auto &b = m_Blocks[id];
+    b.Degree = degree;
+    b.IsOpen = true;
+    m_Solver->AddRestrain(m_BlocksR[id], degree);
+    m_Solver->AddRestrain(id, false);
+    return b;
+}
+
+const BlockProperty &GameMgr::SetBlockMine(int x, int y, bool mined)
+{
+    if (!m_IsExternal)
+        throw std::runtime_error("only external games can be modified");
+    auto id = GetIndex(x, y);
+    auto &b = m_Blocks[id];
+    b.IsOpen = true;
+    b.IsMine = mined;
+    b.Degree = -1;
+    m_Solver->AddRestrain(id, mined);
+    return b;
+}
+
 const BlockProperty *GameMgr::GetBlockProperties() const
 {
     return &*m_Blocks.begin();
@@ -263,21 +257,24 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 #endif
 
 #ifndef NDEBUG
-    for (auto i = 0; i < m_Blocks.size(); ++i)
-        switch (m_Solver->GetBlockStatus(i))
-        {
-        case BlockStatus::Mine:
-            if (!m_Blocks[i].IsMine)
-                throw std::runtime_error("mine is not mine");
-            break;
-        case BlockStatus::Blank:
-            if (m_Blocks[i].IsMine)
-                throw std::runtime_error("blank is not blank");
-            break;
-        case BlockStatus::Unknown:
-        default:
-            break;
-        }
+    if (!m_IsExternal)
+    {
+        for (auto i = 0; i < m_Blocks.size(); ++i)
+            switch (m_Solver->GetBlockStatus(i))
+            {
+            case BlockStatus::Mine:
+                if (!m_Blocks[i].IsMine)
+                    throw std::runtime_error("mine is not mine");
+                break;
+            case BlockStatus::Blank:
+                if (m_Blocks[i].IsMine)
+                    throw std::runtime_error("blank is not blank");
+                break;
+            case BlockStatus::Unknown:
+            default:
+                break;
+            }
+    }
 #endif
 
     if (m_Solver->CanOpenForSure != 0)
@@ -360,6 +357,9 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 
 void GameMgr::OpenOptimalBlocks()
 {
+    if (m_IsExternal)
+        throw std::runtime_error("external games cannot be automated");
+
     if (!m_Best.empty())
     {
         for (auto b : m_Best)
@@ -382,6 +382,9 @@ void GameMgr::OpenOptimalBlocks()
 
 bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single)
 {
+    if (m_IsExternal)
+        throw std::runtime_error("external games cannot be automated");
+
     if (!m_Started)
         return false;
 
@@ -421,6 +424,9 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single)
 
 bool GameMgr::SemiAutomatic(SolvingState maxDepth)
 {
+    if (m_IsExternal)
+        throw std::runtime_error("external games cannot be automated");
+
     if (!m_Started)
         return false;
     while (SemiAutomaticStep(maxDepth, false)) { }
@@ -429,6 +435,9 @@ bool GameMgr::SemiAutomatic(SolvingState maxDepth)
 
 void GameMgr::AutomaticStep(SolvingState maxDepth)
 {
+    if (m_IsExternal)
+        throw std::runtime_error("external games cannot be automated");
+
     if (!m_Started)
         return;
 
@@ -444,6 +453,9 @@ void GameMgr::AutomaticStep(SolvingState maxDepth)
 
 void GameMgr::Automatic(bool drain)
 {
+    if (m_IsExternal)
+        throw std::runtime_error("external games cannot be automated");
+
     SolvingState st;
     switch (BasicStrategy.Logic)
     {
@@ -521,6 +533,7 @@ void GameMgr::EnableDrainer()
 void GameMgr::Save(std::ostream &sw) const
 {
 #define WRITE(val) sw.write(reinterpret_cast<const char *>(&(val)), sizeof(val))
+    WRITE(m_IsExternal);
     WRITE(m_AllowWrongGuess);
     WRITE(BasicStrategy);
     WRITE(m_TotalWidth);
@@ -574,6 +587,33 @@ again:
             if (m_Blocks[id].IsMine)
                 ++m_Blocks[i].Degree;
     }
+}
+
+void GameMgr::GenerateBlocksR()
+{
+    m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
+    m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
+
+    for (auto i = 0; i < m_TotalWidth; ++i)
+        for (auto j = 0; j < m_TotalHeight; ++j)
+        {
+            m_Blocks.emplace_back();
+            m_BlocksR.emplace_back();
+            auto &blk = m_Blocks.back();
+            auto &blkR = m_BlocksR.back();
+            blk.Index = GetIndex(i, j);
+            blk.X = i;
+            blk.Y = j;
+            blk.IsOpen = false;
+            blk.IsMine = false;
+            blkR.reserve(8);
+            for (auto di = -1; di <= 1; ++di)
+                if (i + di >= 0 && i + di < m_TotalWidth)
+                    for (auto dj = -1; dj <= 1; ++dj)
+                        if (j + dj >= 0 && j + dj < m_TotalHeight)
+                            if (di != 0 || dj != 0)
+                                blkR.push_back(GetIndex(i + di, j + dj));
+        }
 }
 
 void GameMgr::OpenBlock(int id)

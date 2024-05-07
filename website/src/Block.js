@@ -7,6 +7,7 @@ export default function Block(props) {
         isOpen,
         degree,
         isFlagged,
+        isEFlagged,
         hasMine,
         probability,
         isBest,
@@ -30,6 +31,9 @@ export default function Block(props) {
         if (hasMine) {
             tdClass += ' blk-dead';
             text = 'M';
+        } else if (isEFlagged) {
+            spanClass = 'flag';
+            text = 'e';
         } else if (degree) {
             spanClass = `num-${degree}`;
             text = degree;

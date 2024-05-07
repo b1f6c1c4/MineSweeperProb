@@ -87,9 +87,9 @@ void BasicSolver::AddRestrain(Block blk, bool isMine)
     }
     m_State &= SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability;
     if (m_Manager[blk] == BlockStatus::Blank && isMine)
-        throw std::runtime_error("blank is not blank");
+        throw std::runtime_error("blank is not blank at " + std::to_string(blk));
     if (m_Manager[blk] == BlockStatus::Mine && !isMine)
-        throw std::runtime_error("mine is not mine");
+        throw std::runtime_error("mine is not mine at " + std::to_string(blk));
 }
 
 void BasicSolver::AddRestrain(const BlockSet &set, int mines)
@@ -407,7 +407,8 @@ bool BasicSolver::ReduceRestrainBlank(int row)
 bool BasicSolver::ReduceRestrainMine(int row)
 {
     auto &sum = m_ReduceCount_Temp;
-    ASSERT(m_MatrixAugment[row] <= sum[row]);
+    if (m_MatrixAugment[row] > sum[row])
+        throw std::runtime_error("infeasible");
     if (m_MatrixAugment[row] != sum[row])
         return false;
 

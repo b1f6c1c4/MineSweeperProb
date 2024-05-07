@@ -24,6 +24,7 @@ class
 {
 public:
     GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess = false);
+    GameMgr(int width, int height, int totalMines, Strategy strategy);
     explicit GameMgr(std::istream &sr);
     ~GameMgr();
 
@@ -45,6 +46,8 @@ public:
     [[nodiscard]] double GetAllBits() const;
 
     [[nodiscard]] const BlockProperty &GetBlockProperty(int x, int y) const;
+    const BlockProperty &SetBlockDegree(int x, int y, int degree);
+    const BlockProperty &SetBlockMine(int x, int y, bool mined);
     [[nodiscard]] const BlockProperty *GetBlockProperties() const;
     [[nodiscard]] double GetBlockProbability(int x, int y) const;
     [[nodiscard]] BlockStatus GetInferredStatus(int x, int y) const;
@@ -74,6 +77,7 @@ public:
 
     friend class Drainer;
 private:
+    bool m_IsExternal;
     bool m_AllowWrongGuess;
     int m_TotalWidth, m_TotalHeight, m_TotalMines;
     bool m_IsSNR;
@@ -88,6 +92,7 @@ private:
 
     [[nodiscard]] int GetIndex(int x, int y) const;
 
+    void GenerateBlocksR();
     void SettleMines(int initID);
     void OpenBlock(int id);
 
