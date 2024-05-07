@@ -72,6 +72,8 @@ export default function Game(props) {
     const cancellerRef = useRef(canceller);
     cancellerRef.current = canceller;
 
+    const [hoverId, setHoverId] = useState(undefined);
+
     // could be inside setTimeout
     function onUpdate(json) {
         if (json) {
@@ -131,6 +133,7 @@ export default function Game(props) {
         if (historyRef.current)
             historyRef.current.delete();
         const m = modeRef.current;
+        setHoverId(undefined);
         setIsSettled(false);
         setIsGameOver(false);
         setIsWon(false);
@@ -227,10 +230,17 @@ export default function Game(props) {
         setEnableAI(false);
     }
 
+    function push(f) {
+        history.push(gameMgr, JSON.stringify(f || flagging));
+    }
+
     function onProbe(row, col) {
-        gameMgr.openBlock(col, row);
-        onUpdate();
-        history.push(gameMgr, JSON.stringify(flagging));
+        if (flagging[col * height + row])
+            return;
+        if (gameMgr.openBlock(col, row)) {
+            onUpdate();
+            push();
+        }
     }
 
     function onFlag(row, col) {
@@ -243,6 +253,7 @@ export default function Game(props) {
             setTotalFlagged(totalFlagged + 1);
         }
         setFlagging(f);
+        push(f);
     }
 
     // could be inside setTimeout
@@ -276,6 +287,7 @@ export default function Game(props) {
             }
         }
         onUpdate();
+        push();
     }
 
     function onSemi() {
@@ -302,6 +314,7 @@ export default function Game(props) {
     function onSemiAll() {
         gameMgr.semiAutomatic(module.SolvingState.SEMI);
         onUpdate();
+        push();
     }
 
     // could be inside setTimeout
@@ -331,6 +344,15 @@ export default function Game(props) {
         if (isAutoRestartRef.current)
             setMode('auto-all');
         onUpdate();
+        push();
+    }
+
+    function onHover(id) {
+        setHoverId(id);
+    }
+
+    function onUnHover() {
+        setHoverId(undefined);
     }
 
     function renderLabel(v) {
@@ -391,6 +413,9 @@ export default function Game(props) {
                     onProbe={isExternal ? onRotate : onProbe}
                     onFlag={isExternal ? onUnRotate : onFlag}
                     enableAI={enableAI}
+                    hoverId={hoverId}
+                    onHover={onHover}
+                    onUnHover={onUnHover}
                 />
                 <br />
                 <Collapse isOpen={enableAI}>

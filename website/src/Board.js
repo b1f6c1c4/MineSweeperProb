@@ -14,6 +14,9 @@ export default function Board(props) {
         onProbe,
         onFlag,
         enableAI,
+        hoverId,
+        onHover,
+        onUnHover,
     } = props;
     let {
         gameMgr,
@@ -40,15 +43,16 @@ export default function Board(props) {
             }
             const property = gameMgr.blockPropertyOf(j, i);
             const infer = enableAI ? gameMgr.inferredStatusOf(j, i) : module.BlockStatus.UNKNOWN;
+            const id = j * height + i;
             let prob = null;
             if (enableAI) {
                 prob = gameMgr.blockProbabilityOf(j, i);
                 if (drain.size())
-                    prob = 1 - drain.get(j * height + i);
+                    prob = 1 - drain.get(id);
                 if (!isStarted)
                     prob = null;
             }
-            const o = overlay[j * height + i];
+            const o = overlay[id];
             const xo = o !== null && o >= 0 && o <= 8;
             // Note: do NOT use {...property} as it won't work for getters
             row.push(<Block key={j}
@@ -57,18 +61,22 @@ export default function Board(props) {
                             isGameOver={isGameOver}
                             isWon={isWon}
                             degree={xo ? o : property.degree}
-                            isOpen={o !== null && o !== undefined || property.isOpen}
-                            isFlagged={flagging[j * height + i]}
+                            isOpen={(o !== null && o !== undefined) || property.isOpen}
+                            isFlagged={flagging[id]}
                             isEFlagged={o === 'E' || property.degree === -1}
                             hasMine={property.hasMine || o === 'M'}
-                            isBest={best[j * height + i]}
-                            isPreferred={preferred[j * height + i]}
+                            isLastProbe={gameMgr.lastProbe == id}
+                            isHover={id == hoverId}
+                            isBest={best[id]}
+                            isPreferred={preferred[id]}
                             isSafe={infer === module.BlockStatus.BLANK}
                             isDangerous={infer === module.BlockStatus.MINE}
                             isDrain={enableAI && !!drain.size()}
                             probability={prob}
                             onProbe={onProbe}
                             onFlag={onFlag}
+                            onHover={() => onHover(id)}
+                            onUnHover={onUnHover}
             />);
         }
         body.push(<tr key={i}>{row}</tr>);

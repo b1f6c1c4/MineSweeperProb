@@ -5,7 +5,7 @@
 #include <iostream>
 #include <utility>
 
-GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr), m_LastProbe(-1)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
         m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
@@ -15,7 +15,7 @@ GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy str
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr), m_LastProbe(-1)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || m_TotalMines == -1)
         m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
@@ -28,7 +28,7 @@ GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : Bas
         m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(std::istream &sr) : m_IsExternal(false), m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
+GameMgr::GameMgr(std::istream &sr) : m_IsExternal(false), m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr), m_LastProbe(0)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val))
     READ(m_IsExternal);
@@ -42,6 +42,7 @@ GameMgr::GameMgr(std::istream &sr) : m_IsExternal(false), m_AllowWrongGuess(fals
     READ(m_Started);
     READ(m_ToOpen);
     READ(m_WrongGuesses);
+    READ(m_LastProbe);
 
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || !m_TotalMines)
         m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
@@ -135,6 +136,11 @@ double GameMgr::GetAllBits() const
     return m_AllBits;
 }
 
+int GameMgr::GetLastProbe() const
+{
+    return m_LastProbe;
+}
+
 const BlockProperty &GameMgr::GetBlockProperty(int x, int y) const
 {
     return m_Blocks[GetIndex(x, y)];
@@ -221,11 +227,6 @@ const std::vector<double> &GameMgr::GetBestProbabilityList() const
     if (!m_Drainer)
         return empty;
     return m_Drainer->GetBestProbabilityList();
-}
-
-void GameMgr::OpenBlock(int x, int y)
-{
-    OpenBlock(GetIndex(x, y));
 }
 
 void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
@@ -350,7 +351,7 @@ void GameMgr::OpenOptimalBlocks()
     {
         for (auto b : m_Best)
         {
-            OpenBlock(b);
+            OpenBlockImpl(m_LastProbe = b);
             if (!m_Started)
                 break;
         }
@@ -363,7 +364,7 @@ void GameMgr::OpenOptimalBlocks()
 
     auto blk = m_Preferred.size() == 1 ? m_Preferred[0] : m_Preferred[RandomInteger(m_Preferred.size())];
     m_Preferred.clear();
-    OpenBlock(blk);
+    OpenBlockImpl(m_LastProbe = blk);
 }
 
 bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single)
@@ -394,7 +395,7 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single)
     {
         if (m_Blocks[i].IsOpen || m_Solver->GetBlockStatus(i) != BlockStatus::Blank)
             continue;
-        OpenBlock(i);
+        OpenBlockImpl(m_LastProbe = i);
 #ifndef NDEBUG
         flag = true;
 #endif
@@ -429,7 +430,7 @@ void GameMgr::AutomaticStep(SolvingState maxDepth)
 
     if (!m_Settled && BasicStrategy.InitialPositionSpecified)
     {
-        OpenBlock(BasicStrategy.Index);
+        OpenBlockImpl(m_LastProbe = BasicStrategy.Index);
         return;
     }
 
@@ -465,9 +466,9 @@ void GameMgr::Automatic(bool drain)
 
     if (!m_Settled)
         if (BasicStrategy.InitialPositionSpecified)
-            OpenBlock(BasicStrategy.Index);
+            OpenBlockImpl(m_LastProbe = BasicStrategy.Index);
         else if (!BasicStrategy.HeuristicEnabled)
-            OpenBlock(RandomInteger(m_Blocks.size()));
+            OpenBlockImpl(m_LastProbe = RandomInteger(m_Blocks.size()));
 
     if (st == SolvingState::Stale) // Passive Logic
     {
@@ -530,6 +531,7 @@ void GameMgr::Save(std::ostream &sw) const
     WRITE(m_Started);
     WRITE(m_ToOpen);
     WRITE(m_WrongGuesses);
+    WRITE(m_LastProbe);
     if (m_Settled)
         for (auto &blk : m_Blocks)
         {
@@ -602,7 +604,17 @@ void GameMgr::GenerateBlocksR()
         }
 }
 
-void GameMgr::OpenBlock(int id)
+bool GameMgr::OpenBlock(int x, int y)
+{
+    auto id = GetIndex(x, y);
+    if (!m_Started || m_Settled && m_Blocks[id].IsOpen)
+        return false;
+
+    OpenBlockImpl(m_LastProbe = id);
+    return true;
+}
+
+void GameMgr::OpenBlockImpl(int id)
 {
     if (!m_Started)
         return;
@@ -633,7 +645,7 @@ void GameMgr::OpenBlock(int id)
     if (m_Blocks[id].Degree == 0)
     {
         for (auto &blk : m_BlocksR[id])
-            OpenBlock(blk);
+            OpenBlockImpl(blk);
     }
     m_Solver->AddRestrain(m_BlocksR[id], m_Blocks[id].Degree);
 

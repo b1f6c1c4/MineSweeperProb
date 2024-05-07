@@ -43,6 +43,7 @@ public:
     [[nodiscard]] bool GetSucceed() const;
     [[nodiscard]] double GetBits() const;
     [[nodiscard]] double GetAllBits() const;
+    [[nodiscard]] int GetLastProbe() const;
 
     [[nodiscard]] const BlockProperty &GetBlockProperty(int x, int y) const;
     const BlockProperty &SetBlockDegree(int x, int y, int degree);
@@ -59,7 +60,7 @@ public:
     [[nodiscard]] const BlockSet &GetPreferredBlockList() const;
     [[nodiscard]] const std::vector<double> &GetBestProbabilityList() const;
 
-    void OpenBlock(int x, int y);
+    bool OpenBlock(int x, int y);
 
     void Solve(SolvingState maxDepth, bool shortcut);
 
@@ -88,12 +89,13 @@ private:
     double m_AllBits;
     BlockSet m_Best, m_Preferred;
     std::unique_ptr<Drainer> m_Drainer;
+    int m_LastProbe;
 
     [[nodiscard]] int GetIndex(int x, int y) const;
 
     void GenerateBlocksR();
     void SettleMines(int initID);
-    void OpenBlock(int id);
+    void OpenBlockImpl(int id);
 
     [[nodiscard]] int FrontierDist(Block blk) const;
 };

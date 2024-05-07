@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '@blueprintjs/core';
 
 export default function Block(props) {
     const {
@@ -6,6 +7,7 @@ export default function Block(props) {
         isWon,
         isOpen,
         degree,
+        isHover,
         isFlagged,
         isEFlagged,
         hasMine,
@@ -15,10 +17,13 @@ export default function Block(props) {
         isSafe,
         isDangerous,
         isDrain,
+        isLastProbe,
         row,
         col,
         onProbe,
         onFlag,
+        onHover,
+        onUnHover,
     } = props;
 
     let tdClass = 'blk';
@@ -91,8 +96,13 @@ export default function Block(props) {
 
     return (<td className={tdClass}
                 style={tdStyle}
+                onMouseEnter={onHover}
+                onMouseLeave={onUnHover}
                 onClick={onClick}
                 onContextMenu={onClick}>
+        {(isLastProbe || (isHover && !isOpen && !isFlagged)) && (
+            <Icon icon="locate" size={20} />
+        )}
         <span className={spanClass}>{text}</span>
     </td>);
 }

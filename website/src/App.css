@@ -37,6 +37,11 @@ td.blk span {
   user-select: none;
 }
 
+td.blk span[icon=locate] {
+  transform: translate(-50%, -50%);
+  opacity: 50%;
+}
+
 td.blk-open {
   border: 3px solid #eeeeee;
   background-color: #f3f3f3;
