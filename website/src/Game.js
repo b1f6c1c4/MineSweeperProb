@@ -73,7 +73,10 @@ export default function Game(props) {
     cancellerRef.current = canceller;
 
     // could be inside setTimeout
-    function onUpdate() {
+    function onUpdate(json) {
+        if (json) {
+            setFlagging(JSON.parse(json));
+        }
         setToOpen(gameMgrRef.current.toOpen);
         if (!gameMgrRef.current.started) {
             setIsGameOver(true);
@@ -89,6 +92,8 @@ export default function Game(props) {
                         onRestart();
                 }, 1500);
         } else {
+            setIsGameOver(false);
+            setIsWon(false);
             if (isDrainRef.current)
                 gameMgrRef.current.solve(module.SolvingState.AUTO, false);
             else
@@ -97,7 +102,7 @@ export default function Game(props) {
             setIsSettled(gameMgrRef.current.settled);
             setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
         }
-        if (enableAI && isAutoFlagRef.current) {
+        if (enableAI && isAutoFlagRef.current && !json) {
             const next = flaggingRef.current;
             let tf = totalFlaggedRef.current;
             for (let i = 0; i < height; i++)
@@ -155,13 +160,11 @@ export default function Game(props) {
     }
 
     function onUndo() {
-        setFlagging(JSON.parse(history.undo(gameMgr)));
-        onUpdate();
+        onUpdate(history.undo(gameMgr));
     }
 
     function onRedo() {
-        setFlagging(JSON.parse(history.redo(gameMgr)));
-        onUpdate();
+        onUpdate(history.redo(gameMgr));
     }
 
     useEffect(() => {
