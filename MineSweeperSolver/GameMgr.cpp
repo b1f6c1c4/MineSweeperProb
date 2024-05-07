@@ -8,9 +8,9 @@
 GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
-        m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
     else
-        m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
+        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight, m_TotalMines);
     GenerateBlocksR();
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
@@ -18,9 +18,9 @@ GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy str
 GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || m_TotalMines == -1)
-        m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
     else
-        m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
+        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight, m_TotalMines);
     GenerateBlocksR();
     if (m_TotalMines == -1)
         m_AllBits = m_TotalWidth * m_TotalHeight;
@@ -44,9 +44,9 @@ GameMgr::GameMgr(std::istream &sr) : m_IsExternal(false), m_AllowWrongGuess(fals
     READ(m_WrongGuesses);
 
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || !m_TotalMines)
-        m_Solver = new Solver(m_TotalWidth * m_TotalHeight);
+        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
     else
-        m_Solver = new Solver(m_TotalWidth * m_TotalHeight, m_TotalMines);
+        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight, m_TotalMines);
 
     GenerateBlocksR();
 
@@ -70,20 +70,6 @@ GameMgr::GameMgr(std::istream &sr) : m_IsExternal(false), m_AllowWrongGuess(fals
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::~GameMgr()
-{
-    if (m_Solver != nullptr)
-    {
-        delete m_Solver;
-        m_Solver = nullptr;
-    }
-    if (m_Drainer != nullptr)
-    {
-        delete m_Drainer;
-        m_Drainer = nullptr;
-    }
-}
-
 Solver &GameMgr::GetSolver()
 {
     return *m_Solver;
@@ -96,7 +82,7 @@ const Solver &GameMgr::GetSolver() const
 
 const Drainer *GameMgr::GetDrainer() const
 {
-    return m_Drainer;
+    return &*m_Drainer;
 }
 
 int GameMgr::GetTotalWidth() const
@@ -526,7 +512,7 @@ void GameMgr::EnableDrainer()
     if (m_Drainer != nullptr)
         return;
     SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
-    m_Drainer = new Drainer(*this);
+    m_Drainer = std::make_unique<Drainer>(*this);
     Solve(SolvingState::Probability | SolvingState::Drained, false);
 }
 

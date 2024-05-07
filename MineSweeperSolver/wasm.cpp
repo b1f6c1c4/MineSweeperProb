@@ -5,6 +5,7 @@
 #include "Drainer.h"
 #include "facade.hpp"
 #include <fstream>
+#include <sstream>
 
 #ifndef __EMSCRIPTEN__
 
@@ -13,6 +14,7 @@
 #else // __EMSCRIPTEN__
 
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
 using namespace emscripten;
 
 #endif // __EMSCRIPTEN__
@@ -31,10 +33,69 @@ void cache(int w, int h, int m) {
     CacheBinomials(w * h, m);
 }
 
+class History {
+public:
+    [[nodiscard]] bool undoable() const {
+        return ptr >= 2;
+    }
+
+    [[nodiscard]] bool redoable() const {
+        return ptr < memo.size();
+    }
+
+    void push(const GameMgr &m, std::string aux) {
+#ifndef NDEBUG
+        std::cerr << "History::push()\n";
+        std::cerr << " GameMgr = " << &m << "\n";
+#endif
+        std::stringstream ss;
+        m.Save(ss);
+        memo.resize(ptr++);
+        memo.emplace_back(ss.str(), std::move(aux));
+    }
+
+    // A push() is strongly recommended right before undoing,
+    // otherwise undo cannot be immediately followed by a redu.
+    auto undo(GameMgr &m) {
+        return revert(m, --ptr - 1);
+    }
+
+    // returns the 'most recent version'
+    auto top(GameMgr &m) const {
+        return revert(m, ptr - 1);
+    }
+
+    auto redo(GameMgr &m) {
+        return revert(m, ptr++);
+    }
+
+private:
+    using memo_t = std::pair<std::string, std::string>;
+    std::vector<memo_t> memo;
+    size_t ptr; // points to next writable memo
+                // i.e., (ptr - 1) is the most recent version.
+
+    std::string revert(GameMgr &m, size_t n) const {
+        auto &mo = memo[n];
+        std::stringstream ss{ mo.first };
+        m = GameMgr{ ss };
+        return mo.second;
+    }
+};
+
 EMSCRIPTEN_BINDINGS(mws) {
     function("seed", &seed);
     function("parse", static_cast<Configuration (*)(const std::string &)>(&parse));
     function("cache", static_cast<void (*)(int, int, int)>(&cache));
+    class_<History>("History")
+        .constructor()
+        .property("undoable", &History::undoable)
+        .property("redoable", &History::redoable)
+        .function("push", &History::push)
+        .function("undo", &History::undo)
+        .function("top", &History::top)
+        .function("redo", &History::redo)
+        ;
     class_<Strategy>("Strategy")
         .property("initialPositionSpecified", &Strategy::InitialPositionSpecified)
         .property("index", &Strategy::Index)

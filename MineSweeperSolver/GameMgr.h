@@ -1,7 +1,9 @@
 #pragma once
 #include "stdafx.h"
 #include "Solver.h"
+#include "Drainer.h"
 #include <vector>
+#include <memory>
 #include "Strategies.h"
 
 struct
@@ -14,8 +16,6 @@ struct
     bool IsMine;
 };
 
-class Drainer;
-
 /* Bookkeeping the gaming process, store mine locations, report degree information to solvers.
  * Use information from BasicSolver/Solver/Drainer to open corresponding blocks.
  */
@@ -26,7 +26,6 @@ public:
     GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess = false);
     GameMgr(int width, int height, int totalMines, Strategy strategy);
     explicit GameMgr(std::istream &sr);
-    ~GameMgr();
 
     Strategy BasicStrategy;
 
@@ -85,10 +84,10 @@ private:
     std::vector<BlockProperty> m_Blocks;
     std::vector<BlockSet> m_BlocksR; // each block's neighbor
     int m_ToOpen, m_WrongGuesses;
-    Solver *m_Solver;
+    std::unique_ptr<Solver> m_Solver;
     double m_AllBits;
     BlockSet m_Best, m_Preferred;
-    Drainer *m_Drainer;
+    std::unique_ptr<Drainer> m_Drainer;
 
     [[nodiscard]] int GetIndex(int x, int y) const;
 

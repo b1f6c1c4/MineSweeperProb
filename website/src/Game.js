@@ -27,6 +27,9 @@ export default function Game(props) {
     const [gameMgr, setGameMgr] = useState(undefined);
     const gameMgrRef = useRef(gameMgr);
     gameMgrRef.current = gameMgr;
+    const [history, setHistory] = useState(undefined);
+    const historyRef = useRef(history);
+    historyRef.current = history;
 
     const [isAutoRestart, setIsAutoRestart] = useState(false);
     const isAutoRestartRef = useRef(isAutoRestart);
@@ -118,6 +121,10 @@ export default function Game(props) {
 
     // could be inside setTimeout
     function onRestart() {
+        if (gameMgrRef.current)
+            gameMgrRef.current.delete();
+        if (historyRef.current)
+            historyRef.current.delete();
         const m = modeRef.current;
         setIsSettled(false);
         setIsGameOver(false);
@@ -136,7 +143,9 @@ export default function Game(props) {
         const mgr = isExternal
             ? new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg)
             : new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
+        const his = new module.History();
         setGameMgr(mgr);
+        setHistory(his);
         setRate([mgr.bits, mgr.allBits]);
         setToOpen(width * height - totalMines);
         if (m === 'auto')
@@ -145,12 +154,24 @@ export default function Game(props) {
             setTimeout(onAutoAll, 500);
     }
 
+    function onUndo() {
+        setFlagging(JSON.parse(history.undo(gameMgr)));
+        onUpdate();
+    }
+
+    function onRedo() {
+        setFlagging(JSON.parse(history.redo(gameMgr)));
+        onUpdate();
+    }
+
     useEffect(() => {
         onRestart();
         return () => {
             if (gameMgrRef.current) {
                 gameMgrRef.current.delete();
+                historyRef.current.delete();
                 setGameMgr(undefined);
+                setHistory(undefined);
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,6 +227,7 @@ export default function Game(props) {
     function onProbe(row, col) {
         gameMgr.openBlock(col, row);
         onUpdate();
+        history.push(gameMgr, JSON.stringify(flagging));
     }
 
     function onFlag(row, col) {
@@ -391,6 +413,12 @@ export default function Game(props) {
                         <Button disabled={!gameMgr || mode != null} rightIcon="refresh"
                                 intent={isGameOver ? isWon ? 'success' : 'danger' : undefined}
                                 className="growing" text="Restart" onClick={onRestart} />
+                    </ButtonGroup>
+                    <ButtonGroup>
+                        <Button disabled={!gameMgr || mode != null || !history || !history.undoable} icon="undo"
+                                className="growing" text="Undo" onClick={onUndo} />
+                        <Button disabled={!gameMgr || mode != null || !history || !history.redoable} rightIcon="redo"
+                                className="growing" text="Redo" onClick={onRedo} />
                     </ButtonGroup>
                 </ControlGroup>
                 {!isExternal && (<>
