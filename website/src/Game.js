@@ -580,7 +580,6 @@ export default function Game(props) {
                     </>)}
                 <Collapse isOpen={enableAI || isExternal} keepChildrenMounted>
                     <h3>AI Control</h3>
-                    <pre>{(isDrain || isDraining) ? strategy : strategy.replace('-D256', '')}</pre>
                     {!isExternal && (
                         <Switch checked={isAutoFlag} onChange={onSwitchFlag}
                                 labelElement={'Auto-flag'}

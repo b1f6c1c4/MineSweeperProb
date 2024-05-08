@@ -32,8 +32,9 @@ export default function Board(props) {
         for (let i = 0; i < set.size(); i++)
             best[set.get(i)] = true;
         set = gameMgr.preferredBlocks;
-        for (let i = 0; i < set.size(); i++)
-            preferred[set.get(i)] = true;
+        if (isAuto)
+            for (let i = 0; i < set.size(); i++)
+                preferred[set.get(i)] = true;
     }
     let drain = isDrain && gameMgr.bestProbabilityList;
     let hoverInfer = null;

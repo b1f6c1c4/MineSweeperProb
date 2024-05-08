@@ -79,7 +79,7 @@ export default function HeatBar(props) {
                     <span className="indicator here">100% Safe</span>
                 ) : (
                     <span className="indicator">
-                        {isDrain ? 'Win' : 'Empty'}
+                        {isDrain ? 'Win' : 'Safe'}
                     </span>
                 )}
             </div>
