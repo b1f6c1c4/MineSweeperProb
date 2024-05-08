@@ -16,6 +16,11 @@
   padding: 8px 0;
 }
 
+.heat-bar.drain {
+  flex-direction: column-reverse;
+  font-weight: bold;
+}
+
 .heat-bar div {
   display: flex;
   flex-direction: row-reverse;
@@ -71,8 +76,8 @@
   background-image: linear-gradient(180deg, #f82929, #09b722);
 }
 
-.heat-bar .mid.drain .color {
-  background-image: linear-gradient(180deg, #f82929, #7b68ee);
+.heat-bar.drain .mid > .color > .color {
+  background-image: linear-gradient(0deg, #f82929, #7b68ee);
 }
 
 .heat-bar .dangerous .color {

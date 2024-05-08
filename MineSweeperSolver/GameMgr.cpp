@@ -146,38 +146,28 @@ int GameMgr::GetLastProbe() const
 double GameMgr::GetMinProbability() const
 {
     double m = 1;
-    if (m_Drainer)
-        for (auto p : m_Drainer->GetBestProbabilityList())
+    for (auto &blk : m_Blocks)
+        if (m_Solver->GetBlockStatus(blk.Index) == BlockStatus::Unknown)
+        {
+            auto p = m_Drainer
+                ? m_Drainer->GetBestProbabilityList()[blk.Index]
+                : m_Solver->GetProbability(blk.Index);
             m = MIN(m, p);
-    else
-        for (auto &blk : m_Blocks)
-            if (m_Solver->GetBlockStatus(blk.Index) == BlockStatus::Unknown)
-            {
-                auto p = m_Solver->GetProbability(blk.Index);
-                m = MIN(m, p);
-            }
-#ifndef NDEBUG
-    std::cerr << "GameMgr::GetMinProbability => " << m << "\n";
-#endif
+        }
     return m;
 }
 
 double GameMgr::GetMaxProbability() const
 {
     double m = 0;
-    if (m_Drainer)
-        for (auto p : m_Drainer->GetBestProbabilityList())
+    for (auto &blk : m_Blocks)
+        if (m_Solver->GetBlockStatus(blk.Index) == BlockStatus::Unknown)
+        {
+            auto p = m_Drainer
+                ? m_Drainer->GetBestProbabilityList()[blk.Index]
+                : m_Solver->GetProbability(blk.Index);
             m = MAX(m, p);
-    else
-        for (auto &blk : m_Blocks)
-            if (m_Solver->GetBlockStatus(blk.Index) == BlockStatus::Unknown)
-            {
-                auto p = m_Solver->GetProbability(blk.Index);
-                m = MAX(m, p);
-            }
-#ifndef NDEBUG
-    std::cerr << "GameMgr::GetMaxProbability => " << m << "\n";
-#endif
+        }
     return m;
 }
 

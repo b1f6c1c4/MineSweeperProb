@@ -41,7 +41,7 @@ export default function Game(props) {
     const [isAutoFlag, setIsAutoFlag] = useState(true);
     const isAutoFlagRef = useRef(isAutoFlag);
     isAutoFlagRef.current = isAutoFlag;
-    const [isDrainAlert, setIsDrainAlert] = useState(false);
+    const [drainAlert, setDrainAlert] = useState(false);
     const [isDraining, setIsDraining] = useState(false);
     const isDrainingRef = useRef(isDraining);
     isDrainingRef.current = isDraining;
@@ -94,7 +94,6 @@ export default function Game(props) {
                 setFlagging(f);
             }
             gameMgrRef.current.solve(module.SolvingState.HEUR, false);
-            console.dir(gameMgrRef.current);
         }
         setToOpen(gameMgrRef.current.toOpen);
         if (!gameMgrRef.current.started) {
@@ -124,7 +123,7 @@ export default function Game(props) {
             setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
         }
         if (enableAI && isAutoFlagRef.current && !json) {
-            const next = flaggingRef.current;
+            const next = [...flaggingRef.current];
             let tf = totalFlaggedRef.current;
             for (let i = 0; i < height; i++)
                 for (let j = 0; j < width; j++) {
@@ -155,11 +154,13 @@ export default function Game(props) {
         if (isExternal)
             setEnableAI(true);
         setIsSettled(!!loadedGame);
+        setIsDrain(false);
+        setIsDraining(false);
         setIsGameOver(false);
         setIsWon(false);
         setOverlay(loadedOverlay || []);
         setFlagging(loadedFlags || []);
-        setTotalFlagged(0);
+        setTotalFlagged((loadedFlags ?? []).reduce((a,v) => v ? ++a : a, 0));
         setHasBest(false);
         if (cancellerRef.current) {
             clearTimeout(cancellerRef.current);
@@ -171,7 +172,7 @@ export default function Game(props) {
         let mgr;
         if (loadedGame) {
             mgr = module.importGame(atob(loadedGame), cfg);
-            mgr.solve(module.SolvingState.HEUR, false);
+            setTimeout(onUpdate, 10);
         } else if (isExternal) {
             mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg);
         } else {
@@ -402,11 +403,19 @@ export default function Game(props) {
     }
 
     function onCloseDrainAlert() {
-        setIsDrainAlert(false);
+        setDrainAlert(false);
     }
 
     function onDrainAlert() {
-        setIsDrainAlert(true);
+        const workload = Math.pow(gameMgr.bits, 1.5) * toOpen;
+        if (workload <= 50)
+            onDrain();
+        else if (workload <= 100)
+            setDrainAlert('less than a minute');
+        else if (workload <= 250)
+            setDrainAlert('roughly a minute');
+        else
+            setDrainAlert('several minutes');
     }
 
     // could be inside setTimeout
@@ -418,13 +427,13 @@ export default function Game(props) {
         } else {
             setIsDraining(undefined);
             setIsDrain(true);
-            onUpdate();
+            setTimeout(onUpdate, 10);
         }
     }
 
     function onDrain() {
         push();
-        setIsDrainAlert(false);
+        setDrainAlert(false);
         gameMgr.enableDrainer(false);
         onUpdate(undefined, false, true);
         setIsDraining([0, gameMgr.drainerSteps]);
@@ -645,11 +654,11 @@ export default function Game(props) {
                     <p>Use left mouse click to indicate the degree of each block. Use right click to toggle between 'e' (assumed not to have mine) and 'M' (assumed to have mine.) Once you click Solve, you <strong>cannot</strong> edit existing degrees.</p>
                     </>)}
             </Card>
-            <Alert icon="layout-balloon" intent="danger" isOpen={isDrainAlert}
+            <Alert icon="layout-balloon" intent="danger" isOpen={drainAlert}
                 canEscapeKeyCancel canOutsideClickCancel
                 cancelButtonText="Cancel" confirmButtonText="Proceed"
                 onCancel={onCloseDrainAlert} onConfirm={onDrain}>
-                <p>It may takes several minutes to compute - do you wish to proceed?</p>
+                <p>It may take {drainAlert} to compute - do you wish to proceed?</p>
             </Alert>
         </>
     );

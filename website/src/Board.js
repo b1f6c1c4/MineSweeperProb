@@ -105,7 +105,7 @@ export default function Board(props) {
                 isSafe={hasSafe}
                 isDrain={isDrain}
                 hasSafe={hasSafe}
-                probability={hasSafe ? null : minProb}
+                probability={hasSafe ? null : isDrain ? maxProb : minProb}
                 minProb={minProb}
                 maxProb={maxProb}
             />)}

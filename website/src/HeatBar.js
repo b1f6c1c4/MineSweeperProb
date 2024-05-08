@@ -44,11 +44,11 @@ export default function HeatBar(props) {
     }
 
     return (
-        <div className={'heat-bar' + (disabled ? ' disabled' : '')}>
+        <div className={'heat-bar' + (disabled ? ' disabled' : '') + (isDrain ? ' drain' : '')}>
             <div className="ends dangerous">
                 <span className="color"></span>
                 {isDangerous ? (
-                    <span className="indicator here">100% Death</span>
+                    <span className="indicator here">100% Lose</span>
                 ) : (
                     <span className="indicator">
                         {isDrain ? 'Lose' : 'Mine'}
