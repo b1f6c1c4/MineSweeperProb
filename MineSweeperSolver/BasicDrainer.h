@@ -55,6 +55,10 @@ class
 public:
     virtual ~BasicDrainer();
 
+    [[nodiscard]] size_t GetSteps() const;
+    // to be called GetSteps() times, or until returning false
+    [[nodiscard]] bool MakeProgress();
+
     [[nodiscard]] double GetBestProb() const;
 protected:
     BasicDrainer();
@@ -63,7 +67,6 @@ protected:
     MacroSituation *m_RootMacro;
 
     void GenerateMicros(const std::vector<BlockSet> &sets, size_t totalStates, const std::vector<Solution> &solutions);
-    void Drain();
 #ifdef USE_BASIC_SOLVER
     void GenerateRoot(BasicSolver *solver, int toOpen);
 #else
@@ -73,7 +76,10 @@ protected:
 
     void Update(MacroSituation *&macro);
 private:
-    std::vector<MicroSituation> m_Micros;
+    using micros_t = std::vector<MicroSituation>;
+    micros_t m_Micros;
+    micros_t::iterator m_MicroSolvingIter;
+
     std::multimap<size_t, MacroSituation *> m_Macros;
 
     MacroSituation *m_SucceedMacro, *m_FailMacro;

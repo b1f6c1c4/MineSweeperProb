@@ -320,7 +320,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         if (m_Drainer == nullptr && m_Solver->GetTotalStates() <= (BasicStrategy.PruningEnabled ? BasicStrategy.PruningCriterion : BasicStrategy.ExhaustCriterion) &&
             (m_Solver->GetTotalStates() > 2 || m_ToOpen > 1))
         {
-            EnableDrainer();
+            EnableDrainer(true);
             return;
         }
 
@@ -539,12 +539,15 @@ void GameMgr::Automatic(bool drain)
         }
 }
 
-void GameMgr::EnableDrainer()
+void GameMgr::EnableDrainer(bool drain)
 {
     if (m_Drainer != nullptr)
         return;
     SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
     m_Drainer = std::make_unique<Drainer>(*this);
+    if (!drain)
+        return;
+    while (m_Drainer->MakeProgress());
     Solve(SolvingState::Probability | SolvingState::Drained, false);
 }
 

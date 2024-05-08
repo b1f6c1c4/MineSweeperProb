@@ -157,10 +157,18 @@ double BasicDrainer::GetBestProb() const
     return m_RootMacro->m_BestProb;
 }
 
-void BasicDrainer::Drain()
+size_t BasicDrainer::GetSteps() const
 {
-    for (auto &micro : m_Micros)
-        SolveMicro(micro, m_RootMacro);
+    return m_Micros.size() + 1zu;
+}
+
+bool BasicDrainer::MakeProgress()
+{
+    if (m_MicroSolvingIter != m_Micros.end())
+    {
+        SolveMicro(*m_MicroSolvingIter++, m_RootMacro);
+        return true;
+    }
 
     std::vector<MacroSituation *> macros;
     for (auto macro : m_Macros)
@@ -219,6 +227,8 @@ void BasicDrainer::Drain()
             if (probs[i] > ma->m_BestProb - 1E-6)
                 ma->m_BestBlocks.push_back(i);
     }
+
+    return false;
 }
 
 void BasicDrainer::Update(MacroSituation *&macro)

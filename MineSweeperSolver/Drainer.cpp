@@ -65,7 +65,6 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
 
     GenerateMicros(solver->m_BlockSets, m_Mgr.m_Solver->m_TotalStates, m_Mgr.m_Solver->m_Solutions);
     GenerateRoot(solver, m_Mgr.m_ToOpen);
-    Drain();
 }
 
 BlockSet Drainer::GetBestBlocks() const

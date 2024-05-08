@@ -206,4 +206,8 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("preferredBlocks", &GameMgr::GetPreferredBlockList)
         .property("bestProbabilityList", &GameMgr::GetBestProbabilityList)
         ;
+    class_<Drainer>("Drainer")
+        .property("steps", &BasicDrainer::GetSteps)
+        .function("makeProgress", &BasicDrainer::MakeProgress)
+        ;
 }

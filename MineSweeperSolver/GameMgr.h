@@ -73,7 +73,7 @@ public:
     void AutomaticStep(SolvingState maxDepth);
     void Automatic(bool drain = true);
 
-    void EnableDrainer();
+    void EnableDrainer(bool drain);
 
     void Save(std::ostream &sw) const;
 
