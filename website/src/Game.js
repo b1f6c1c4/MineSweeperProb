@@ -12,6 +12,7 @@ import {
     ProgressBar,
     Slider,
     Switch,
+    Tooltip,
 } from '@blueprintjs/core';
 
 export default function Game(props) {
@@ -561,8 +562,10 @@ export default function Game(props) {
                     <ButtonGroup>
                         <Button disabled={!gameMgr || mode != null || !history || !(isExternal ? (!enableAI || history.xundoable) : history.undoable)} icon="undo"
                                 className="growing" text={isExternal && !enableAI ? 'Clear' : 'Undo'} onClick={onUndo} />
-                        <Button disabled={!gameMgr || mode != null || !isSettled} rightIcon="download"
-                                className="growing" onClick={onDownload} />
+                        <Tooltip content='Save game to file' position='bottom'>
+                            <Button disabled={!gameMgr || mode != null || !isSettled} rightIcon="download"
+                                    className="growing" onClick={onDownload} />
+                        </Tooltip>
                         <Button disabled={!gameMgr || mode != null || !history || !history.redoable} rightIcon="redo"
                                 className="growing" text="Redo" onClick={onRedo} />
                     </ButtonGroup>
@@ -596,18 +599,21 @@ export default function Game(props) {
                     </ControlGroup>
                     {!isExternal && (<>
                         <br />
-                        <FormGroup label="Speed">
-                            <Slider
-                                min={-2}
-                                max={2}
-                                stepSize={0.1}
-                                labelStepSize={1}
-                                onChange={setSpeed}
-                                labelRenderer={renderLabel}
-                                showTrackFill={false}
-                                value={speed}
-                            />
-                        </FormGroup>
+                        <Tooltip content="Speed" placement="left-end">
+                            <FormGroup>
+                                <Slider
+                                    fill
+                                    min={-2}
+                                    max={2}
+                                    stepSize={0.1}
+                                    labelStepSize={1}
+                                    onChange={setSpeed}
+                                    labelRenderer={renderLabel}
+                                    showTrackFill={false}
+                                    value={speed}
+                                />
+                            </FormGroup>
+                        </Tooltip>
                         <ControlGroup vertical>
                             <ButtonGroup>
                                 <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'semi') || !hasBest}
@@ -624,18 +630,25 @@ export default function Game(props) {
                             <ButtonGroup>
                                 <Button disabled={!gameMgr || isGameOver || (mode !== null && mode !== 'auto')}
                                         active={mode === 'auto'}
-                                        icon="fast-forward" intent="warning" className="growing"
+                                        icon="rocket-slant" intent="warning" className="growing"
                                         text="Full-auto" onClick={onAuto} />
                                 <Button disabled={!gameMgr || isGameOver || mode !== null}
                                         icon="lightning" intent="warning"
                                         onClick={onAutoAll} />
                             </ButtonGroup>
-                            {drainable && (
+                            {!isDraining && (
+                                <Tooltip
+                                    content={drainable
+                                            ? 'Analyze all possible solutions and find the optimal click sequence'
+                                            : 'Only available when there are fewer than 256 possible solutions'}
+                                    placement="bottom-end"
+                                >
                                 <ButtonGroup>
-                                    <Button active={isDraining} icon="layout-balloon" rightIcon="layout-balloon"
-                                            intent="danger" className="growing" disabled={isDraining}
+                                    <Button active={isDrain} icon="layout-balloon" rightIcon="layout-balloon"
+                                            intent={drainable ? 'danger' : undefined} className="growing" disabled={!drainable || mode !== null}
                                             text="Exhaustive Search" onClick={onDrainAlert} />
                                 </ButtonGroup>
+                                </Tooltip>
                                 )}
                             {isDraining && (
                                 <FormGroup label={isDraining[0] === isDraining[1]
