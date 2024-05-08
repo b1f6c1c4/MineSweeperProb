@@ -252,23 +252,23 @@ td.blk-drain {
   margin: auto;
 }
 
-.control .bp4-form-group.bp4-inline {
+.control .bp5-form-group.bp5-inline {
   justify-content: space-between;
 }
 
-.control .bp4-control-group.bp4-vertical {
+.control .bp5-control-group.bp5-vertical {
   align-items: stretch;
 }
 
-.control .bp4-control-group.bp4-vertical .bp4-button-group {
+.control .bp5-control-group.bp5-vertical .bp5-button-group {
   width: 100%;
 }
 
-.control .bp4-button-group .bp4-button.growing {
+.control .bp5-button-group .bp5-button.growing {
   flex-grow: 1;
 }
 
-.control .bp4-form-content:has(> .bp4-slider) {
+.control .bp5-form-content:has(> .bp5-slider) {
   padding: 0 20px;
 }
 
