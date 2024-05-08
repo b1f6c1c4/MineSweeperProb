@@ -68,7 +68,7 @@ public:
 
     void OpenOptimalBlocks();
 
-    bool SemiAutomaticStep(SolvingState maxDepth, bool single);
+    bool SemiAutomaticStep(SolvingState maxDepth, bool single, bool nearest = false);
     bool SemiAutomatic(SolvingState maxDepth);
     void AutomaticStep(SolvingState maxDepth);
     void Automatic(bool drain = true);

@@ -329,7 +329,7 @@ export default function Game(props) {
             setEnableAI(true);
             onUpdate();
         } else {
-            if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true)) {
+            if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true, true)) {
                 gameMgrRef.current.automaticStep(ss);
             }
             onUpdate();
@@ -343,7 +343,8 @@ export default function Game(props) {
             // could be inside setTimeout
             const foo = () => {
                 setCanceller(undefined);
-                const next = gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true);
+                const next = gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true, true);
+                push();
                 onUpdate();
                 if (next)
                     setCanceller(setTimeout(foo, Math.pow(10, 3 + speedRef.current)));
@@ -356,6 +357,12 @@ export default function Game(props) {
             setCanceller(undefined);
             setMode(null);
         }
+    }
+
+    function onSemiEvery() {
+        gameMgr.semiAutomaticStep(module.SolvingState.SEMI, false, false);
+        onUpdate();
+        push();
     }
 
     function onSemiAll() {
@@ -601,6 +608,9 @@ export default function Game(props) {
                                         text="Semi-auto" onClick={onSemi} />
                                 <Button disabled={!gameMgr || isGameOver || mode !== null || !hasBest}
                                         icon="fast-forward" intent="success"
+                                        onClick={onSemiEvery} />
+                                <Button disabled={!gameMgr || isGameOver || mode !== null || !hasBest}
+                                        icon="step-forward" intent="success"
                                         onClick={onSemiAll} />
                             </ButtonGroup>
                             <ButtonGroup>

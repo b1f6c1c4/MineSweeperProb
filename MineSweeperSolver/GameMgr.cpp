@@ -409,7 +409,7 @@ void GameMgr::OpenOptimalBlocks()
     OpenBlockImpl(m_LastProbe = blk);
 }
 
-bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single)
+bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single, bool nearest)
 {
     if (m_IsExternal)
         throw std::runtime_error("external games cannot be automated");
@@ -430,6 +430,23 @@ bool GameMgr::SemiAutomaticStep(SolvingState maxDepth, bool single)
 #else
         return false;
 #endif
+    if (nearest && single && m_LastProbe >= 0)
+    {
+        std::vector<int> candidates;
+        for (auto i = 0; i < m_Blocks.size(); ++i)
+            if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
+                candidates.push_back(i);
+
+        auto &last = m_Blocks[m_LastProbe];
+        auto dist = [this, last](int id) {
+            return abs(m_Blocks[id].X - last.X) + abs(m_Blocks[id].Y - last.Y);
+        };
+        auto id = *std::min_element(candidates.begin(), candidates.end(), [dist](int lhs, int rhs) {
+            return dist(lhs) - dist(rhs);
+        });
+        OpenBlockImpl(m_LastProbe = id);
+        return m_Started;
+    }
 #ifndef NDEBUG
     auto flag = false;
 #endif
