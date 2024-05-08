@@ -442,18 +442,25 @@ export default function Game(props) {
         return `${Math.round(y * s) / s}x`;
     }
 
-    function onSwitch(e) {
-        setIsAutoRestart(e.currentTarget.checked);
-        if (isGameOver && !e.currentTarget.checked)
+    function getValue(e, v) {
+        if ('checked' in e.currentTarget)
+            return e.currentTarget.checked;
+        return !v;
+    }
+
+    function onSwitchRestart(e) {
+        const v = getValue(e, isAutoRestart);
+        setIsAutoRestart(v);
+        if (isGameOver && !v)
             setMode(null);
     }
 
     function onSwitchFlag(e) {
-        setIsAutoFlag(e.currentTarget.checked);
+        setIsAutoFlag(getValue(e, isAutoFlag));
     }
 
     function onSwitchAI(e) {
-        setEnableAI(e.currentTarget.checked);
+        setEnableAI(getValue(e, enableAI));
     }
 
     function onDownload() {
@@ -570,15 +577,16 @@ export default function Game(props) {
                 onSemiEvery,
                 onStep,
                 onStop,
-                onSwitch,
                 onSwitchAI,
                 onSwitchFlag,
+                onSwitchRestart,
                 onUndo,
                 rate,
                 renderLabel,
                 setIsStepHover,
                 setSpeed,
                 speed,
+                width,
             }} />
             <Alert icon="layout-balloon" intent="danger" isOpen={drainAlert}
                 canEscapeKeyCancel canOutsideClickCancel

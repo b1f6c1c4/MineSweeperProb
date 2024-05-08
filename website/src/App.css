@@ -252,6 +252,10 @@ td.blk-drain {
   margin: auto;
 }
 
+.control .short-btns .bp5-button {
+  min-width: initial;
+}
+
 .control .bp5-form-group.bp5-inline {
   justify-content: space-between;
 }
@@ -285,6 +289,17 @@ td.blk-drain {
   word-wrap: break-word;
   max-width: 190px;
   margin: auto;
+}
+
+.control.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+}
+
+.control.compact .bp5-control-group {
+  justify-content: space-between;
 }
 
 input[type=file] {
