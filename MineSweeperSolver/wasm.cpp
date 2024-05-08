@@ -36,6 +36,8 @@ void cache(int w, int h, int m) {
 
 class History {
 public:
+    explicit History(Strategy s) : memo{}, st{ std::move(s) }, ptr{} { }
+
     [[nodiscard]] bool undoable() const {
         return ptr >= 2;
     }
@@ -101,13 +103,14 @@ public:
 private:
     using memo_t = std::pair<std::string, std::string>;
     std::vector<memo_t> memo;
+    Strategy st;
     size_t ptr; // points to next writable memo
                 // i.e., (ptr - 1) is the most recent version.
 
     std::string revert(GameMgr &m, size_t n) const {
         auto &mo = memo[n];
         std::stringstream ss{ mo.first };
-        m = GameMgr{ ss };
+        m = GameMgr{ ss, st };
         return mo.second;
     }
 };
@@ -117,7 +120,7 @@ EMSCRIPTEN_BINDINGS(mws) {
     function("parse", static_cast<Configuration (*)(const std::string &)>(&parse));
     function("cache", static_cast<void (*)(int, int, int)>(&cache));
     class_<History>("History")
-        .constructor()
+        .constructor<Strategy>()
         .property("undoable", &History::undoable)
         .property("xundoable", &History::xundoable)
         .property("redoable", &History::redoable)

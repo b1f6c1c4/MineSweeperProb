@@ -25,7 +25,7 @@ class
 public:
     GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess = false);
     GameMgr(int width, int height, int totalMines, Strategy strategy);
-    explicit GameMgr(std::istream &sr);
+    GameMgr(std::istream &sr, Strategy strategy);
 
     Strategy BasicStrategy;
 

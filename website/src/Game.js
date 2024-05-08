@@ -158,7 +158,7 @@ export default function Game(props) {
         const mgr = isExternal
             ? new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg)
             : new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
-        const his = new module.History();
+        const his = new module.History(cfg);
         setGameMgr(mgr);
         setHistory(his);
         setRate([mgr.bits, mgr.allBits]);
