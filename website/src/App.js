@@ -109,7 +109,7 @@ export default function App(props) {
         <Card elevation={Elevation.TWO} className="control">
             <h3>Showcase &amp; Playground</h3>
             <Switch checked={isExternal} onChange={sw(setIsExternal)}
-                labelElement={'External'}
+                labelElement={'Mode'}
                 innerLabelChecked="Analyze" innerLabel="New Game"
                 alignIndicator={Alignment.RIGHT} />
             <FormGroup label="Board" inline>

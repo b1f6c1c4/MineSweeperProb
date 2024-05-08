@@ -6,6 +6,7 @@
 #include "facade.hpp"
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 #ifndef __EMSCRIPTEN__
 
@@ -39,6 +40,10 @@ public:
         return ptr >= 2;
     }
 
+    [[nodiscard]] bool xundoable() const {
+        return ptr;
+    }
+
     [[nodiscard]] bool redoable() const {
         return ptr < memo.size();
     }
@@ -46,26 +51,50 @@ public:
     void push(const GameMgr &m, std::string aux) {
 #ifndef NDEBUG
         std::cerr << "History::push()\n";
-        std::cerr << " GameMgr = " << &m << "\n";
+        std::cerr << " sz = " << memo.size() << "\n";
+        std::cerr << " ptr = " << ptr << "\n";
 #endif
         std::stringstream ss;
         m.Save(ss);
         memo.resize(ptr++);
         memo.emplace_back(ss.str(), std::move(aux));
+#ifndef NDEBUG
+        std::cerr << " sz = " << memo.size() << "\n";
+        std::cerr << " ptr = " << ptr << "\n";
+#endif
     }
 
     // A push() is strongly recommended right before undoing,
     // otherwise undo cannot be immediately followed by a redu.
     auto undo(GameMgr &m) {
+#ifndef NDEBUG
+        std::cerr << "History::undo()\n";
+        std::cerr << " sz = " << memo.size() << "\n";
+        std::cerr << " ptr = " << ptr << "\n";
+#endif
         return revert(m, --ptr - 1);
     }
 
-    // returns the 'most recent version'
-    auto top(GameMgr &m) const {
-        return revert(m, ptr - 1);
+    // kill all version >= this
+    auto drop() {
+#ifndef NDEBUG
+        std::cerr << "History::drop()\n";
+        std::cerr << " sz = " << memo.size() << "\n";
+        std::cerr << " ptr = " << ptr << "\n";
+#endif
+        memo.resize(--ptr);
+#ifndef NDEBUG
+        std::cerr << " sz = " << memo.size() << "\n";
+        std::cerr << " ptr = " << ptr << "\n";
+#endif
     }
 
     auto redo(GameMgr &m) {
+#ifndef NDEBUG
+        std::cerr << "History::redo()\n";
+        std::cerr << " sz = " << memo.size() << "\n";
+        std::cerr << " ptr = " << ptr << "\n";
+#endif
         return revert(m, ptr++);
     }
 
@@ -90,11 +119,12 @@ EMSCRIPTEN_BINDINGS(mws) {
     class_<History>("History")
         .constructor()
         .property("undoable", &History::undoable)
+        .property("xundoable", &History::xundoable)
         .property("redoable", &History::redoable)
         .function("push", &History::push)
         .function("undo", &History::undo)
-        .function("top", &History::top)
         .function("redo", &History::redo)
+        .function("drop", &History::drop)
         ;
     class_<Strategy>("Strategy")
         .property("initialPositionSpecified", &Strategy::InitialPositionSpecified)

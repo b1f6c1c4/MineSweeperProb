@@ -82,7 +82,7 @@ export default function Board(props) {
                             isEFlagged={o === 'E' || property.degree === -1}
                             hasMine={property.hasMine || o === 'M'}
                             isLastProbe={gameMgr.lastProbe === id}
-                            isHover={id === hoverId}
+                            isHover={id === hoverId && !isExternal}
                             isBest={best[id]}
                             isPreferred={preferred[id]}
                             isSafe={infer === module.BlockStatus.BLANK}

@@ -50,7 +50,7 @@ export default function Game(props) {
     const [toOpen, setToOpen] = useState(width * height - totalMines);
     const [hasBest, setHasBest] = useState(false);
 
-    // <empty>: mutable; null: immutable;
+    // undefined or null: mutable; 'X': immutable;
     // 0~8: degree to be assigned; 'M': must be mine, 'E': must no mine
     const [overlay, setOverlay] = useState([]);
     const overlayRef = useRef(overlay);
@@ -73,9 +73,17 @@ export default function Game(props) {
     cancellerRef.current = canceller;
 
     // could be inside setTimeout
-    function onUpdate(json) {
+    function onUpdate(json, isRedo) {
         if (json) {
-            setFlagging(JSON.parse(json));
+            const { f, o, fake } = JSON.parse(json);
+            if (fake)
+                historyRef.current.drop();
+            if (isExternal) {
+                setOverlay(o);
+                setEnableAI(isRedo);
+            } else {
+                setFlagging(f);
+            }
         }
         setToOpen(gameMgrRef.current.toOpen);
         if (!gameMgrRef.current.started) {
@@ -131,6 +139,8 @@ export default function Game(props) {
         if (historyRef.current)
             historyRef.current.delete();
         const m = modeRef.current;
+        if (isExternal)
+            setEnableAI(true);
         setIsSettled(false);
         setIsGameOver(false);
         setIsWon(false);
@@ -160,11 +170,22 @@ export default function Game(props) {
     }
 
     function onUndo() {
-        onUpdate(history.undo(gameMgr));
+        if (isExternal) {
+            if (!enableAI) { // "Clear"
+                setOverlay(overlay.map((v) => v === 'X' ? v : undefined));
+                setEnableAI(true);
+            } else {
+                if (!history.redoable)
+                    push(undefined, true);
+                onUpdate(history.undo(gameMgr));
+            }
+        } else {
+            onUpdate(history.undo(gameMgr));
+        }
     }
 
     function onRedo() {
-        onUpdate(history.redo(gameMgr));
+        onUpdate(history.redo(gameMgr), true);
     }
 
     useEffect(() => {
@@ -184,9 +205,10 @@ export default function Game(props) {
         const ov = [...overlay];
         const id = col * height + row;
         switch (overlay[id]) {
-            case null:
+            case 'X':
                 return;
-            case undefined: // <empty>
+            case null:
+            case undefined:
             case 'E':
             case 'M':
             case 0:
@@ -207,9 +229,10 @@ export default function Game(props) {
         const ov = [...overlay];
         const id = col * height + row;
         switch (ov[id]) {
-            case null:
+            case 'X':
                 return;
-            case undefined: // <empty>
+            case null:
+            case undefined:
                 ov[id] = 0;
                 break;
             case 0:
@@ -227,8 +250,13 @@ export default function Game(props) {
         setEnableAI(false);
     }
 
-    function push(f) {
-        history.push(gameMgr, JSON.stringify(f || flagging));
+    // could be inside setTimeout
+    function push(f, fake) {
+        historyRef.current.push(gameMgrRef.current, JSON.stringify({
+            f: f || flaggingRef.current,
+            o: overlayRef.current,
+            fake,
+        }));
     }
 
     function onProbe(row, col) {
@@ -257,6 +285,7 @@ export default function Game(props) {
     function onStep() {
         const ss = isDrainRef.current ? module.SolvingState.AUTO : module.SolvingState.HEUR;
         if (isExternal) {
+            push();
             overlayRef.current.forEach((v, i) => {
                 const row = i % height;
                 const col = (i - row) / height;
@@ -267,6 +296,7 @@ export default function Game(props) {
                     case 'E':
                         gameMgrRef.current.setBlockMine(col, row, false);
                         break;
+                    case 'X':
                     case null:
                     case undefined:
                         break;
@@ -275,16 +305,17 @@ export default function Game(props) {
                         break;
                 }
             });
-            setOverlay(overlayRef.current.map((v) => v === undefined ? v : null));
+            setOverlay(overlayRef.current.map((v) => (v === undefined || v == null) ? v : 'X'));
             gameMgrRef.current.solve(ss, false);
             setEnableAI(true);
+            onUpdate();
         } else {
             if (!gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true)) {
                 gameMgrRef.current.automaticStep(ss);
             }
+            onUpdate();
+            push();
         }
-        onUpdate();
-        push();
     }
 
     function onSemi() {
@@ -430,8 +461,8 @@ export default function Game(props) {
                                 className="growing" text="Restart" onClick={onRestart} />
                     </ButtonGroup>
                     <ButtonGroup>
-                        <Button disabled={!gameMgr || mode != null || !history || !history.undoable} icon="undo"
-                                className="growing" text="Undo" onClick={onUndo} />
+                        <Button disabled={!gameMgr || mode != null || !history || !(isExternal ? (!enableAI || history.xundoable) : history.undoable)} icon="undo"
+                                className="growing" text={isExternal && !enableAI ? 'Clear' : 'Undo'} onClick={onUndo} />
                         <Button disabled={!gameMgr || mode != null || !history || !history.redoable} rightIcon="redo"
                                 className="growing" text="Redo" onClick={onRedo} />
                     </ButtonGroup>
