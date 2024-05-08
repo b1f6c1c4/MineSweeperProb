@@ -5,7 +5,7 @@
 #include <iostream>
 #include <utility>
 
-GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr), m_LastProbe(-1)
+GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
         m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
@@ -15,7 +15,7 @@ GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy str
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr), m_LastProbe(-1)
+GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || m_TotalMines == -1)
         m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
@@ -28,7 +28,7 @@ GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : Bas
         m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver(nullptr), m_Drainer(nullptr), m_LastProbe(0)
+GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(0)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val))
     READ(m_IsExternal);
@@ -57,17 +57,20 @@ GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(
             READ(blk.Degree);
             READ(blk.IsOpen);
             READ(blk.IsMine);
-            if (blk.IsOpen && !blk.IsMine)
-                m_Solver->AddRestrain(blk.Index, false);
+            if (blk.IsOpen)
+                m_Solver->AddRestrain(blk.Index, blk.IsMine);
         }
 
         for (auto &blk : m_Blocks)
-            if (blk.IsOpen && !blk.IsMine && blk.Degree != 0)
+            if (blk.IsOpen && !blk.IsMine && blk.Degree >= 0)
                 m_Solver->AddRestrain(m_BlocksR[blk.Index], blk.Degree);
     }
 
     CacheBinomials(m_TotalWidth * m_TotalHeight, m_TotalMines);
-    m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
+    if (m_TotalMines == -1)
+        m_AllBits = m_TotalWidth * m_TotalHeight;
+    else
+        m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
 Solver &GameMgr::GetSolver()
@@ -297,7 +300,6 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 
     if (m_Solver->CanOpenForSure != 0)
     {
-        ASSERT(m_Solver->CanOpenForSure >= 0);
         for (auto i = 0; i < m_Blocks.size(); ++i)
             if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
                 m_Best.push_back(i);
@@ -317,15 +319,18 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         return;
 
     if ((maxDepth & SolvingState::Drained) == SolvingState::Drained && BasicStrategy.ExhaustEnabled)
-        if (m_Drainer == nullptr && m_Solver->GetTotalStates() <= (BasicStrategy.PruningEnabled ? BasicStrategy.PruningCriterion : BasicStrategy.ExhaustCriterion) &&
+        if (!m_Drainer && m_Solver->GetTotalStates() <= (BasicStrategy.PruningEnabled ? BasicStrategy.PruningCriterion : BasicStrategy.ExhaustCriterion) &&
             (m_Solver->GetTotalStates() > 2 || m_ToOpen > 1))
         {
             EnableDrainer(true);
             return;
         }
 
-    if (m_Drainer != nullptr)
+    if (m_Drainer)
     {
+#ifndef NDEBUG
+        std::cerr << "GameMgr::Solve() calling m_Drainer->Update()\n";
+#endif
         m_Drainer->Update();
         if ((maxDepth & SolvingState::Drained) == SolvingState::Drained)
             m_Preferred = m_Drainer->GetBestBlocks();
@@ -541,14 +546,43 @@ void GameMgr::Automatic(bool drain)
 
 void GameMgr::EnableDrainer(bool drain)
 {
-    if (m_Drainer != nullptr)
+    if (m_Drainer)
         return;
-    SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
+    if (drain)
+        SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
+#ifndef NDEBUG
+    std::cerr << "GameMgr::EnableDrainer() calling Drainer::Drainer()\n";
+#endif
     m_Drainer = std::make_unique<Drainer>(*this);
     if (!drain)
         return;
+#ifndef NDEBUG
+    std::cerr << "GameMgr::EnableDrainer() calling Drainer::MakeProgress()\n";
+#endif
     while (m_Drainer->MakeProgress());
+#ifndef NDEBUG
+    std::cerr << "GameMgr::EnableDrainer() calling GameMgr::Solve()\n";
+#endif
     Solve(SolvingState::Probability | SolvingState::Drained, false);
+}
+
+size_t GameMgr::GetDrainerSteps() const
+{
+    if (!m_Drainer)
+        return 0zu;
+
+    return m_Drainer->GetSteps();
+}
+
+bool GameMgr::MakeDrainerProgress()
+{
+    if (!m_Drainer)
+        return false;
+
+#ifndef NDEBUG
+    std::cerr << "GameMgr::MakeDrainerProgress()\n";
+#endif
+    return m_Drainer->MakeProgress();
 }
 
 void GameMgr::Save(std::ostream &sw) const

@@ -159,16 +159,22 @@ double BasicDrainer::GetBestProb() const
 
 size_t BasicDrainer::GetSteps() const
 {
-    return m_Micros.size() + 1zu;
+    return m_Micros.size();
 }
 
 bool BasicDrainer::MakeProgress()
 {
     if (m_MicroSolvingIter != m_Micros.end())
     {
+#ifndef NDEBUG
+        std::cerr << "BasicDrainer::MakeProgress Processing #" << m_MicroSolvingIter - m_Micros.begin() << "\n";
+#endif
         SolveMicro(*m_MicroSolvingIter++, m_RootMacro);
         return true;
     }
+#ifndef NDEBUG
+    std::cerr << "BasicDrainer::MakeProgress Post-processing\n";
+#endif
 
     std::vector<MacroSituation *> macros;
     for (auto macro : m_Macros)
@@ -194,9 +200,7 @@ bool BasicDrainer::MakeProgress()
             {
                 if (i == j)
                     break;
-                auto t = macros[i];
-                macros[i] = macros[j];
-                macros[j] = t;
+                std::swap(macros[i], macros[j]);
                 break;
             }
         }
@@ -262,6 +266,10 @@ MacroSituation *BasicDrainer::GetOrAddMacroSituation(MacroSituation *&macro)
 
 void BasicDrainer::GenerateMicros(const std::vector<BlockSet> &sets, size_t totalStates, const std::vector<Solution> &solutions)
 {
+#ifndef NDEBUG
+    std::cerr << "BasicDrainer::GenerateMicros(" << sets.size() << ", " << totalStates << ", " << solutions.size() << ")\n";
+#endif
+
     m_Micros.reserve(totalStates);
 
     std::vector<std::map<int, std::vector<std::map<int, BlockStatus>>>> dicc(sets.size());
@@ -323,6 +331,8 @@ void BasicDrainer::GenerateMicros(const std::vector<BlockSet> &sets, size_t tota
                 ++stack.back();
             }
     }
+
+    m_MicroSolvingIter = m_Micros.begin();
 }
 
 #ifdef USE_BASIC_SOLVER

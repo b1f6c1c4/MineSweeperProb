@@ -74,6 +74,8 @@ public:
     void Automatic(bool drain = true);
 
     void EnableDrainer(bool drain);
+    [[nodiscard]] size_t GetDrainerSteps() const;
+    [[nodiscard]] bool MakeDrainerProgress();
 
     void Save(std::ostream &sw) const;
 

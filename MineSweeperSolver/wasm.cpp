@@ -2,7 +2,6 @@
 #include "BinomialHelper.h"
 #include "GameMgr.h"
 #include "random.h"
-#include "Drainer.h"
 #include "facade.hpp"
 #include <fstream>
 #include <sstream>
@@ -205,9 +204,7 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("bestBlocks", &GameMgr::GetBestBlockList)
         .property("preferredBlocks", &GameMgr::GetPreferredBlockList)
         .property("bestProbabilityList", &GameMgr::GetBestProbabilityList)
-        ;
-    class_<Drainer>("Drainer")
-        .property("steps", &BasicDrainer::GetSteps)
-        .function("makeProgress", &BasicDrainer::MakeProgress)
+        .property("drainerSteps", &GameMgr::GetDrainerSteps)
+        .function("makeDrainerProgress", &GameMgr::MakeDrainerProgress)
         ;
 }

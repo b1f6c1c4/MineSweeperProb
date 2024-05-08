@@ -1,6 +1,7 @@
 import React, {useEffect, useReducer, useRef, useState} from 'react';
 import Board from './Board';
 import {
+    Alert,
     Alignment,
     Button,
     ButtonGroup,
@@ -10,7 +11,7 @@ import {
     FormGroup,
     ProgressBar,
     Slider,
-    Switch
+    Switch,
 } from '@blueprintjs/core';
 
 export default function Game(props) {
@@ -37,6 +38,10 @@ export default function Game(props) {
     const [isAutoFlag, setIsAutoFlag] = useState(true);
     const isAutoFlagRef = useRef(isAutoFlag);
     isAutoFlagRef.current = isAutoFlag;
+    const [isDrainAlert, setIsDrainAlert] = useState(false);
+    const [isDraining, setIsDraining] = useState(false);
+    const isDrainingRef = useRef(isDraining);
+    isDrainingRef.current = isDraining;
     const [isDrain, setIsDrain] = useState(false);
     const isDrainRef = useRef(isDrain);
     isDrainRef.current = isDrain;
@@ -73,7 +78,7 @@ export default function Game(props) {
     cancellerRef.current = canceller;
 
     // could be inside setTimeout
-    function onUpdate(json, isRedo) {
+    function onUpdate(json, isRedo, noSolve) {
         if (json) {
             const { f, o, fake } = JSON.parse(json);
             if (fake)
@@ -84,6 +89,8 @@ export default function Game(props) {
             } else {
                 setFlagging(f);
             }
+            gameMgrRef.current.solve(module.SolvingState.HEUR, false);
+            console.dir(gameMgrRef.current);
         }
         setToOpen(gameMgrRef.current.toOpen);
         if (!gameMgrRef.current.started) {
@@ -102,10 +109,12 @@ export default function Game(props) {
         } else {
             setIsGameOver(false);
             setIsWon(false);
-            if (isDrainRef.current)
-                gameMgrRef.current.solve(module.SolvingState.AUTO, false);
-            else
-                gameMgrRef.current.solve(module.SolvingState.HEUR, false);
+            if (!noSolve || isDrainingRef.current) {
+                if (isDrainRef.current)
+                    gameMgrRef.current.solve(module.SolvingState.AUTO, false);
+                else
+                    gameMgrRef.current.solve(module.SolvingState.HEUR, false);
+            }
             setHasBest(!!gameMgrRef.current.bestBlocks.size());
             setIsSettled(gameMgrRef.current.settled);
             setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
@@ -375,6 +384,35 @@ export default function Game(props) {
         push();
     }
 
+    function onCloseDrainAlert() {
+        setIsDrainAlert(false);
+    }
+
+    function onDrainAlert() {
+        setIsDrainAlert(true);
+    }
+
+    // could be inside setTimeout
+    function progressDrain() {
+        const [x, a] = isDrainingRef.current;
+        if (gameMgrRef.current.makeDrainerProgress()) {
+            setIsDraining([x + 1, a]);
+            setTimeout(progressDrain, 10);
+        } else {
+            setIsDraining(undefined);
+            setIsDrain(true);
+            onUpdate();
+        }
+    }
+
+    function onDrain() {
+        setIsDrainAlert(false);
+        gameMgr.enableDrainer(false);
+        onUpdate(undefined, false, true);
+        setIsDraining([0, gameMgr.drainerSteps]);
+        setTimeout(progressDrain, 50);
+    }
+
     function renderLabel(v) {
         const y = Math.pow(10, -v);
         const s = Math.pow(10, Math.ceil(v) + 1);
@@ -395,10 +433,6 @@ export default function Game(props) {
         setEnableAI(e.currentTarget.checked);
     }
 
-    function onSwitchDrain(e) {
-        setIsDrain(e.currentTarget.checked);
-    }
-
     function roundDigits(v) {
         const av = Math.abs(v);
         if (av >= 0.0001 && av < 100000)
@@ -410,6 +444,7 @@ export default function Game(props) {
     }
 
     const isReady = gameMgr && gameMgr.totalWidth === width && gameMgr.totalHeight === height;
+    const drainable = isReady && rate[0] <= 8 && !isDrain;
 
     return (
         <>
@@ -480,11 +515,7 @@ export default function Game(props) {
                     </>)}
                 <Collapse isOpen={enableAI || isExternal} keepChildrenMounted>
                     <h3>AI Control</h3>
-                    <pre>{isDrain ? strategy : strategy.replace('-D256', '')}</pre>
-                    <Switch checked={isDrain} onChange={onSwitchDrain}
-                            labelElement={'Exhaustive'} disabled={mode !== null}
-                            innerLabelChecked="PSEQ-D256" innerLabel="PSEQ"
-                            alignIndicator={Alignment.RIGHT} />
+                    <pre>{(isDrain || isDraining) ? strategy : strategy.replace('-D256', '')}</pre>
                     {!isExternal && (
                         <Switch checked={isAutoFlag} onChange={onSwitchFlag}
                                 labelElement={'Auto-flag'}
@@ -532,6 +563,21 @@ export default function Game(props) {
                                         icon="lightning" intent="warning"
                                         onClick={onAutoAll} />
                             </ButtonGroup>
+                            {drainable && (
+                                <ButtonGroup>
+                                    <Button active={isDraining} icon="layout-balloon" rightIcon="layout-balloon"
+                                            intent="danger" className="growing" disabled={isDraining}
+                                            text="Exhaustive Search" onClick={onDrainAlert} />
+                                </ButtonGroup>
+                                )}
+                            {isDraining && (
+                                <FormGroup label={isDraining[0] === isDraining[1]
+                                        ? 'Post-processing results...'
+                                        : `${isDraining[0]}/${isDraining[1]} solutions analyzed`}>
+                                <ProgressBar value={isDraining[0] / isDraining[1]} intent="danger"
+                                             stripes={isDraining[0] === isDraining[1]} />
+                                </FormGroup>
+                            )}
                         </ControlGroup>
                         </>)}
                 </Collapse>
@@ -540,6 +586,12 @@ export default function Game(props) {
                     <p>Use left mouse click to indicate the degree of each block. Use right click to toggle between 'e' (assumed not to have mine) and 'M' (assumed to have mine.) Once you click Solve, you <strong>cannot</strong> edit existing degrees.</p>
                     </>)}
             </Card>
+            <Alert icon="layout-balloon" intent="danger" isOpen={isDrainAlert}
+                canEscapeKeyCancel canOutsideClickCancel
+                cancelButtonText="Cancel" confirmButtonText="Proceed"
+                onCancel={onCloseDrainAlert} onConfirm={onDrain}>
+                <p>It may takes several minutes to compute - do you wish to proceed?</p>
+            </Alert>
         </>
     );
 }
