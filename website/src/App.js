@@ -7,11 +7,12 @@ import {
     Card,
     ControlGroup,
     Elevation,
+    FileInput,
     FormGroup,
     HTMLSelect,
     NumericInput,
     Spinner,
-    Switch
+    Switch,
 } from "@blueprintjs/core";
 
 const moduleLoader = window.MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' });
@@ -21,7 +22,8 @@ export default function App(props) {
     const [cfg, setCfg] = useState({ text: '(select)' });
     const [isSNR, setIsSNR] = useState(false);
     const [isExternal, setIsExternal] = useState(false);
-    const [isStarted, toggleStart] = useReducer(x => !x, false);
+    const [isStarted, setStarted] = useState(false);
+    const [loadedGame, setLoadedGame] = useState(undefined);
 
     useEffect(() => {
         moduleLoader.then((module) => {
@@ -49,6 +51,15 @@ export default function App(props) {
         });
     }
 
+    function onStart() {
+        setStarted(true);
+    }
+
+    function onStop() {
+        setStarted(false);
+        setLoadedGame(undefined);
+    }
+
     function sw(f) {
         return (e) => f(e.currentTarget.checked);
     }
@@ -63,6 +74,11 @@ export default function App(props) {
 
     function onT(v) {
         setCfg({ ...cfg, totalMines: v });
+    }
+
+    async function onLoad(e) {
+        setLoadedGame(JSON.parse(await e.target.files[0].text()));
+        setStarted(true);
     }
 
     let strategy = 'FL';
@@ -89,6 +105,13 @@ export default function App(props) {
             return (
                 <pre>TODO</pre>
             );
+        } else if (loadedGame) {
+            return (
+                <Game
+                    module={module}
+                    {...loadedGame}
+                    onStop={onStop}
+                />);
         } else {
             return (
                 <Game
@@ -97,10 +120,9 @@ export default function App(props) {
                     width={cfg.width}
                     height={cfg.height}
                     totalMines={cfg.totalMines}
-                    isSNR={isSNR}
                     strategy={strategy}
                     config={config}
-                    onStop={toggleStart}
+                    onStop={onStop}
                 />);
         }
     }
@@ -171,12 +193,15 @@ export default function App(props) {
                 {module ? (
                     <ButtonGroup>
                         <Button disabled={!ready} icon="play" className="growing"
-                        intent="primary" text="Play" onClick={toggleStart} />
+                        intent="primary" text="Play" onClick={onStart} />
                     </ButtonGroup>
                 ) : (
                     <Spinner intent="primary" />
                 )}
             </ControlGroup>
+            <h4>Load game</h4>
+            <FileInput text="Choose file..." onInputChange={onLoad}
+                fill inputProps={{ accept: 'application/json' }} />
         </Card>
     );
 }

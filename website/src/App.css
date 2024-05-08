@@ -273,3 +273,8 @@ td.blk-drain {
   max-width: 190px;
   margin: auto;
 }
+
+input[type=file] {
+  width: 0;
+  min-width: initial;
+}

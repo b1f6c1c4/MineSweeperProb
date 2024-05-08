@@ -548,8 +548,7 @@ void GameMgr::EnableDrainer(bool drain)
 {
     if (m_Drainer)
         return;
-    if (drain)
-        SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
+    SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
 #ifndef NDEBUG
     std::cerr << "GameMgr::EnableDrainer() calling Drainer::Drainer()\n";
 #endif

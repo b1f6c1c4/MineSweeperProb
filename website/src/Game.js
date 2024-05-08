@@ -23,6 +23,9 @@ export default function Game(props) {
         totalMines,
         strategy,
         config,
+        loadedGame,
+        loadedFlags,
+        loadedOverlay,
         onStop,
     } = props;
     const [gameMgr, setGameMgr] = useState(undefined);
@@ -150,11 +153,11 @@ export default function Game(props) {
         const m = modeRef.current;
         if (isExternal)
             setEnableAI(true);
-        setIsSettled(false);
+        setIsSettled(!!loadedGame);
         setIsGameOver(false);
         setIsWon(false);
-        setOverlay([]);
-        setFlagging([]);
+        setOverlay(loadedOverlay || []);
+        setFlagging(loadedFlags || []);
         setTotalFlagged(0);
         setHasBest(false);
         if (cancellerRef.current) {
@@ -164,9 +167,13 @@ export default function Game(props) {
         setMode(null);
         const cfg = module.parse(config);
         module.cache(cfg.width, cfg.height, cfg.totalMines);
-        const mgr = isExternal
-            ? new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg)
-            : new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
+        let mgr;
+        if (loadedGame)
+            mgr = module.importGame(atob(loadedGame), cfg);
+        else if (isExternal)
+            mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg);
+        else
+            mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
         const his = new module.History(cfg);
         setGameMgr(mgr);
         setHistory(his);
@@ -208,7 +215,7 @@ export default function Game(props) {
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [config]);
+    }, [config, loadedGame, loadedFlags, loadedOverlay]);
 
     function onRotate(row, col) {
         const ov = [...overlay];
@@ -433,6 +440,39 @@ export default function Game(props) {
         setEnableAI(e.currentTarget.checked);
     }
 
+    function onDownload() {
+        const json = JSON.stringify({
+            isExternal,
+            width,
+            height,
+            totalMines,
+            strategy,
+            config,
+            loadedGame: btoa(module.exportGame(gameMgr)),
+            loadedFlags: flagging,
+            loadedOverlay: overlay,
+        });
+        const blob = new Blob([json], { type: 'application/json' });
+        const link = document.createElement('a');
+
+        link.download = 'game.json';
+        link.href = window.URL.createObjectURL(blob);
+        link.dataset.downloadurl = [
+            'application/json',
+            link.download,
+            link.href,
+        ].join(":");
+
+        const evt = new MouseEvent('click', {
+            view: window,
+            bubbles: true,
+            cancelable: true,
+        });
+
+        link.dispatchEvent(evt);
+        link.remove()
+    }
+
     function roundDigits(v) {
         const av = Math.abs(v);
         if (av >= 0.0001 && av < 100000)
@@ -486,7 +526,7 @@ export default function Game(props) {
                     )}
             </Card>
             <Card elevation={Elevation.TWO} className="control">
-                <h3>Game Control</h3>
+                <h3>Game Control{loadedGame ? ' (loaded)' : ''}</h3>
                 <ControlGroup vertical>
                     <ButtonGroup>
                         <Button disabled={!gameMgr || mode != null} icon="cross"
@@ -498,6 +538,8 @@ export default function Game(props) {
                     <ButtonGroup>
                         <Button disabled={!gameMgr || mode != null || !history || !(isExternal ? (!enableAI || history.xundoable) : history.undoable)} icon="undo"
                                 className="growing" text={isExternal && !enableAI ? 'Clear' : 'Undo'} onClick={onUndo} />
+                        <Button disabled={!gameMgr || mode != null || !isSettled} rightIcon="download"
+                                className="growing" onClick={onDownload} />
                         <Button disabled={!gameMgr || mode != null || !history || !history.redoable} rightIcon="redo"
                                 className="growing" text="Redo" onClick={onRedo} />
                     </ButtonGroup>

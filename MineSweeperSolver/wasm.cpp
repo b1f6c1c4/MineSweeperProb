@@ -33,6 +33,17 @@ void cache(int w, int h, int m) {
     CacheBinomials(w * h, m);
 }
 
+std::string exportGame(const GameMgr &m) {
+    std::stringstream ss;
+    m.Save(ss);
+    return ss.str();
+}
+
+auto importGame(const std::string &s, Strategy st) {
+    std::stringstream ss{ s };
+    return GameMgr{ ss, st };
+}
+
 class History {
 public:
     explicit History(Strategy s) : memo{}, st{ std::move(s) }, ptr{} { }
@@ -55,10 +66,8 @@ public:
         std::cerr << " sz = " << memo.size() << "\n";
         std::cerr << " ptr = " << ptr << "\n";
 #endif
-        std::stringstream ss;
-        m.Save(ss);
         memo.resize(ptr++);
-        memo.emplace_back(ss.str(), std::move(aux));
+        memo.emplace_back(exportGame(m), std::move(aux));
 #ifndef NDEBUG
         std::cerr << " sz = " << memo.size() << "\n";
         std::cerr << " ptr = " << ptr << "\n";
@@ -108,8 +117,7 @@ private:
 
     std::string revert(GameMgr &m, size_t n) const {
         auto &mo = memo[n];
-        std::stringstream ss{ mo.first };
-        m = GameMgr{ ss, st };
+        m = importGame(mo.first, st);
         return mo.second;
     }
 };
@@ -118,6 +126,8 @@ EMSCRIPTEN_BINDINGS(mws) {
     function("seed", &seed);
     function("parse", static_cast<Configuration (*)(const std::string &)>(&parse));
     function("cache", static_cast<void (*)(int, int, int)>(&cache));
+    function("exportGame", &exportGame);
+    function("importGame", &importGame);
     class_<History>("History")
         .constructor<Strategy>()
         .property("undoable", &History::undoable)
