@@ -148,7 +148,7 @@ td.blk span {
   user-select: none;
 }
 
-td.blk span[icon=locate] {
+td.blk span.bp5-icon {
   transform: translate(-50%, -50%);
   opacity: 50%;
 }
