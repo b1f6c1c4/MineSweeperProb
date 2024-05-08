@@ -49,6 +49,7 @@ export default function Game(props) {
     const isDrainRef = useRef(isDrain);
     isDrainRef.current = isDrain;
     const [enableAI, setEnableAI] = useState(true);
+    const [isStepHover, setIsStepHover] = useState(false);
 
     const [, forceUpdate] = useReducer(x => x + 1, 0);
     const [isSettled, setIsSettled] = useState(false);
@@ -168,12 +169,14 @@ export default function Game(props) {
         const cfg = module.parse(config);
         module.cache(cfg.width, cfg.height, cfg.totalMines);
         let mgr;
-        if (loadedGame)
+        if (loadedGame) {
             mgr = module.importGame(atob(loadedGame), cfg);
-        else if (isExternal)
+            mgr.solve(module.SolvingState.HEUR, false);
+        } else if (isExternal) {
             mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg);
-        else
+        } else {
             mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg.isSNR, cfg, false);
+        }
         const his = new module.History(cfg);
         setGameMgr(mgr);
         setHistory(his);
@@ -413,6 +416,7 @@ export default function Game(props) {
     }
 
     function onDrain() {
+        push();
         setIsDrainAlert(false);
         gameMgr.enableDrainer(false);
         onUpdate(undefined, false, true);
@@ -484,7 +488,7 @@ export default function Game(props) {
     }
 
     const isReady = gameMgr && gameMgr.totalWidth === width && gameMgr.totalHeight === height;
-    const drainable = isReady && rate[0] <= 8 && !isDrain;
+    const drainable = isReady && !isGameOver && rate[0] <= 8 && !isDrain;
 
     return (
         <>
@@ -501,6 +505,7 @@ export default function Game(props) {
                     isExternal={isExternal}
                     isStarted={isSettled}
                     isGameOver={isGameOver}
+                    isDrain={isDrain}
                     isWon={isWon}
                     gameMgr={isReady && gameMgr}
                     module={module}
@@ -509,6 +514,8 @@ export default function Game(props) {
                     onProbe={isExternal ? onRotate : onProbe}
                     onFlag={isExternal ? onUnRotate : onFlag}
                     enableAI={enableAI}
+                    isLocked={isDraining || mode !== null}
+                    isAuto={mode !== null || (isStepHover && isSettled)}
                 />
                 <br />
                 <Collapse isOpen={enableAI}>
@@ -568,8 +575,8 @@ export default function Game(props) {
                         <ButtonGroup>
                             <Button disabled={!gameMgr || isGameOver || mode !== null || (isExternal && enableAI)}
                                     icon="hand-up" intent="primary" className="growing"
-                                    text={isExternal ? 'Solve' : 'Single step'}
-                                    onClick={onStep} />
+                                    text={isExternal ? 'Solve' : 'Single step'} onClick={onStep}
+                                    onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
                         </ButtonGroup>
                     </ControlGroup>
                     {!isExternal && (<>

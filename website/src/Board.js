@@ -9,6 +9,7 @@ export default function Board(props) {
         isStarted,
         isGameOver,
         isWon,
+        isDrain,
         flagging,
         module,
         overlay,
@@ -16,6 +17,8 @@ export default function Board(props) {
         onFlag,
         isExternal,
         enableAI,
+        isLocked,
+        isAuto,
         gameMgr,
     } = props;
     const [hoverId, setHoverId] = useState(undefined);
@@ -32,9 +35,7 @@ export default function Board(props) {
         for (let i = 0; i < set.size(); i++)
             preferred[set.get(i)] = true;
     }
-    let drain = enableAI && gameMgr && gameMgr.bestProbabilityList;
-    if (drain && !drain.size())
-        drain = undefined;
+    let drain = isDrain && gameMgr.bestProbabilityList;
     let hoverInfer = null;
     let hoverProbability = null;
 
@@ -55,8 +56,8 @@ export default function Board(props) {
             let rprob = null;
             if (enableAI) {
                 prob = gameMgr.blockProbabilityOf(j, i);
-                if (drain)
-                    prob = 1 - drain.get(id);
+                if (isDrain)
+                    prob = drain.get(id);
                 if (!isStarted)
                     prob = null;
                 if (id === hoverId && !property.isOpen) {
@@ -87,23 +88,32 @@ export default function Board(props) {
                             isPreferred={preferred[id]}
                             isSafe={infer === module.BlockStatus.BLANK}
                             isDangerous={infer === module.BlockStatus.MINE}
-                            isDrain={drain}
+                            isDrain={isDrain}
                             probability={rprob}
-                            onProbe={onProbe}
-                            onFlag={onFlag}
-                            onHover={() => setHoverId(id)}
-                            onUnHover={() => setHoverId(undefined)}
+                            onProbe={!isLocked && onProbe}
+                            onFlag={!isLocked && onFlag}
+                            onHover={() => !isLocked && setHoverId(id)}
+                            onUnHover={() => !isLocked && setHoverId(undefined)}
             />);
         }
         body.push(<tr key={i}>{row}</tr>);
     }
 
     return (<div className="board-container">
-        {(isExternal || enableAI) && (
+        {(isAuto && enableAI) && (
             <HeatBar
-                disabled={isExternal && !enableAI}
+                isSafe={hasSafe}
+                isDrain={isDrain}
+                hasSafe={hasSafe}
+                probability={hasSafe ? null : minProb}
+                minProb={minProb}
+                maxProb={maxProb}
+            />)}
+        {!isAuto && (isExternal || enableAI) && (
+            <HeatBar
+                disabled={isLocked || (isExternal && !enableAI)}
                 isSafe={hoverInfer === module.BlockStatus.BLANK}
-                isDrain={drain}
+                isDrain={isDrain}
                 isDangerous={hoverInfer === module.BlockStatus.MINE}
                 hasSafe={hasSafe}
                 probability={hoverProbability}

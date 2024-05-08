@@ -156,6 +156,9 @@ double GameMgr::GetMinProbability() const
                 auto p = m_Solver->GetProbability(blk.Index);
                 m = MIN(m, p);
             }
+#ifndef NDEBUG
+    std::cerr << "GameMgr::GetMinProbability => " << m << "\n";
+#endif
     return m;
 }
 
@@ -172,6 +175,9 @@ double GameMgr::GetMaxProbability() const
                 auto p = m_Solver->GetProbability(blk.Index);
                 m = MAX(m, p);
             }
+#ifndef NDEBUG
+    std::cerr << "GameMgr::GetMaxProbability => " << m << "\n";
+#endif
     return m;
 }
 

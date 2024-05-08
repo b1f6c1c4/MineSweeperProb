@@ -59,9 +59,9 @@ export default function Block(props) {
                 const b = Math.round(0x29 * probability + 0x22 * (1 - probability));
                 tdStyle.backgroundImage = `linear-gradient(135deg, rgb(${r}, ${g}, ${b}), #d2d2d2 40%)`;
             } else {
-                const r = Math.round(0xf8 * probability + 0x7b * (1 - probability));
-                const g = Math.round(0x29 * probability + 0x68 * (1 - probability));
-                const b = Math.round(0x29 * probability + 0xee * (1 - probability));
+                const r = Math.round(0x7b * probability + 0xf8 * (1 - probability));
+                const g = Math.round(0x68 * probability + 0x29 * (1 - probability));
+                const b = Math.round(0xee * probability + 0x29 * (1 - probability));
                 tdStyle.backgroundImage = `linear-gradient(45deg, rgb(${r}, ${g}, ${b}), transparent 100%)`;
             }
         }

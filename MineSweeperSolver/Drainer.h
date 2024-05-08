@@ -14,7 +14,6 @@ public:
     ~Drainer() = default;
 
     [[nodiscard]] BlockSet GetBestBlocks() const;
-    [[nodiscard]] const double *GetBestProbabilities() const;
     [[nodiscard]] const std::vector<double> &GetBestProbabilityList() const;
 
     void Update();

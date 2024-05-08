@@ -76,11 +76,6 @@ BlockSet Drainer::GetBestBlocks() const
     return set;
 }
 
-const double *Drainer::GetBestProbabilities() const
-{
-    return &*m_Prob.begin();
-}
-
 const std::vector<double> &Drainer::GetBestProbabilityList() const
 {
     return m_Prob;

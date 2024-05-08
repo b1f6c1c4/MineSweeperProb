@@ -44,7 +44,7 @@ export default function HeatBar(props) {
     }
 
     return (
-        <div className="heat-bar">
+        <div className={'heat-bar' + (disabled ? ' disabled' : '')}>
             <div className="ends dangerous">
                 <span className="color"></span>
                 {isDangerous ? (

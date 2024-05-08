@@ -33,6 +33,10 @@
   height: 1.5em;
 }
 
+.heat-bar.disabled .color {
+  opacity: 50%;
+}
+
 .heat-bar .color {
   display: block;
   width: 6mm;
@@ -85,6 +89,10 @@
   position: relative;
   right: 0;
   transform: translate(2px, +50%);
+}
+
+.heat-bar.disabled .indicator {
+  display: none;
 }
 
 .heat-bar .here {
