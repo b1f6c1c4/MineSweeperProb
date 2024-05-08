@@ -7,6 +7,14 @@
   flex-direction: row;
   align-items: stretch;
   gap: 4px;
+  margin-bottom: 5px;
+  min-width: fit-content;
+}
+
+@media(max-height: 500px) {
+  .board-container {
+    margin-bottom: 1px;
+  }
 }
 
 .heat-bar {
@@ -44,7 +52,7 @@
 
 .heat-bar .color {
   display: block;
-  width: 6mm;
+  width: 18px;
   height: 100%;
   background-color: lightgray;
   flex-grow: 0;
@@ -116,6 +124,7 @@
 table.board {
   table-layout: fixed;
   margin: auto;
+  border-spacing: 2px;
 }
 
 table.board * {
@@ -124,19 +133,30 @@ table.board * {
 }
 
 table.board tr {
-  line-height: 5mm;
+  line-height: 20px;
 }
 
 td.blk {
-  width: 5mm;
-  height: 5mm;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
   overflow: visible;
   border-spacing: 0;
   font-family: monospace;
-  font-size: 6mm;
+  font-size: 20px;
   border: 3px solid #b0b0b0;
   background-color: #d2d2d2;
   position: relative;
+}
+
+@media (max-width: 400px) or (max-height: 400px) {
+  table.board {
+    border-spacing: 1px;
+  }
+
+  td.blk {
+    border-width: 1.5px;
+  }
 }
 
 td.blk span {
@@ -154,7 +174,7 @@ td.blk span.bp5-icon {
 }
 
 td.blk-open {
-  border: 3px solid #eeeeee;
+  border-color: #eeeeee;
   background-color: #f3f3f3;
   font-weight: bold;
 }
@@ -199,7 +219,7 @@ td.blk-dead {
 
 span.flag {
   color: #cb4444;
-  font-size: 4mm;
+  font-size: 15px;
   transform: translate(-50%, -45%);
 }
 
@@ -245,7 +265,8 @@ td.blk-drain {
 
 .game {
   width: fit-content;
-  min-width: 300px;
+  margin: 20px;
+  margin-top: 0;
 }
 
 .centering {
@@ -291,15 +312,62 @@ td.blk-drain {
   margin: auto;
 }
 
-.control.compact {
+main:has(.game) {
+  display: block !important;
+  padding: 0;
+}
+
+#playground-root:has(.compact.control) {
+  padding-bottom: 120px;
+}
+
+*:has(.compact.control) {
+  min-width: fit-content;
+}
+
+.compact.control {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 9px;
+  position: fixed;
+  margin: 0 auto;
+  bottom: 15px;
+  left: 0;
+  right: 0;
 }
 
-.control.compact .bp5-control-group {
+.compact.control .bp5-control-group {
   justify-content: space-between;
+}
+
+@media(max-height: 450px) {
+  .compact.control {
+    flex-direction: row;
+    gap: 2px;
+    bottom: 8px;
+  }
+
+  .bp5-form-group {
+    margin-bottom: 5px;
+  }
+
+  #playground-root:has(.compact.control) {
+    padding-bottom: 65px;
+  }
+}
+
+.control.bp5-compact {
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+}
+
+.bp5-form-group {
+  margin-bottom: 8px;
+}
+
+.bp5-form-group:last-child {
+  margin-bottom: 0;
 }
 
 input[type=file] {

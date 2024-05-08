@@ -535,13 +535,12 @@ export default function Game(props) {
                     isLocked={isDraining || mode !== null}
                     isAuto={mode !== null || (isStepHover && isSettled)}
                 />
-                <br />
-                <Collapse isOpen={enableAI}>
+                {enableAI && (
                     <FormGroup label={`${roundDigits(Math.pow(2, rate[0]))} possible solutions`}>
                         <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
                                      intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
                     </FormGroup>
-                </Collapse>
+                    )}
                 {!isExternal && (
                     <FormGroup label={`${toOpen} / ${width * height - totalMines} blocks left`}>
                         <ProgressBar value={1 - toOpen / (width * height - totalMines)}

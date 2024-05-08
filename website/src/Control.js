@@ -190,9 +190,23 @@ export default function Control(props) {
             </Card>
         );
 
+    const short = dim.height < 600;
+
+    const speedSlider = (
+        <Tooltip content="Speed" placement="left-end">
+            <FormGroup>
+                <Slider fill min={-2} max={2} stepSize={0.1} labelStepSize={1} onChange={setSpeed}
+                    labelRenderer={renderLabel} showTrackFill={false} value={speed} />
+            </FormGroup>
+        </Tooltip>);
+    const stepButton = (
+        <Button disabled={disabledStep} text={textStep} onClick={onStep}
+                icon="hand-up" intent="primary" className="growing" fill
+                onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />);
+
     return (
-        <Card elevation={Elevation.TWO} className="control">
-            <h3>Game Control{loadedGame ? ' (loaded)' : ''}</h3>
+        <Card elevation={Elevation.TWO} className="control" compact={short}>
+            {!short && (<h3>Game Control{loadedGame ? ' (loaded)' : ''}</h3>)}
             <ControlGroup vertical>
                 <ButtonGroup>
                     <Button disabled={disabledGeneral} icon="cross"
@@ -223,38 +237,19 @@ export default function Control(props) {
                         alignIndicator={Alignment.RIGHT} />
                 </>)}
             <Collapse isOpen={enableAI || isExternal} keepChildrenMounted>
-                <h3>AI Control</h3>
+                {!short && (<h3>AI Control</h3>)}
                 {!isExternal && (
                     <Switch checked={isAutoFlag} onChange={onSwitchFlag}
                             labelElement={'Auto-flag'}
                             innerLabelChecked="on" innerLabel="off"
                             alignIndicator={Alignment.RIGHT} />
                     )}
-                <ControlGroup vertical>
-                    <ButtonGroup>
-                        <Button disabled={disabledStep} text={textStep} onClick={onStep}
-                                icon="hand-up" intent="primary" className="growing"
-                                onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
-                    </ButtonGroup>
-                </ControlGroup>
+                {!short && stepButton}
                 {!isExternal && (<>
-                    <br />
-                    <Tooltip content="Speed" placement="left-end">
-                        <FormGroup>
-                            <Slider
-                                fill
-                                min={-2}
-                                max={2}
-                                stepSize={0.1}
-                                labelStepSize={1}
-                                onChange={setSpeed}
-                                labelRenderer={renderLabel}
-                                showTrackFill={false}
-                                value={speed}
-                            />
-                        </FormGroup>
-                    </Tooltip>
+                    {!short && (<br />)}
+                    {!short && speedSlider}
                     <ControlGroup vertical>
+                        {short && stepButton}
                         <ButtonGroup>
                             <Button disabled={disableSemi}
                                     active={mode === 'semi'}
@@ -294,6 +289,7 @@ export default function Control(props) {
                             </FormGroup>
                         )}
                     </ControlGroup>
+                    {short && speedSlider}
                     </>)}
             </Collapse>
             {isExternal && (<>

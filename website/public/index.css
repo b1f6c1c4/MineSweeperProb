@@ -12,7 +12,7 @@ header {
   gap: 20px;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: -1;
   overflow: hidden;
 }
 
@@ -74,9 +74,6 @@ main {
 }
 
 @media(min-width: 650px) {
-  header {
-    z-index: 0;
-  }
   main {
     flex-wrap: unset;
   }
