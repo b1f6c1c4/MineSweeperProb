@@ -162,6 +162,8 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("bits", &GameMgr::GetBits)
         .property("allBits", &GameMgr::GetAllBits)
         .property("lastProbe", &GameMgr::GetLastProbe)
+        .property("minProb", &GameMgr::GetMinProbability)
+        .property("maxProb", &GameMgr::GetMaxProbability)
         .function("blockPropertyOf", &GameMgr::GetBlockProperty)
         .function("setBlockDegree", &GameMgr::SetBlockDegree)
         .function("setBlockMine", &GameMgr::SetBlockMine)

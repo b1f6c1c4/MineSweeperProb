@@ -44,6 +44,8 @@ public:
     [[nodiscard]] double GetBits() const;
     [[nodiscard]] double GetAllBits() const;
     [[nodiscard]] int GetLastProbe() const;
+    [[nodiscard]] double GetMinProbability() const;
+    [[nodiscard]] double GetMaxProbability() const;
 
     [[nodiscard]] const BlockProperty &GetBlockProperty(int x, int y) const;
     const BlockProperty &SetBlockDegree(int x, int y, int degree);

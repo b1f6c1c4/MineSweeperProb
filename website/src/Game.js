@@ -72,8 +72,6 @@ export default function Game(props) {
     const cancellerRef = useRef(canceller);
     cancellerRef.current = canceller;
 
-    const [hoverId, setHoverId] = useState(undefined);
-
     // could be inside setTimeout
     function onUpdate(json) {
         if (json) {
@@ -133,7 +131,6 @@ export default function Game(props) {
         if (historyRef.current)
             historyRef.current.delete();
         const m = modeRef.current;
-        setHoverId(undefined);
         setIsSettled(false);
         setIsGameOver(false);
         setIsWon(false);
@@ -347,14 +344,6 @@ export default function Game(props) {
         push();
     }
 
-    function onHover(id) {
-        setHoverId(id);
-    }
-
-    function onUnHover() {
-        setHoverId(undefined);
-    }
-
     function renderLabel(v) {
         const y = Math.pow(10, -v);
         const s = Math.pow(10, Math.ceil(v) + 1);
@@ -403,6 +392,7 @@ export default function Game(props) {
                 <Board
                     width={width}
                     height={height}
+                    isExternal={isExternal}
                     isStarted={isSettled}
                     isGameOver={isGameOver}
                     isWon={isWon}
@@ -413,9 +403,6 @@ export default function Game(props) {
                     onProbe={isExternal ? onRotate : onProbe}
                     onFlag={isExternal ? onUnRotate : onFlag}
                     enableAI={enableAI}
-                    hoverId={hoverId}
-                    onHover={onHover}
-                    onUnHover={onUnHover}
                 />
                 <br />
                 <Collapse isOpen={enableAI}>

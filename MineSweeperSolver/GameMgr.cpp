@@ -141,6 +141,38 @@ int GameMgr::GetLastProbe() const
     return m_LastProbe;
 }
 
+double GameMgr::GetMinProbability() const
+{
+    double m = 1;
+    if (m_Drainer)
+        for (auto p : m_Drainer->GetBestProbabilityList())
+            m = MIN(m, p);
+    else
+        for (auto &blk : m_Blocks)
+            if (m_Solver->GetBlockStatus(blk.Index) == BlockStatus::Unknown)
+            {
+                auto p = m_Solver->GetProbability(blk.Index);
+                m = MIN(m, p);
+            }
+    return m;
+}
+
+double GameMgr::GetMaxProbability() const
+{
+    double m = 0;
+    if (m_Drainer)
+        for (auto p : m_Drainer->GetBestProbabilityList())
+            m = MAX(m, p);
+    else
+        for (auto &blk : m_Blocks)
+            if (m_Solver->GetBlockStatus(blk.Index) == BlockStatus::Unknown)
+            {
+                auto p = m_Solver->GetProbability(blk.Index);
+                m = MAX(m, p);
+            }
+    return m;
+}
+
 const BlockProperty &GameMgr::GetBlockProperty(int x, int y) const
 {
     return m_Blocks[GetIndex(x, y)];

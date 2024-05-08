@@ -2,6 +2,104 @@
 @import "~@blueprintjs/core/lib/css/blueprint.css";
 @import "~@blueprintjs/icons/lib/css/blueprint-icons.css";
 
+.board-container {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.heat-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.heat-bar div {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 4px;
+  align-items: center;
+  width: 5em;
+}
+
+.heat-bar .mid {
+  flex: 1;
+  align-items: flex-end;
+}
+
+.heat-bar .ends {
+  height: 1.5em;
+}
+
+.heat-bar .color {
+  display: block;
+  width: 6mm;
+  height: 100%;
+  background-color: lightgray;
+  flex-grow: 0;
+  flex-shrink: 0;
+}
+
+.heat-bar .unavailable .color:before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 100%;
+  --color: #444;
+  --l: 2px; /* line-width */
+  background: linear-gradient(to top right, transparent calc(50% - var(--l) / 2), var(--color) calc(50% - var(--l) / 2) calc(50% + var(--l) / 2), transparent calc(50% + var(--l) / 2)),
+              linear-gradient(to bottom right, transparent calc(50% - var(--l) / 2), var(--color) calc(50% - var(--l) / 2) calc(50% + var(--l) / 2), transparent calc(50% + var(--l) / 2));
+}
+
+.heat-bar .safe .color {
+  background-color: #ffd702;
+}
+
+.heat-bar .mid > .color {
+  position: relative;
+  background-color: lightgray;
+}
+
+.heat-bar .mid > .color > .color {
+  position: absolute;
+  background-image: linear-gradient(180deg, #f82929, #09b722);
+}
+
+.heat-bar .mid.drain .color {
+  background-image: linear-gradient(180deg, #f82929, #7b68ee);
+}
+
+.heat-bar .dangerous .color {
+  background-color: #f82960;
+}
+
+.heat-bar .indicator {
+  position: relative;
+  text-align: right;
+  padding-right: 2px;
+}
+
+.heat-bar .mid .indicator {
+  position: relative;
+  right: 0;
+  transform: translate(2px, +50%);
+}
+
+.heat-bar .here {
+  font-weight: bold;
+  padding-right: 7px;
+}
+
+.heat-bar .here::after {
+  content: '▸';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translate(2px, -58.7%);
+}
+
 table.board {
   table-layout: fixed;
   margin: auto;
@@ -92,11 +190,11 @@ span.flag {
   transform: translate(-50%, -45%);
 }
 
-td.blk-safe {
+.blk-safe {
   border-color: #ffd702 !important;
 }
 
-td.blk-dangerous {
+.blk-dangerous {
   border-color: #f82960 !important;
 }
 
