@@ -98,6 +98,8 @@ export default function Control(props) {
         : !drainable ? 'Disabled when solutions > 256'
         : hasBest ? 'Open the safe blocks first'
         : 'Find the optimal clicks';
+    const tooltipStep = enableAI ? 'Modify board to solve again' : 'Solve' ;
+    const tooltipSearch = isExternal ? 'Lock to check, unlock to modify' : 'Lock to check, unlock to dig';
 
     if (dim.width <= width * 19.3 + 446)
         return (
@@ -113,7 +115,7 @@ export default function Control(props) {
                     </ButtonGroup>
                     <ButtonGroup>
                         <Tooltip content={textUndo} position="top">
-                            <Button disabled={disabledUndo} icon="undo" onClick={onUndo} />
+                            <Button disabled={disabledUndo} icon={(isExternal && !enableAI) ? 'delete' : 'undo'} onClick={onUndo} />
                         </Tooltip>
                         <Tooltip content="Save game to file" position="top">
                             <Button disabled={disabledSave} icon="download" onClick={onDownload} />
@@ -138,14 +140,25 @@ export default function Control(props) {
                             </Tooltip>
                         </ButtonGroup>
                     )}
-                    <Tooltip content="Lock to check, unlock to dig" position="top">
+                    {isExternal && (
+                        <ButtonGroup>
+                            <Tooltip content={tooltipStep} position="top">
+                                <Button disabled={disabledStep} icon="target" intent="primary" onClick={onStep} />
+                            </Tooltip>
+                            <Tooltip content={tooltipDrain} placement="bottom-end">
+                                <Button active={isDrain} icon="layout-balloon" intent={drainable ? 'danger' : undefined}
+                                        disabled={!drainable || mode !== null || hasBest} onClick={onDrainAlert} />
+                            </Tooltip>
+                        </ButtonGroup>
+                    )}
+                    <Tooltip content={tooltipSearch} position="top">
                         <Button icon={isSearching ? 'lock' : 'unlock'} onClick={onSearching}
                             intent={isSearching ? 'primary' : 'warning'} disabled={disabledGeneral} />
                     </Tooltip>
                 </ControlGroup>
-                {(enableAI && !isDraining) && (
+                {!isExternal && enableAI && !isDraining && (
                     <ControlGroup>
-                        <Tooltip content={isExternal ? 'Solve' : 'AI single-step'} position="bottom">
+                        <Tooltip content='AI single-step' position="bottom">
                             <Button disabled={disabledStep} icon="target" intent="primary" onClick={onStep}
                                     onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
                         </Tooltip>
@@ -211,7 +224,7 @@ export default function Control(props) {
             <Button disabled={disabledStep} text={isExternal ? 'Solve' : 'AI Step'} onClick={onStep}
                     icon="target" intent="primary" className="growing" fill
                     onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
-            <Tooltip content="Lock to check, unlock to dig" position="top">
+            <Tooltip content={tooltipSearch} position="top">
                 <Button icon={isSearching ? 'lock' : 'unlock'} onClick={onSearching}
                     intent={isSearching ? 'primary' : 'warning'} disabled={disabledGeneral} />
             </Tooltip>
@@ -258,11 +271,11 @@ export default function Control(props) {
                             alignIndicator={Alignment.RIGHT} />
                     )}
                 {!short && stepButton}
-                {!isExternal && (<>
-                    {!short && (<br />)}
-                    {!short && speedSlider}
-                    <ControlGroup vertical>
-                        {short && stepButton}
+                {!isExternal && !short && (<br />)}
+                {!isExternal && !short && speedSlider}
+                <ControlGroup vertical>
+                    {short && stepButton}
+                    {!isExternal && (<>
                         <ButtonGroup>
                             <Button disabled={disableSemi}
                                     active={mode === 'semi'}
@@ -284,26 +297,26 @@ export default function Control(props) {
                                     icon="lightning" intent="warning"
                                     onClick={onAutoAll} />
                         </ButtonGroup>
-                        {!isDraining && (
-                            <Tooltip content={tooltipDrain} placement="bottom-end">
-                                <ButtonGroup>
-                                    <Button active={isDrain} icon="layout-balloon" rightIcon="layout-balloon"
-                                            intent={drainable ? 'danger' : undefined} className="growing" disabled={!drainable || mode !== null}
-                                            text="Exhaustive Search" onClick={onDrainAlert} />
-                                </ButtonGroup>
-                            </Tooltip>
-                            )}
-                        {isDraining && (
-                            <FormGroup label={isDraining[0] === isDraining[1]
-                                    ? 'Post-processing results...'
-                                    : `${isDraining[0]}/${isDraining[1]} solutions analyzed`}>
-                            <ProgressBar value={isDraining[0] / isDraining[1]} intent="danger"
-                                         stripes={isDraining[0] === isDraining[1]} />
-                            </FormGroup>
+                        </>)}
+                    {!isDraining && (
+                        <Tooltip content={tooltipDrain} placement="bottom-end">
+                            <ButtonGroup>
+                                <Button active={isDrain} icon="layout-balloon" rightIcon="layout-balloon"
+                                        intent={drainable ? 'danger' : undefined} className="growing" disabled={!drainable || mode !== null}
+                                        text="Exhaustive Search" onClick={onDrainAlert} />
+                            </ButtonGroup>
+                        </Tooltip>
                         )}
-                    </ControlGroup>
-                    {short && speedSlider}
-                    </>)}
+                    {isDraining && (
+                        <FormGroup label={isDraining[0] === isDraining[1]
+                                ? 'Post-processing results...'
+                                : `${isDraining[0]}/${isDraining[1]} solutions analyzed`}>
+                        <ProgressBar value={isDraining[0] / isDraining[1]} intent="danger"
+                                     stripes={isDraining[0] === isDraining[1]} />
+                        </FormGroup>
+                    )}
+                </ControlGroup>
+                {!isExternal && short && speedSlider}
             </Collapse>
             {isExternal && (<>
                 <h4>External Mode</h4>

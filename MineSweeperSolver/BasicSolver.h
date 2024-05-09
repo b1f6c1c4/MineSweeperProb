@@ -19,6 +19,11 @@ enum class SolvingState
     Drained = 0x8000
 };
 
+struct Infeasible : std::runtime_error
+{
+    Infeasible() : std::runtime_error{ "infeasible" } { }
+};
+
 inline SolvingState operator&(SolvingState lhs, SolvingState rhs)
 {
     return static_cast<SolvingState>(static_cast<int>(lhs) & static_cast<int>(rhs));

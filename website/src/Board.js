@@ -108,7 +108,7 @@ export default function Board(props) {
     }
 
     return (<div className="board-container">
-        {(isAuto && enableAI) && (
+        {(isAuto && enableAI && !isExternal) && (
             <HeatBar
                 isSafe={hasSafe}
                 isDrain={isDrain}
@@ -117,7 +117,7 @@ export default function Board(props) {
                 minProb={minProb}
                 maxProb={maxProb}
             />)}
-        {!isAuto && (isExternal || enableAI) && (
+        {(isExternal || (!isAuto && enableAI)) && (
             <HeatBar
                 disabled={isLocked || (isExternal && !enableAI)}
                 isSafe={hoverInfer === module.BlockStatus.BLANK}

@@ -98,14 +98,18 @@ export default function Game(props) {
             setIsWon(gameMgrRef.current.succeed);
             setHasBest(false);
             setIsSettled(true);
-            if (gameMgrRef.current.succeed)
-                setRate([0, gameMgrRef.current.allBits]);
-            if (isAutoRestartRef.current)
-                setTimeout(() => {
-                    // just in case the user cancels during the period
-                    if (isAutoRestartRef.current)
-                        onRestart();
-                }, 1500);
+            if (isExternal) {
+                setRate([null, null]);
+            } else {
+                if (gameMgrRef.current.succeed)
+                    setRate([0, gameMgrRef.current.allBits]);
+                if (isAutoRestartRef.current)
+                    setTimeout(() => {
+                        // just in case the user cancels during the period
+                        if (isAutoRestartRef.current)
+                            onRestart();
+                    }, 1500);
+            }
         } else {
             setIsGameOver(false);
             setIsWon(false);
@@ -555,7 +559,7 @@ export default function Game(props) {
                     isAuto={mode !== null || (isStepHover && isSettled)}
                 />
                 {enableAI && (
-                    <FormGroup label={`${roundDigits(Math.pow(2, rate[0]))} possible solutions`}>
+                    <FormGroup label={rate[0] === null ? 'INFEASIBLE - Click undo and retry' : `${roundDigits(Math.pow(2, rate[0]))} possible solutions`}>
                         <ProgressBar value={1 - rate[0] / rate[1]} stripes={!isGameOver}
                                      intent={(isGameOver && !isWon) ? 'danger' : 'success'} />
                     </FormGroup>

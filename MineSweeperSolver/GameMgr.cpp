@@ -267,11 +267,24 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Best.clear();
     m_Preferred.clear();
 
-    m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
-#ifndef NDEBUG
-    if (m_Solver->GetTotalStates() == 0)
-        throw std::runtime_error("total states = 0");
-#endif
+    try
+    {
+        m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
+    }
+    catch (const Infeasible &)
+    {
+        if (m_IsExternal)
+        {
+            m_Started = false;
+            return;
+        }
+        throw;
+    }
+    if (m_IsExternal && m_Solver->GetTotalStates() == 0)
+    {
+        m_Started = false;
+        return;
+    }
 
 #ifndef NDEBUG
     if (!m_IsExternal)
@@ -561,7 +574,8 @@ void GameMgr::EnableDrainer(bool drain)
 {
     if (m_Drainer)
         return;
-    SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
+    if (!m_IsExternal)
+        SemiAutomatic(SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability);
 #ifndef NDEBUG
     std::cerr << "GameMgr::EnableDrainer() calling Drainer::Drainer()\n";
 #endif

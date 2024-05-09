@@ -361,10 +361,7 @@ bool BasicSolver::ReduceBlockSet(int col)
     {
         for (auto j = 0; j < m_Matrix[CNT(col)].size(); ++j)
             if (NZ(m_Matrix[CNT(col)][j], SHF(col)))
-            {
                 m_MatrixAugment[j] -= dMines;
-                ASSERT(m_MatrixAugment[j] >= 0);
-            }
         m_State = SolvingState::Stale;
     }
     if (m_BlockSets[col].empty())
@@ -378,7 +375,6 @@ bool BasicSolver::ReduceBlockSet(int col)
 
 bool BasicSolver::ReduceRestrainBlank(int row)
 {
-    ASSERT(m_MatrixAugment[row] >= 0);
     if (m_MatrixAugment[row] != 0)
         return false;
 
@@ -408,7 +404,7 @@ bool BasicSolver::ReduceRestrainMine(int row)
 {
     auto &sum = m_ReduceCount_Temp;
     if (m_MatrixAugment[row] > sum[row])
-        throw std::runtime_error("infeasible");
+        throw Infeasible{};
     if (m_MatrixAugment[row] != sum[row])
         return false;
 
