@@ -26,16 +26,31 @@ export default function App(props) {
     const [loadedGame, setLoadedGame] = useState(undefined);
 
     useEffect(() => {
+        const r = (e) => {
+            if (!e.state) {
+                setStarted(false);
+                setLoadedGame(undefined);
+            } else {
+                setCfg(e.state.cfg);
+                setIsSNR(e.state.isSNR);
+                setIsExternal(e.state.isExternal);
+                setLoadedGame(e.state.loadedGame);
+                setStarted(e.state.start);
+            }
+        };
         moduleLoader.then((module) => {
             setModule(module);
             module.seed();
+            r(window.history);
+            window.addEventListener('popstate', r);
         }, console.error);
+        return () => window.removeEventListener('popstate', r);
     }, []);
 
     function onSelect(e) {
         const m = e.currentTarget.value.match(/^(?<w>[0-9]+)-(?<h>[0-9]+)-T(?<m>[0-9]+)$/);
         if (!m) {
-            setCfg({
+            onSetCfg({
                 text: e.currentTarget.value,
                 width: 16,
                 height: 16,
@@ -43,7 +58,7 @@ export default function App(props) {
             });
             return;
         }
-        setCfg({
+        onSetCfg({
             text: e.currentTarget.value,
             width: +m.groups['w'],
             height: +m.groups['h'],
@@ -51,34 +66,90 @@ export default function App(props) {
         });
     }
 
+    function onSetCfg(c) {
+        setCfg(c);
+        window.history.replaceState({
+            start: false,
+            cfg: c,
+            isSNR,
+            isExternal,
+            loadedGame,
+        }, '', '/');
+    }
+
+    function onSetExt(e) {
+        const c = e.currentTarget.checked;
+        setIsExternal(c);
+        window.history.replaceState({
+            start: false,
+            cfg,
+            isSNR,
+            isExternal: c,
+            loadedGame,
+        }, '', '/');
+    }
+
+    function onSetSNR(e) {
+        const c = e.currentTarget.checked;
+        setIsSNR(c);
+        window.history.replaceState({
+            start: false,
+            cfg,
+            isSNR: c,
+            isExternal,
+            loadedGame,
+        }, '', '/');
+    }
+
     function onStart() {
+        window.history.pushState({
+            start: true,
+            cfg,
+            isSNR,
+            isExternal,
+            loadedGame,
+        }, '', '#game');
         setStarted(true);
     }
 
     function onStop() {
+        window.history.pushState({
+            start: false,
+            cfg,
+            isSNR,
+            isExternal,
+        }, '', '/');
         setStarted(false);
         setLoadedGame(undefined);
     }
 
-    function sw(f) {
-        return (e) => f(e.currentTarget.checked);
+    function onPersist(g) {
+        console.dir('saving');
+        console.dir(g);
+        window.history.replaceState({
+            start: true,
+            cfg,
+            isSNR,
+            isExternal,
+            loadedGame: g,
+        }, '', '#game');
     }
 
     function onW(v) {
-        setCfg({ ...cfg, width: v });
+        onSetCfg({ ...cfg, width: v });
     }
 
     function onH(v) {
-        setCfg({ ...cfg, height: v });
+        onSetCfg({ ...cfg, height: v });
     }
 
     function onT(v) {
-        setCfg({ ...cfg, totalMines: v });
+        onSetCfg({ ...cfg, totalMines: v });
     }
 
     async function onLoad(e) {
         setLoadedGame(JSON.parse(await e.target.files[0].text()));
-        setStarted(true);
+        onStart();
     }
 
     let strategy = 'FL';
@@ -111,6 +182,7 @@ export default function App(props) {
                     module={module}
                     {...loadedGame}
                     onStop={onStop}
+                    onPersist={onPersist}
                 />);
         } else {
             return (
@@ -123,6 +195,7 @@ export default function App(props) {
                     strategy={strategy}
                     config={config}
                     onStop={onStop}
+                    onPersist={onPersist}
                 />);
         }
     }
@@ -130,7 +203,7 @@ export default function App(props) {
     return (
         <Card elevation={Elevation.TWO} className="control">
             <h3>Showcase &amp; Playground</h3>
-            <Switch checked={isExternal} onChange={sw(setIsExternal)}
+            <Switch checked={isExternal} onChange={onSetExt}
                 labelElement={'Mode'}
                 innerLabelChecked="Analyze" innerLabel="New Game"
                 alignIndicator={Alignment.RIGHT} />
@@ -171,7 +244,7 @@ export default function App(props) {
                 <p>Choose this option if you wish to analyze an existing Minesweeper game, instead of starting a new one.</p>
                 </>)}
             {!isExternal && (
-                <Switch checked={isSNR} onChange={sw(setIsSNR)}
+                <Switch checked={isSNR} onChange={onSetSNR}
                     labelElement={'Rule'}
                     innerLabelChecked="SNR" innerLabel="SFAR"
                     alignIndicator={Alignment.RIGHT} />

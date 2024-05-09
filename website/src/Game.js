@@ -23,6 +23,7 @@ export default function Game(props) {
         loadedFlags,
         loadedOverlay,
         onStop,
+        onPersist,
     } = props;
     const [gameMgr, setGameMgr] = useState(undefined);
     const gameMgrRef = useRef(gameMgr);
@@ -216,6 +217,15 @@ export default function Game(props) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [config, loadedGame, loadedFlags, loadedOverlay]);
+
+    useEffect(() => {
+        const r = () => {
+            if (document.visibilityState === 'hidden')
+                onPersist(btoa(module.exportGame(gameMgrRef.current)));
+        };
+        window.addEventListener('visibilitychange', r);
+        return () => window.removeEventListener('visibilitychange', r);
+    }, []);
 
     function onRotate(row, col) {
         const ov = [...overlay];
