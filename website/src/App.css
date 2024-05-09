@@ -313,6 +313,12 @@ td.blk-drain {
   margin: auto;
 }
 
+.app.control p {
+  max-width: 250px;
+  hyphens: auto;
+  margin: unset;
+}
+
 main:has(.game) {
   display: block !important;
   padding: 0;
@@ -374,4 +380,40 @@ main:has(.game) {
 input[type=file] {
   width: 0;
   min-width: initial;
+}
+
+@media (min-width: 350px) and (max-width: 650px),
+       (min-width: 350px) and (max-height: 480px) {
+  .app {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    grid-column-gap: 15px;
+    max-width: 100%;
+    width: fit-content;
+  }
+
+  .app h3 {
+    grid-column: 1 / span 2;
+  }
+
+  .app h4 {
+    margin-top: 8px;
+  }
+
+  .app > * {
+    grid-column: 1;
+  }
+
+  .app > br {
+    display: none;
+  }
+
+  .app .description {
+    grid-column: 2;
+    grid-row: 2 / span 9;
+  }
+
+  .app .description h4 {
+    margin-top: 0;
+  }
 }

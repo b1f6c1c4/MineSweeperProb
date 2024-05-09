@@ -65,27 +65,11 @@ header a:hover {
 
 main {
   display: flex !important;
-  flex-direction: row;
   align-items: flex-start;
   gap: 28px;
   padding: 0 20px;
   justify-content: center;
-  flex-wrap: wrap-reverse;
-}
-
-@media(min-width: 650px) {
-  main {
-    flex-wrap: unset;
-  }
-  #playground-root {
-    position: sticky;
-    top: 20px;
-  }
-  @media(min-height: 400px) {
-    #playground-root {
-      top: 92px;
-    }
-  }
+  flex-direction: row;
 }
 
 #playground-root {
@@ -95,6 +79,29 @@ main {
   align-items: flex-end;
   justify-content: center;
   gap: 20px;
+  position: sticky;
+  width: unset;
+}
+
+@media (max-width: 650px) or (max-height: 480px) {
+  main {
+    flex-direction: column-reverse;
+  }
+  #playground-root {
+    position: unset;
+    width: 100%;
+  }
+}
+
+@media not (max-width: 650px) {
+  #playground-root {
+    top: 20px;
+  }
+  @media not (max-height: 550px) {
+    #playground-root {
+      top: 92px;
+    }
+  }
 }
 
 #intro {

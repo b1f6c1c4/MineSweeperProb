@@ -76,9 +76,7 @@ export default function Game(props) {
     const [mode, setMode] = useState(null);
     const modeRef = useRef(mode);
     modeRef.current = mode;
-    const [canceller, setCanceller] = useState(undefined);
-    const cancellerRef = useRef(canceller);
-    cancellerRef.current = canceller;
+    const cancellerRef = useRef(undefined);
 
     // could be inside setTimeout
     function onUpdate(json, isRedo, noSolve) {
@@ -169,7 +167,7 @@ export default function Game(props) {
         setHasBest(false);
         if (cancellerRef.current) {
             clearTimeout(cancellerRef.current);
-            setCanceller(undefined);
+            cancellerRef.current = undefined;
         }
         setMode(null);
         const cfg = module.parse(config);
@@ -356,19 +354,19 @@ export default function Game(props) {
             setMode('semi');
             // could be inside setTimeout
             const foo = () => {
-                setCanceller(undefined);
+                cancellerRef.current = undefined;
                 const next = gameMgrRef.current.semiAutomaticStep(module.SolvingState.SEMI, true, true);
                 push();
                 onUpdate();
                 if (next)
-                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speedRef.current)));
+                    cancellerRef.current = setTimeout(foo, Math.pow(10, 3 + speedRef.current));
                 else
                     setMode(null);
             };
             foo();
         } else {
-            clearTimeout(canceller);
-            setCanceller(undefined);
+            clearTimeout(cancellerRef.current);
+            cancellerRef.current = undefined;
             setMode(null);
         }
     }
@@ -391,17 +389,17 @@ export default function Game(props) {
             setMode('auto');
             // could be inside setTimeout
             const foo = () => {
-                setCanceller(undefined);
+                cancellerRef.current = undefined;
                 onStep();
                 if (gameMgrRef.current.started)
-                    setCanceller(setTimeout(foo, Math.pow(10, 3 + speedRef.current)));
+                    cancellerRef.current = setTimeout(foo, Math.pow(10, 3 + speedRef.current));
                 else if (!isAutoRestartRef.current)
                     setMode(null);
             };
             foo();
         } else {
             clearTimeout(cancellerRef.current);
-            setCanceller(undefined);
+            cancellerRef.current = undefined;
             setMode(null);
         }
     }

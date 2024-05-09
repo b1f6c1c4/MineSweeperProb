@@ -94,10 +94,10 @@ export default function Control(props) {
     const textUndo = isExternal && !enableAI ? 'Clear' : 'Undo';
     const intentRestart = isManual ? 'warning' : isGameOver ? isWon ? 'success' : 'danger' : undefined;
     const textRestart = isManual ? 'Reload' : 'New game';
-    const textStep = isExternal ? 'Solve' : 'AI-step';
-    const tooltipDrain = drainable
-        ? 'Analyze all possible solutions and find the optimal click sequence'
-        : 'Only available when there are fewer than 256 possible solutions';
+    const tooltipDrain = isDrain ? 'Check blocks for probabilities'
+        : !drainable ? 'Disabled when solutions > 256'
+        : hasBest ? 'Open the safe blocks first'
+        : 'Find the optimal clicks';
 
     if (dim.width <= width * 19.3 + 446)
         return (
@@ -145,7 +145,7 @@ export default function Control(props) {
                 </ControlGroup>
                 {(enableAI && !isDraining) && (
                     <ControlGroup>
-                        <Tooltip content={textStep} position="bottom">
+                        <Tooltip content={isExternal ? 'Solve' : 'AI single-step'} position="bottom">
                             <Button disabled={disabledStep} icon="target" intent="primary" onClick={onStep}
                                     onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
                         </Tooltip>
@@ -181,7 +181,7 @@ export default function Control(props) {
                         <ButtonGroup>
                             <Tooltip content={tooltipDrain} placement="bottom-end">
                                 <Button active={isDrain} icon="layout-balloon" intent={drainable ? 'danger' : undefined}
-                                        disabled={!drainable || mode !== null} onClick={onDrainAlert} />
+                                        disabled={!drainable || mode !== null || hasBest} onClick={onDrainAlert} />
                             </Tooltip>
                         </ButtonGroup>
                     </ControlGroup>
@@ -208,7 +208,7 @@ export default function Control(props) {
         </Tooltip>);
     const stepButton = (
         <ControlGroup fill>
-            <Button disabled={disabledStep} text={textStep} onClick={onStep}
+            <Button disabled={disabledStep} text={isExternal ? 'Solve' : 'AI Step'} onClick={onStep}
                     icon="target" intent="primary" className="growing" fill
                     onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
             <Tooltip content="Lock to check, unlock to dig" position="top">

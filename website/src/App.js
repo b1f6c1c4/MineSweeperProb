@@ -13,6 +13,7 @@ import {
     NumericInput,
     Spinner,
     Switch,
+    Tooltip,
 } from "@blueprintjs/core";
 
 const moduleLoader = window.MineSweeperSolver({ locateFile: () => 'MineSweeperSolver.wasm' });
@@ -205,7 +206,7 @@ export default function App(props) {
     }
 
     return (
-        <Card elevation={Elevation.TWO} className="control">
+        <Card elevation={Elevation.TWO} className="control app">
             <h3>Showcase &amp; Playground</h3>
             <Switch checked={isExternal} onChange={onSetExt}
                 labelElement="Mode"
@@ -243,40 +244,44 @@ export default function App(props) {
                         value={cfg.totalMines} />
                 </FormGroup>
                 </>)}
-            {isExternal && (<>
-                <h4>External Mode</h4>
-                <p>Choose this option if you wish to analyze an existing Minesweeper game, instead of starting a new one.</p>
-                </>)}
             {!isExternal && (
                 <Switch checked={isSNR} onChange={onSetSNR}
                     labelElement={'Rule'}
                     innerLabelChecked="SNR" innerLabel="SFAR"
                     alignIndicator={Alignment.RIGHT} />
                 )}
-            {!isExternal && !isSNR && (<>
-                <h4>Single First Action Rule</h4>
-                <p>Your first click is guaranteed to be safe.
-                This is the default behavior for the old Microsoft Minesweeper game
-                as well as many competitive Minesweeper games.</p>
-                </>)}
-            {!isExternal && isSNR && (<>
-                <h4>Single Neighborhood Rule</h4>
-                <p>Your first click is guaranteed to be safe.
-                Furthermore, all immediate neighbors of your first click is also safe.
-                This is the default behavior for newer Microsoft Minesweeper.</p>
-                </>)}
+            <div className="description">
+                {isExternal && (<>
+                    <h4>External Mode</h4>
+                    <p>Choose this option if you wish to analyze an existing Minesweeper game, instead of starting a new one.</p>
+                    </>)}
+                {!isExternal && !isSNR && (<>
+                    <h4>Single First Action Rule</h4>
+                    <p>Your first click is guaranteed to be safe.
+                    This is the default behavior for the old Microsoft Minesweeper game
+                    as well as many competitive Minesweeper games.</p>
+                    </>)}
+                {!isExternal && isSNR && (<>
+                    <h4>Single Neighborhood Rule</h4>
+                    <p>Your first click is guaranteed to be safe.
+                    Furthermore, all immediate neighbors of your first click is also safe.
+                    This is the default behavior for newer Microsoft Minesweeper.</p>
+                    </>)}
+            </div>
             <br />
             <ControlGroup vertical>
                 {module ? (
                     <ButtonGroup>
-                        <Button disabled={!ready} icon="play" className="growing"
-                        intent="primary" text="Play" onClick={onStart} />
+                        <Tooltip content={ready ? '' : 'Select board first'}>
+                            <Button disabled={!ready} icon="play" className="growing"
+                                intent="primary" text="New Game" onClick={onStart} />
+                        </Tooltip>
                     </ButtonGroup>
                 ) : (
                     <Spinner intent="primary" />
                 )}
             </ControlGroup>
-            <h4>Load game</h4>
+            <h4>Load saved game</h4>
             <FileInput text="Choose file..." onInputChange={onLoad}
                 fill inputProps={{ accept: 'application/json' }} />
         </Card>
