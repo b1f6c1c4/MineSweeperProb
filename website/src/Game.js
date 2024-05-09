@@ -13,6 +13,7 @@ import {
 export default function Game(props) {
     const {
         module,
+        isManual,
         isExternal,
         width,
         height,
@@ -142,7 +143,12 @@ export default function Game(props) {
     }
 
     // could be inside setTimeout
-    function onRestart() {
+    function onRestart(isFirst) {
+        if (isFirst !== true) // invoked with event => false
+            isFirst = false;
+        if (isManual) // always load the same
+            isFirst = true;
+
         if (gameMgrRef.current)
             gameMgrRef.current.delete();
         if (historyRef.current)
@@ -150,14 +156,14 @@ export default function Game(props) {
         const m = modeRef.current;
         if (isExternal)
             setEnableAI(true);
-        setIsSettled(!!loadedGame);
+        setIsSettled(!!loadedGame && isFirst);
         setIsDrain(false);
         setIsDraining(false);
         setIsGameOver(false);
         setIsWon(false);
-        setOverlay(loadedOverlay || []);
-        setFlagging(loadedFlags || []);
-        setTotalFlagged((loadedFlags ?? []).reduce((a,v) => v ? ++a : a, 0));
+        setOverlay((isFirst && loadedOverlay) || []);
+        setFlagging((isFirst && loadedFlags) || []);
+        setTotalFlagged(isFirst ? (loadedFlags ?? []).reduce((a,v) => v ? ++a : a, 0) : 0);
         setHasBest(false);
         if (cancellerRef.current) {
             clearTimeout(cancellerRef.current);
@@ -167,8 +173,8 @@ export default function Game(props) {
         const cfg = module.parse(config);
         module.cache(cfg.width, cfg.height, cfg.totalMines);
         let mgr;
-        if (loadedGame) {
-            mgr = module.importGame(atob(loadedGame), cfg);
+        if (isFirst && loadedGame) {
+            mgr = module.importGame(loadedGame, cfg);
             setTimeout(onUpdate, 10);
         } else if (isExternal) {
             mgr = new module.GameMgr(cfg.width, cfg.height, cfg.totalMines, cfg);
@@ -206,7 +212,7 @@ export default function Game(props) {
     }
 
     useEffect(() => {
-        onRestart();
+        onRestart(true);
         return () => {
             if (gameMgrRef.current) {
                 gameMgrRef.current.delete();
@@ -217,15 +223,6 @@ export default function Game(props) {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [config, loadedGame, loadedFlags, loadedOverlay]);
-
-    useEffect(() => {
-        const r = () => {
-            if (document.visibilityState === 'hidden')
-                onPersist(btoa(module.exportGame(gameMgrRef.current)));
-        };
-        window.addEventListener('visibilitychange', r);
-        return () => window.removeEventListener('visibilitychange', r);
-    }, []);
 
     function onRotate(row, col) {
         const ov = [...overlay];
@@ -278,6 +275,8 @@ export default function Game(props) {
 
     // could be inside setTimeout
     function push(f, fake) {
+        if (!(isManual && loadedGame))
+            onPersist(persist());
         historyRef.current.push(gameMgrRef.current, JSON.stringify({
             f: f || flaggingRef.current,
             o: overlayRef.current,
@@ -473,19 +472,22 @@ export default function Game(props) {
         setEnableAI(getValue(e, enableAI));
     }
 
-    function onDownload() {
-        const json = JSON.stringify({
+    function persist() {
+        return {
             isExternal,
             width,
             height,
             totalMines,
             strategy,
             config,
-            loadedGame: btoa(module.exportGame(gameMgr)),
+            loadedGame: module.exportGame(gameMgr),
             loadedFlags: flagging,
             loadedOverlay: overlay,
-        });
-        const blob = new Blob([json], { type: 'application/json' });
+        };
+    }
+
+    function onDownload() {
+        const blob = new Blob([JSON.stringify(persist())], { type: 'application/json' });
         const link = document.createElement('a');
 
         link.download = 'game.json';
@@ -570,10 +572,10 @@ export default function Game(props) {
                 isDraining,
                 isExternal,
                 isGameOver,
+                isManual: isManual && loadedGame,
                 isReady,
                 isSettled,
                 isWon,
-                loadedGame,
                 mode,
                 onAuto,
                 onAutoAll,

@@ -23,19 +23,21 @@ export default function App(props) {
     const [isSNR, setIsSNR] = useState(false);
     const [isExternal, setIsExternal] = useState(false);
     const [isStarted, setStarted] = useState(false);
-    const [loadedGame, setLoadedGame] = useState(undefined);
+    const [loaded, setLoaded] = useState(undefined);
+    const [isManual, setIsManual] = useState(false);
 
     useEffect(() => {
         const r = (e) => {
             if (!e.state) {
                 setStarted(false);
-                setLoadedGame(undefined);
+                setLoaded(undefined);
             } else {
                 setCfg(e.state.cfg);
                 setIsSNR(e.state.isSNR);
                 setIsExternal(e.state.isExternal);
-                setLoadedGame(e.state.loadedGame);
-                setStarted(e.state.start);
+                setLoaded(e.state.loaded);
+                setIsManual(e.state.isManual);
+                setStarted(e.state.isStarted);
             }
         };
         moduleLoader.then((module) => {
@@ -69,11 +71,11 @@ export default function App(props) {
     function onSetCfg(c) {
         setCfg(c);
         window.history.replaceState({
-            start: false,
+            isStarted: false,
             cfg: c,
             isSNR,
             isExternal,
-            loadedGame,
+            loaded,
         }, '', '/');
     }
 
@@ -81,11 +83,11 @@ export default function App(props) {
         const c = e.currentTarget.checked;
         setIsExternal(c);
         window.history.replaceState({
-            start: false,
+            isStarted: false,
             cfg,
             isSNR,
             isExternal: c,
-            loadedGame,
+            loaded,
         }, '', '/');
     }
 
@@ -93,45 +95,44 @@ export default function App(props) {
         const c = e.currentTarget.checked;
         setIsSNR(c);
         window.history.replaceState({
-            start: false,
+            isStarted: false,
             cfg,
             isSNR: c,
             isExternal,
-            loadedGame,
+            loaded,
         }, '', '/');
     }
 
     function onStart() {
         window.history.pushState({
-            start: true,
+            isStarted: true,
             cfg,
             isSNR,
             isExternal,
-            loadedGame,
+            loaded,
         }, '', '#game');
         setStarted(true);
     }
 
     function onStop() {
         window.history.pushState({
-            start: false,
+            isStarted: false,
             cfg,
             isSNR,
             isExternal,
         }, '', '/');
         setStarted(false);
-        setLoadedGame(undefined);
+        setLoaded(undefined);
     }
 
     function onPersist(g) {
-        console.dir('saving');
-        console.dir(g);
         window.history.replaceState({
-            start: true,
+            isStarted: true,
             cfg,
             isSNR,
             isExternal,
-            loadedGame: g,
+            loaded: g,
+            isManual,
         }, '', '#game');
     }
 
@@ -148,7 +149,8 @@ export default function App(props) {
     }
 
     async function onLoad(e) {
-        setLoadedGame(JSON.parse(await e.target.files[0].text()));
+        setLoaded(JSON.parse(await e.target.files[0].text()));
+        setIsManual(true);
         onStart();
     }
 
@@ -176,11 +178,12 @@ export default function App(props) {
             return (
                 <pre>TODO</pre>
             );
-        } else if (loadedGame) {
+        } else if (loaded) {
             return (
                 <Game
                     module={module}
-                    {...loadedGame}
+                    isManual={isManual}
+                    {...loaded}
                     onStop={onStop}
                     onPersist={onPersist}
                 />);
@@ -188,6 +191,7 @@ export default function App(props) {
             return (
                 <Game
                     module={module}
+                    isManual={isManual}
                     isExternal={isExternal}
                     width={cfg.width}
                     height={cfg.height}
@@ -204,7 +208,7 @@ export default function App(props) {
         <Card elevation={Elevation.TWO} className="control">
             <h3>Showcase &amp; Playground</h3>
             <Switch checked={isExternal} onChange={onSetExt}
-                labelElement={'Mode'}
+                labelElement="Mode"
                 innerLabelChecked="Analyze" innerLabel="New Game"
                 alignIndicator={Alignment.RIGHT} />
             <FormGroup label="Board" inline>

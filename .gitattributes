@@ -1,6 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
+base64.hpp vendor linguist-vendored
+
 # Custom for Visual Studio
 *.cs     diff=csharp
 

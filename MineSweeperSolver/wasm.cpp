@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "base64.hpp"
 #include "BinomialHelper.h"
 #include "GameMgr.h"
 #include "random.h"
@@ -36,11 +37,13 @@ void cache(int w, int h, int m) {
 std::string exportGame(const GameMgr &m) {
     std::stringstream ss;
     m.Save(ss);
-    return ss.str();
+    auto s = ss.str();
+    return base64::to_base64(s);
 }
 
-auto importGame(const std::string &s, Strategy st) {
-    std::stringstream ss{ s };
+auto importGame(const std::string &b, Strategy st) {
+    auto s = base64::from_base64(b);
+    std::stringstream ss{ std::move(s) };
     return GameMgr{ ss, st };
 }
 
@@ -67,7 +70,9 @@ public:
         std::cerr << " ptr = " << ptr << "\n";
 #endif
         memo.resize(ptr++);
-        memo.emplace_back(exportGame(m), std::move(aux));
+        std::stringstream ss;
+        m.Save(ss);
+        memo.emplace_back(ss.str(), std::move(aux));
 #ifndef NDEBUG
         std::cerr << " sz = " << memo.size() << "\n";
         std::cerr << " ptr = " << ptr << "\n";
@@ -117,7 +122,8 @@ private:
 
     std::string revert(GameMgr &m, size_t n) const {
         auto &mo = memo[n];
-        m = importGame(mo.first, st);
+        std::stringstream ss{ mo.first };
+        m = GameMgr{ ss, st };
         return mo.second;
     }
 };

@@ -26,10 +26,10 @@ export default function Control(props) {
         isDraining,
         isExternal,
         isGameOver,
+        isManual,
         isReady,
         isSettled,
         isWon,
-        loadedGame,
         mode,
         onAuto,
         onAutoAll,
@@ -90,7 +90,8 @@ export default function Control(props) {
     const disableAuto = !gameMgr || isGameOver || (mode !== null && mode !== 'auto');
     const disableAutoE = !gameMgr || isGameOver || mode !== null;
     const textUndo = isExternal && !enableAI ? 'Clear' : 'Undo';
-    const intentRestart = isGameOver ? isWon ? 'success' : 'danger' : undefined;
+    const intentRestart = isManual ? 'warning' : isGameOver ? isWon ? 'success' : 'danger' : undefined;
+    const textRestart = isManual ? 'Reload' : 'New game';
     const textStep = isExternal ? 'Solve' : 'Single step';
     const tooltipDrain = drainable
         ? 'Analyze all possible solutions and find the optimal click sequence'
@@ -104,7 +105,7 @@ export default function Control(props) {
                         <Tooltip content="Close" position="top">
                             <Button disabled={disabledGeneral} icon="arrow-left" onClick={onStop} />
                         </Tooltip>
-                        <Tooltip content="Restart" position="top" intent={intentRestart}>
+                        <Tooltip content={textRestart} position="top" intent={intentRestart}>
                             <Button disabled={disabledGeneral} icon="refresh" intent={intentRestart} onClick={onRestart} />
                         </Tooltip>
                     </ButtonGroup>
@@ -206,13 +207,13 @@ export default function Control(props) {
 
     return (
         <Card elevation={Elevation.TWO} className="control" compact={short}>
-            {!short && (<h3>Game Control{loadedGame ? ' (loaded)' : ''}</h3>)}
+            {!short && (<h3>Game Control{isManual ? ' (loaded)' : ''}</h3>)}
             <ControlGroup vertical>
                 <ButtonGroup>
                     <Button disabled={disabledGeneral} icon="cross"
                             className="growing" text="Close" onClick={onStop} />
                     <Button disabled={disabledGeneral} rightIcon="refresh" intent={intentRestart}
-                            className="growing" text="Restart" onClick={onRestart} />
+                            className="growing" text={textRestart} onClick={onRestart} />
                 </ButtonGroup>
                 <ButtonGroup>
                     <Button disabled={disabledUndo} icon="undo"
