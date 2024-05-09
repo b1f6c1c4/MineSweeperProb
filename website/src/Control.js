@@ -28,6 +28,7 @@ export default function Control(props) {
         isGameOver,
         isManual,
         isReady,
+        isSearching,
         isSettled,
         isWon,
         mode,
@@ -37,6 +38,7 @@ export default function Control(props) {
         onDrainAlert,
         onRedo,
         onRestart,
+        onSearching,
         onSemi,
         onSemiAll,
         onSemiEvery,
@@ -92,7 +94,7 @@ export default function Control(props) {
     const textUndo = isExternal && !enableAI ? 'Clear' : 'Undo';
     const intentRestart = isManual ? 'warning' : isGameOver ? isWon ? 'success' : 'danger' : undefined;
     const textRestart = isManual ? 'Reload' : 'New game';
-    const textStep = isExternal ? 'Solve' : 'Single step';
+    const textStep = isExternal ? 'Solve' : 'AI-step';
     const tooltipDrain = drainable
         ? 'Analyze all possible solutions and find the optimal click sequence'
         : 'Only available when there are fewer than 256 possible solutions';
@@ -136,11 +138,15 @@ export default function Control(props) {
                             </Tooltip>
                         </ButtonGroup>
                     )}
+                    <Tooltip content="Lock to check, unlock to dig" position="top">
+                        <Button icon={isSearching ? 'lock' : 'unlock'} onClick={onSearching}
+                            intent={isSearching ? 'primary' : 'warning'} disabled={disabledGeneral} />
+                    </Tooltip>
                 </ControlGroup>
                 {(enableAI && !isDraining) && (
                     <ControlGroup>
                         <Tooltip content={textStep} position="bottom">
-                            <Button disabled={disabledStep} icon="hand-up" intent="primary" onClick={onStep}
+                            <Button disabled={disabledStep} icon="target" intent="primary" onClick={onStep}
                                     onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
                         </Tooltip>
                         <ButtonGroup className="short-btns">
@@ -201,9 +207,15 @@ export default function Control(props) {
             </FormGroup>
         </Tooltip>);
     const stepButton = (
-        <Button disabled={disabledStep} text={textStep} onClick={onStep}
-                icon="hand-up" intent="primary" className="growing" fill
-                onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />);
+        <ControlGroup fill>
+            <Button disabled={disabledStep} text={textStep} onClick={onStep}
+                    icon="target" intent="primary" className="growing" fill
+                    onMouseEnter={() => setIsStepHover(true)} onMouseLeave={() => setIsStepHover(false)} />
+            <Tooltip content="Lock to check, unlock to dig" position="top">
+                <Button icon={isSearching ? 'lock' : 'unlock'} onClick={onSearching}
+                    intent={isSearching ? 'primary' : 'warning'} disabled={disabledGeneral} />
+            </Tooltip>
+        </ControlGroup>);
 
     return (
         <Card elevation={Elevation.TWO} className="control" compact={short}>

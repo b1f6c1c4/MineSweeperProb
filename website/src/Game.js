@@ -56,6 +56,7 @@ export default function Game(props) {
     const [rate, setRate] = useState([1, 1]);
     const [toOpen, setToOpen] = useState(width * height - totalMines);
     const [hasBest, setHasBest] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
 
     // undefined or null: mutable; 'X': immutable;
     // 0~8: degree to be assigned; 'M': must be mine, 'E': must no mine
@@ -120,12 +121,13 @@ export default function Game(props) {
             setIsSettled(gameMgrRef.current.settled);
             setRate([gameMgrRef.current.bits, gameMgrRef.current.allBits]);
         }
-        if (enableAI && isAutoFlagRef.current && !json) {
+        if (!json) {
+            const af = enableAI && isAutoFlagRef.current;
             const next = [...flaggingRef.current];
             let tf = totalFlaggedRef.current;
             for (let i = 0; i < height; i++)
                 for (let j = 0; j < width; j++) {
-                    if (gameMgrRef.current.inferredStatusOf(j, i) === module.BlockStatus.MINE)
+                    if (af && gameMgrRef.current.inferredStatusOf(j, i) === module.BlockStatus.MINE)
                         if (!next[j * height + i]) {
                             next[j * height + i] = true;
                             tf++;
@@ -273,6 +275,10 @@ export default function Game(props) {
         setEnableAI(false);
     }
 
+    function onSearching() {
+        setIsSearching(!isSearching)
+    }
+
     // could be inside setTimeout
     function push(f, fake) {
         if (!(isManual && loadedGame))
@@ -294,6 +300,8 @@ export default function Game(props) {
     }
 
     function onFlag(row, col) {
+        if (gameMgr.blockPropertyOf(col, row).isOpen)
+            return;
         const f = [...flagging];
         if (f[col * height + row]) {
             delete f[col * height + row];
@@ -533,6 +541,7 @@ export default function Game(props) {
                     width={width}
                     height={height}
                     isExternal={isExternal}
+                    isSearching={isSearching}
                     isStarted={isSettled}
                     isGameOver={isGameOver}
                     isDrain={isDrain}
@@ -574,6 +583,7 @@ export default function Game(props) {
                 isGameOver,
                 isManual: isManual && loadedGame,
                 isReady,
+                isSearching,
                 isSettled,
                 isWon,
                 mode,
@@ -583,6 +593,7 @@ export default function Game(props) {
                 onDrainAlert,
                 onRedo,
                 onRestart,
+                onSearching,
                 onSemi,
                 onSemiAll,
                 onSemiEvery,

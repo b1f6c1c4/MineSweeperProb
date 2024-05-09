@@ -9,6 +9,7 @@
   gap: 4px;
   margin-bottom: 5px;
   min-width: fit-content;
+  user-select: none;
 }
 
 @media(max-height: 500px) {

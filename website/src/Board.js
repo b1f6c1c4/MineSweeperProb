@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import Block from './Block';
 import HeatBar from './HeatBar';
 
@@ -19,9 +19,15 @@ export default function Board(props) {
         enableAI,
         isLocked,
         isAuto,
+        isSearching,
         gameMgr,
     } = props;
     const [hoverId, setHoverId] = useState(undefined);
+
+    useEffect(() => {
+        if (!isSearching)
+            setHoverId(undefined);
+    }, [isSearching]);
 
     const body = [];
     const best = [], preferred = [];
@@ -72,6 +78,7 @@ export default function Board(props) {
             }
             const o = overlay[id];
             const xo = o !== null && o >= 0 && o <= 8;
+            const onLeft = !isLocked && (isSearching ? () => setHoverId(id) : onProbe);
             // Note: do NOT use {...property} as it won't work for getters
             row.push(<Block key={j}
                             row={i}
@@ -91,10 +98,10 @@ export default function Board(props) {
                             isDangerous={infer === module.BlockStatus.MINE}
                             isDrain={isDrain}
                             probability={rprob}
-                            onProbe={!isLocked && onProbe}
+                            onProbe={onLeft}
                             onFlag={!isLocked && onFlag}
-                            onHover={() => !isLocked && setHoverId(id)}
-                            onUnHover={() => !isLocked && setHoverId(undefined)}
+                            onHover={() => !isSearching && !isLocked && setHoverId(id)}
+                            onUnHover={() => !isSearching && !isLocked && setHoverId(undefined)}
             />);
         }
         body.push(<tr key={i}>{row}</tr>);
