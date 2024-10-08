@@ -133,7 +133,7 @@ EMSCRIPTEN_BINDINGS(mws) {
     function("parse", static_cast<Configuration (*)(const std::string &)>(&parse));
     function("cache", static_cast<void (*)(int, int, int)>(&cache));
     function("exportGame", &exportGame);
-    function("importGame", &importGame);
+    function("importGame", &importGame, return_value_policy::take_ownership());
     class_<History>("History")
         .constructor<Strategy>()
         .property("undoable", &History::undoable)
