@@ -185,6 +185,7 @@ EMSCRIPTEN_BINDINGS(mws) {
         .property("degree", &BlockProperty::Degree)
         .property("isOpen", &BlockProperty::IsOpen)
         .property("hasMine", &BlockProperty::IsMine)
+        .property("isRelevant2", &BlockProperty::IsRelevant2)
         ;
     register_vector<Block>("BlockSet");
     register_vector<double>("VectorDouble");

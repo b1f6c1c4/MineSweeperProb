@@ -1,4 +1,5 @@
 #include "GameMgr.h"
+#include "Strategies.h"
 #include "random.h"
 #include "BinomialHelper.h"
 #include "Drainer.h"
@@ -63,7 +64,10 @@ GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(
 
         for (auto &blk : m_Blocks)
             if (blk.IsOpen && !blk.IsMine && blk.Degree >= 0)
+            {
                 m_Solver->AddRestrain(m_BlocksR[blk.Index], blk.Degree);
+                UpdateRelevant2Info(blk.Index);
+            }
     }
 
     CacheBinomials(m_TotalWidth * m_TotalHeight, m_TotalMines);
@@ -186,6 +190,7 @@ const BlockProperty &GameMgr::SetBlockDegree(int x, int y, int degree)
     b.IsOpen = true;
     m_Solver->AddRestrain(m_BlocksR[id], degree);
     m_Solver->AddRestrain(id, false);
+    UpdateRelevant2Info(id);
     return b;
 }
 
@@ -356,7 +361,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             m_Preferred.push_back(i);
         }
 
-#define LARGEST(exp) Largest(m_Preferred, [this](Block blk) -> double { return exp; } )
+#define LARGEST(exp) Largest(m_Preferred, [this](Block blk) { return exp; } )
 
     for (auto heu : BasicStrategy.DecisionTree)
         switch (heu)
@@ -381,6 +386,9 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             break;
         case HeuristicMethod::MaxUpperBound:
             LARGEST(m_Solver->UpperBoundCondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
+            break;
+        case HeuristicMethod::Relevant2:
+            LARGEST(static_cast<int>(m_Blocks[blk].IsRelevant2));
             break;
         default:
             break;
@@ -730,6 +738,7 @@ void GameMgr::OpenBlockImpl(int id)
             m_Started = false;
             return;
         }
+    UpdateRelevant2Info(id);
 
     if (m_Solver->GetBlockStatus(id) == BlockStatus::Blank)
         --m_Solver->CanOpenForSure;
@@ -746,6 +755,17 @@ void GameMgr::OpenBlockImpl(int id)
     {
         m_Started = false;
         m_Succeed = true;
+    }
+}
+
+void GameMgr::UpdateRelevant2Info(int id)
+{
+    for (auto blk : m_BlocksR[id])
+    {
+        if (m_Blocks[blk].IsOpen)
+            continue;
+        for (auto b : m_BlocksR[blk])
+            m_Blocks[b].IsRelevant2 = true;
     }
 }
 

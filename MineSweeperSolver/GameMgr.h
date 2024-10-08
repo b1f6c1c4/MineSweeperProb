@@ -14,6 +14,7 @@ struct
     int Degree;
     bool IsOpen;
     bool IsMine;
+    bool IsRelevant2;
 };
 
 /* Bookkeeping the gaming process, store mine locations, report degree information to solvers.
@@ -100,6 +101,7 @@ private:
     void GenerateBlocksR();
     void SettleMines(int initID);
     void OpenBlockImpl(int id);
+    void UpdateRelevant2Info(int id);
 
     [[nodiscard]] int FrontierDist(Block blk) const;
 };

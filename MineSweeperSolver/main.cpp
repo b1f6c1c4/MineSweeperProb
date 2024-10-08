@@ -49,6 +49,9 @@ std::string to_string(const std::vector<HeuristicMethod> &dt) {
             case HeuristicMethod::MaxUpperBound:
                 str.push_back('U');
                 break;
+            case HeuristicMethod::Relevant2:
+                str.push_back('2');
+                break;
         }
     return str;
 }
@@ -214,7 +217,7 @@ void sig_empty(int signal) {
 int main(int argc, char *argv[]) {
     if (argc < 2 || argc > 4) {
         std::cout << "Usage: " << argv[0]
-                  << R"( [PSDF]L(@\[<I>,<J>\])?-(NH|Pure|[PZSEQFU]+)(-D<D>)?-<W>-<H>-T<M>-(SFAR|SNR) [<number> [<nprocs>]])"
+                  << R"( [PSDF]L(@\[<I>,<J>\])?-(NH|Pure|[PZSEQFU2]+)(-D<D>)?-<W>-<H>-T<M>-(SFAR|SNR) [<number> [<nprocs>]])"
                   << std::endl;
         return 2;
     }

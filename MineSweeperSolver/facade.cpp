@@ -97,6 +97,9 @@ Configuration parse(const char *hsh)
             case 'U':
                 st.DecisionTree.push_back(HeuristicMethod::MaxUpperBound);
                 break;
+            case '2':
+                st.DecisionTree.push_back(HeuristicMethod::Relevant2);
+                break;
             default:
                 break;
         }

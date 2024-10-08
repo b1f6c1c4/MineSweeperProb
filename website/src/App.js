@@ -162,7 +162,7 @@ export default function App(props) {
         strategy += '@[4,4]';
     else
         strategy += '@[3,3]';
-    strategy += '-PSEQ';
+    strategy += '-2PSEQ';
     strategy += '-D256';
     let config = strategy + `-${cfg.width}-${cfg.height}-T${cfg.totalMines}`;
     if (isSNR)
