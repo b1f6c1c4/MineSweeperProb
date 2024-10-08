@@ -2,6 +2,7 @@
 #include "stdafx.h"
 #include "Solver.h"
 #include "Drainer.h"
+#include <optional>
 #include <vector>
 #include <memory>
 #include "Strategies.h"
@@ -17,6 +18,17 @@ struct
     bool IsRelevant2;
 };
 
+template <typename T>
+struct EmptyCopyable : std::unique_ptr<T>
+{
+    EmptyCopyable() = default;
+    EmptyCopyable(std::unique_ptr<T> &&other) : std::unique_ptr<T>{ std::move(other) } { }
+    EmptyCopyable(const EmptyCopyable<T> &other) : std::unique_ptr<T>{} { }
+    EmptyCopyable(EmptyCopyable<T> &&other) noexcept = default;
+    auto &operator=(const EmptyCopyable<T> &other) noexcept { return *this; }
+    EmptyCopyable<T> &operator=(EmptyCopyable<T> &&other) = default;
+};
+
 /* Bookkeeping the gaming process, store mine locations, report degree information to solvers.
  * Use information from BasicSolver/Solver/Drainer to open corresponding blocks.
  */
@@ -27,6 +39,10 @@ public:
     GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess = false);
     GameMgr(int width, int height, int totalMines, Strategy strategy);
     GameMgr(std::istream &sr, Strategy strategy);
+    GameMgr(const GameMgr &) = default;
+    GameMgr(GameMgr &&) noexcept = default;
+    GameMgr &operator=(const GameMgr &) = default;
+    GameMgr &operator=(GameMgr &&) noexcept = default;
 
     Strategy BasicStrategy;
 
@@ -90,10 +106,10 @@ private:
     std::vector<BlockProperty> m_Blocks;
     std::vector<BlockSet> m_BlocksR; // each block's neighbor
     int m_ToOpen, m_WrongGuesses;
-    std::unique_ptr<Solver> m_Solver;
+    std::optional<Solver> m_Solver;
     double m_AllBits;
     BlockSet m_Best, m_Preferred;
-    std::unique_ptr<Drainer> m_Drainer;
+    EmptyCopyable<Drainer> m_Drainer;
     int m_LastProbe;
 
     [[nodiscard]] int GetIndex(int x, int y) const;

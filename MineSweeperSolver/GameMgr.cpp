@@ -9,9 +9,9 @@
 GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
-        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
+        m_Solver.emplace(m_TotalWidth * m_TotalHeight);
     else
-        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight, m_TotalMines);
+        m_Solver.emplace(m_TotalWidth * m_TotalHeight, m_TotalMines);
     GenerateBlocksR();
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
@@ -19,9 +19,9 @@ GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy str
 GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
 {
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || m_TotalMines == -1)
-        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
+        m_Solver.emplace(m_TotalWidth * m_TotalHeight);
     else
-        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight, m_TotalMines);
+        m_Solver.emplace(m_TotalWidth * m_TotalHeight, m_TotalMines);
     GenerateBlocksR();
     if (m_TotalMines == -1)
         m_AllBits = m_TotalWidth * m_TotalHeight;
@@ -45,9 +45,9 @@ GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(
     READ(m_LastProbe);
 
     if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || !m_TotalMines)
-        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight);
+        m_Solver.emplace(m_TotalWidth * m_TotalHeight);
     else
-        m_Solver = std::make_unique<Solver>(m_TotalWidth * m_TotalHeight, m_TotalMines);
+        m_Solver.emplace(m_TotalWidth * m_TotalHeight, m_TotalMines);
 
     GenerateBlocksR();
 
