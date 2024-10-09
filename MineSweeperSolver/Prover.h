@@ -1,62 +1,70 @@
 #pragma once
+#include "BasicSolver.h"
 #include "stdafx.h"
 #include "GameMgr.h"
 #include "BinomialHelper.h"
 #include <memory>
+#include <variant>
+
+struct BaseCase;
+using PCase = BaseCase *;
+using PGame = std::shared_ptr<GameMgr>;
 
 struct BaseCase
 {
-    explicit BaseCase(std::unique_ptr<GameMgr> &&game);
-    explicit BaseCase(std::shared_ptr<BaseCase> p);
+    BaseCase(PCase p, PGame game);
+    explicit BaseCase(PCase p);
+    virtual ~BaseCase() = default;
 
-    std::shared_ptr<BaseCase> parent;
-    double LogProbability;
+    PCase parent;
+    double TotalStates;
     int Duplication;
 
-    [[nodiscard]] GameMgr &Game();
+    [[nodiscard]] GameMgr &Game() { return *PGame(); }
+    [[nodiscard]] PGame PGame();
     BaseCase &Deflate();
 
+    virtual PCase Fork();
+
 private:
-    std::unique_ptr<GameMgr> m_Game;
-    std::string m_SavedGame;
+    std::variant<std::string, ::PGame> m_Game;
 };
 
-using PCase = std::shared_ptr<BaseCase>;
-
-struct ActionCase : BaseCase
+struct ForkedCase : BaseCase
 {
-    ActionCase(std::shared_ptr<BaseCase> p, int id)
-        : BaseCase{ p }, ActionId{ id } { }
+    ForkedCase(PCase p, ::PGame g, int id)
+        : BaseCase{ p, g }, Id{ id }, m_Degree{} { }
 
-    int ActionId;
+    int Id;
 
-    auto &Dist()
-    {
-        return Game().GetDistInfo(ActionId);
-    }
+    PCase Fork() override;
+
+private:
+    int m_Degree;
 };
 
-struct SafeCase : BaseCase
+struct ActionCase : ForkedCase
 {
-    SafeCase(std::shared_ptr<BaseCase> p, double lp)
-        : BaseCase{ p }
-    {
-        LogProbability += lp;
-    }
+};
 
-    auto &Dist()
-    {
-        return Game().GetDistInfo(Game().GetBestBlockList().front());
-    }
+struct SafeCase : ForkedCase
+{
+    SafeCase(PCase p, ::PGame g)
+        : ForkedCase{ p, g, g->GetBestBlockList().front() } { }
 };
 
 struct UnsafeCase : BaseCase
 {
-    UnsafeCase(std::shared_ptr<BaseCase> p, double lp)
-        : BaseCase{ p }
+    UnsafeCase(PCase p, ::PGame g)
+        : BaseCase{ p, g }
     {
-        LogProbability += lp;
+        Duplication = g->GetPreferredBlockCount();
     }
 
-    std::map<int, std::shared_ptr<ActionCase>> Actions;
+    PCase Fork() override;
+
+    std::map<int, ActionCase *> Actions;
+
+private:
+    BlockSet::const_iterator m_It;
 };

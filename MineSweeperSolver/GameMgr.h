@@ -66,6 +66,7 @@ public:
 
     [[nodiscard]] const BlockProperty &GetBlockProperty(int x, int y) const;
     const BlockProperty &SetBlockDegree(int x, int y, int degree);
+    const BlockProperty &SetBlockDegree(int id, int degree);
     const BlockProperty &SetBlockMine(int x, int y, bool mined);
     [[nodiscard]] const BlockProperty *GetBlockProperties() const;
     [[nodiscard]] double GetBlockProbability(int x, int y) const;

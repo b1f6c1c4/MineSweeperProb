@@ -182,9 +182,13 @@ const BlockProperty &GameMgr::GetBlockProperty(int x, int y) const
 
 const BlockProperty &GameMgr::SetBlockDegree(int x, int y, int degree)
 {
+    return SetBlockDegree(GetIndex(x, y), degree);
+}
+
+const BlockProperty &GameMgr::SetBlockDegree(int id, int degree)
+{
     if (!m_IsExternal)
         throw std::runtime_error("only external games can be modified");
-    auto id = GetIndex(x, y);
     auto &b = m_Blocks[id];
     b.Degree = degree;
     b.IsOpen = true;

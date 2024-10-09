@@ -10,40 +10,65 @@
 
 Strategy g_Strategy;
 
-BaseCase::BaseCase(std::unique_ptr<GameMgr> &&game)
-    : parent{},
-      LogProbability{},
-      Duplication{},
-      m_Game{ std::move(game) },
-      m_SavedGame{} { }
-
-BaseCase::BaseCase(std::shared_ptr<BaseCase> p)
+BaseCase::BaseCase(PCase p)
     : parent{ p },
-      LogProbability{ p->LogProbability },
+      TotalStates{ p->TotalStates },
       Duplication{},
-      m_Game{},
-      m_SavedGame{} { }
+      m_Game{ p->m_Game } { }
 
-GameMgr &BaseCase::Game()
+BaseCase::BaseCase(PCase p, PGame game)
+    : parent{ p },
+      TotalStates{ game->GetSolver().GetTotalStates() },
+      Duplication{},
+      m_Game{ std::move(game) } { }
+
+PGame BaseCase::PGame()
 {
-    if (m_Game)
-        return *m_Game;
+    if (std::holds_alternative<PGame>(m_Game))
+        return std::get<PGame>(m_Game);
 
-    std::stringstream ss{ std::move(m_SavedGame) };
-    m_Game = std::make_unique<GameMgr>(ss, g_Strategy);
-    return *m_Game;
+    std::stringstream ss{ std::get<std::string>(std::move(m_Game)) };
+    m_Game = std::make_shared<GameMgr>(ss, g_Strategy);
+    return std::get<PGame>(m_Game);
 }
 
 BaseCase &BaseCase::Deflate()
 {
-    if (!m_Game)
+    if (std::holds_alternative<std::string>(m_Game))
         return *this;
 
     std::stringstream ss;
-    m_Game->Save(ss);
-    m_SavedGame = ss.str();
-    m_Game.reset();
+    std::get<GameMgr>(m_Game).Save(ss);
+    m_Game = ss.str();
     return *this;
+}
+
+PCase ForkedCase::Fork()
+{
+    while (m_Degree <= 8)
+    {
+        auto g = std::make_shared<GameMgr>(Game());
+        g->SetBlockDegree(Id, m_Degree++);
+        g->Solve(SolvingState::Heuristic, false);
+        auto ts = g->GetSolver().GetTotalStates();
+        if (!ts)
+            continue;
+        if (g->GetBestBlockCount())
+            return new SafeCase(this, g);
+        return new UnsafeCase(this, g);
+    }
+    return nullptr;
+}
+
+PCase UnsafeCase::Fork()
+{
+    auto &lst = Game().GetPreferredBlockList();
+    while (m_It != lst.end())
+    {
+        return new ActionCase(this, PGame(), *m_It);
+    }
+
+    return nullptr;
 }
 
 class ConcurrentPriorityQueue
@@ -55,17 +80,18 @@ class ConcurrentPriorityQueue
 
     struct Comparer
     {
-        bool operator()(const std::shared_ptr<BaseCase> &lhs,
-                const std::shared_ptr<BaseCase> &rhs) const
+        bool operator()(const PCase &lhs,
+                const PCase &rhs) const
         {
-            if (lhs->LogProbability > rhs->LogProbability)
+            if (lhs->TotalStates > rhs->TotalStates)
                 return true;
-            if (lhs->LogProbability < rhs->LogProbability)
+            if (lhs->TotalStates < rhs->TotalStates)
                 return false;
             return lhs->Duplication < rhs->Duplication;
         }
     };
 
+public:
     void push(PCase p)
     {
         {
@@ -78,11 +104,10 @@ class ConcurrentPriorityQueue
         cv.notify_one();
     }
 
-public:
     template <typename T, typename ... Args>
     void emplace(Args && ... args)
     {
-        push(std::make_shared<T>(std::forward<Args>(args)...));
+        push(new T(std::forward<Args>(args)...));
     }
 
     void finish()
@@ -119,32 +144,15 @@ int main(int argc, char *argv[]) {
     g_Strategy = cfg;
 
     ConcurrentPriorityQueue queue{};
-    auto root = std::make_shared<BaseCase>(cfg);
-    std::make_unique<GameMgr(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy);
+    auto root = new BaseCase(cfg,
+        GameMgr(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy));
 
     queue.emplace<ActionCase>(root, cfg.Index);
 
     PCase p;
     while ((p = queue.pop()))
     {
-        auto &g = p->Game();
-        if (auto ac = dynamic_cast<ActionCase *>(p.get()); ac)
-        {
-            auto &d = ac->Dist();
-            if (d[0])
-                queue.emplace<SafeCase>(ac, std::log(d[0]));
-            for (auto i = 1; i <= 8; i++)
-                if (d[i])
-                    queue.emplace<UnsafeCase>(ac, std::log(d[0]));
-
-            continue;
-        }
-
-        if (auto sc = dynamic_cast<SafeCase *>(p.get()); sc)
-        {
-            auto &g = sc->Game();
-            auto id = g.GetBestBlockList().front();
-            auto &d = g.GetDistInfo(id);
-        }
+        for (PCase pp; pp = ac.Fork();)
+            queue.push(pp);
     }
 }
