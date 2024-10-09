@@ -47,3 +47,7 @@ else()
 endif()
 
 target_link_libraries(MineSweeperSolver PRIVATE mws)
+
+add_executable(MineSweeperProver Prover.cpp)
+target_link_libraries(MineSweeperProver PRIVATE mws)
+target_link_libraries(MineSweeperProver PRIVATE fmt)

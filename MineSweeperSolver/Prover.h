@@ -4,6 +4,7 @@
 #include "GameMgr.h"
 #include "BinomialHelper.h"
 #include <memory>
+#include <stdexcept>
 #include <variant>
 
 struct BaseCase;
@@ -14,25 +15,25 @@ struct BaseCase
 {
     BaseCase(PCase p, PGame game);
     explicit BaseCase(PCase p);
-    virtual ~BaseCase() = default;
+    virtual ~BaseCase();
 
     PCase parent;
     double TotalStates;
     int Duplication;
 
-    [[nodiscard]] GameMgr &Game() { return *PGame(); }
-    [[nodiscard]] PGame PGame();
+    [[nodiscard]] GameMgr &Game() { return *ThePGame(); }
+    [[nodiscard]] PGame ThePGame();
     BaseCase &Deflate();
 
-    virtual PCase Fork();
+    virtual PCase Fork() { throw std::logic_error{ "Do not call this" }; }
 
 private:
-    std::variant<std::string, ::PGame> m_Game;
+    std::variant<std::string, PGame> m_Game;
 };
 
 struct ForkedCase : BaseCase
 {
-    ForkedCase(PCase p, ::PGame g, int id)
+    ForkedCase(PCase p, PGame g, int id)
         : BaseCase{ p, g }, Id{ id }, m_Degree{} { }
 
     int Id;
@@ -45,18 +46,19 @@ private:
 
 struct ActionCase : ForkedCase
 {
+    using ForkedCase::ForkedCase;
 };
 
 struct SafeCase : ForkedCase
 {
-    SafeCase(PCase p, ::PGame g)
+    SafeCase(PCase p, PGame g)
         : ForkedCase{ p, g, g->GetBestBlockList().front() } { }
 };
 
 struct UnsafeCase : BaseCase
 {
-    UnsafeCase(PCase p, ::PGame g)
-        : BaseCase{ p, g }
+    UnsafeCase(PCase p, PGame g)
+        : BaseCase{ p, g }, m_It{ Game().GetPreferredBlockList().begin() }
     {
         Duplication = g->GetPreferredBlockCount();
     }

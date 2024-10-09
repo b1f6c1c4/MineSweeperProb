@@ -1,6 +1,7 @@
 #include "facade.hpp"
 #include "Prover.h"
 #include "GameMgr.h"
+#include <fmt/ranges.h>
 #include <algorithm>
 #include <condition_variable>
 #include <memory>
@@ -22,7 +23,9 @@ BaseCase::BaseCase(PCase p, PGame game)
       Duplication{},
       m_Game{ std::move(game) } { }
 
-PGame BaseCase::PGame()
+BaseCase::~BaseCase() = default;
+
+PGame BaseCase::ThePGame()
 {
     if (std::holds_alternative<PGame>(m_Game))
         return std::get<PGame>(m_Game);
@@ -38,7 +41,7 @@ BaseCase &BaseCase::Deflate()
         return *this;
 
     std::stringstream ss;
-    std::get<GameMgr>(m_Game).Save(ss);
+    std::get<PGame>(m_Game)->Save(ss);
     m_Game = ss.str();
     return *this;
 }
@@ -65,7 +68,7 @@ PCase UnsafeCase::Fork()
     auto &lst = Game().GetPreferredBlockList();
     while (m_It != lst.end())
     {
-        return new ActionCase(this, PGame(), *m_It);
+        return new ActionCase(this, ThePGame(), *m_It);
     }
 
     return nullptr;
@@ -134,6 +137,11 @@ public:
 };
 
 int main(int argc, char *argv[]) {
+    if (argc != 2)
+    {
+        std::cerr << "Usage: FL@[<I>,<J>]-(NH|2|P|2P)-<W>-<H>-T<M>-(SFAR|SNR)\n";
+        return 1;
+    }
     auto cfg = parse(argv[1]);
     if (!cfg.InitialPositionSpecified)
     {
@@ -144,15 +152,15 @@ int main(int argc, char *argv[]) {
     g_Strategy = cfg;
 
     ConcurrentPriorityQueue queue{};
-    auto root = new BaseCase(cfg,
-        GameMgr(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy));
+    auto root = new BaseCase(nullptr,
+        std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy));
 
-    queue.emplace<ActionCase>(root, cfg.Index);
+    queue.emplace<ActionCase>(root, root->ThePGame(), cfg.Index);
 
     PCase p;
     while ((p = queue.pop()))
     {
-        for (PCase pp; pp = ac.Fork();)
+        for (PCase pp; (pp = p->Fork());)
             queue.push(pp);
     }
 }
