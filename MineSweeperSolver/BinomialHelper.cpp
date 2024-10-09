@@ -2,9 +2,9 @@
 #include <vector>
 
 #ifndef __EMSCRIPTEN__
-#include "boost/thread/shared_mutex.hpp"
-#include "boost/thread/lock_types.hpp"
-static boost::shared_mutex mtx;
+#include <mutex>
+#include <shared_mutex>
+static std::shared_mutex mtx;
 #endif // __EMSCRIPTEN__
 
 static std::vector<std::vector<double>> BinomialCoeff;
@@ -23,8 +23,8 @@ extern "C" void CacheBinomials(int n, int m)
 
     {
 #ifndef __EMSCRIPTEN__
-        boost::shared_lock<boost::shared_mutex> lock(mtx);
-        boost::unique_lock<boost::shared_mutex> writeLock(mtx, boost::defer_lock);
+        std::shared_lock<std::shared_mutex> lock(mtx);
+        std::unique_lock<std::shared_mutex> writeLock(mtx, std::defer_lock);
 
 #define UPGRADE \
     do { \
@@ -87,7 +87,7 @@ extern "C" void CacheBinomials(int n, int m)
 double Binomial(int n, int m)
 {
 #ifndef __EMSCRIPTEN__
-    boost::shared_lock<boost::shared_mutex> lock(mtx, boost::defer_lock);
+    std::shared_lock<std::shared_mutex> lock(mtx, std::defer_lock);
 #endif // __EMSCRIPTEN__
 
     if (n < 0)
