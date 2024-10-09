@@ -1,14 +1,13 @@
+#include "BinomialHelper.h"
 #include "facade.hpp"
 #include "Prover.h"
 #include "GameMgr.h"
 #include <fmt/ostream.h>
-#include <algorithm>
+#include <fmt/ranges.h>
 #include <condition_variable>
-#include <memory>
-#include <queue>
-#include <mutex>
 #include <sstream>
-#include <variant>
+#include <stdexcept>
+#include <ranges>
 
 Strategy g_Strategy;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
@@ -48,6 +47,73 @@ BaseCase &BaseCase::Deflate()
     return *this;
 }
 
+bool HolderCase::Comparer::operator()(ActionCase *lhs, ActionCase *rhs) const
+{
+    return lhs->Danger < rhs->Danger;
+}
+
+void HolderCase::AddChildren(ActionCase *v)
+{
+    std::lock_guard lock{ mtx };
+    v->Handle = m_Heap.push(v);
+}
+
+void HolderCase::ReportDanger(ActionCase *self, double v)
+{
+    auto increase = 0.0;
+    if (!self)
+    {
+        increase = Danger = v; // initial danger prediction from UnsafeCase
+    }
+    else
+    {
+        std::lock_guard lock{ mtx };
+        self->Danger += v;
+
+#ifndef NDEBUG
+        fmt::print("[[[{}@{}+={}->{} in {}@{}]]]\n",
+                self->ToString(),
+                fmt::ptr(self),
+                v,
+                self->Danger,
+                ToString(),
+                fmt::ptr(this));
+#endif
+        m_Heap.increase(self->Handle);
+
+        auto next = m_Heap.top()->Danger;
+        increase = next - Danger;
+        Danger = next;
+    }
+
+    if (increase && parent)
+    {
+#ifndef NDEBUG
+        auto ac = dynamic_cast<ActionCase *>(parent);
+        if (!ac)
+            throw std::logic_error{ "Parent of ActionCase must be HolderCase!" };
+#else
+        auto ac = reinterpret_cast<ActionCase *>(parent);
+#endif
+        ac->ReportDanger(increase);
+    }
+}
+
+void ActionCase::ReportDanger(double v)
+{
+    if (!v)
+        return;
+#ifndef NDEBUG
+    auto hc = dynamic_cast<HolderCase *>(parent);
+    if (!hc)
+        throw std::logic_error{ "Parent of ActionCase must be HolderCase!" };
+#else
+    auto hc = reinterpret_cast<HolderCase *>(parent);
+#endif
+    hc->ReportDanger(this, v);
+}
+
+template <bool Ephermeral>
 PCase ForkedCase::Fork()
 {
     while (m_Degree <= 8)
@@ -57,9 +123,10 @@ PCase ForkedCase::Fork()
         g->Solve(HEUR, false);
         if (!g->GetStarted()) // infeasible
             continue;
+        auto p = Ephermeral ? parent : this;
         if (g->GetBestBlockCount())
-            return new SafeCase(this, g);
-        return new UnsafeCase(this, g);
+            return new SafeCase(p, g);
+        return new UnsafeCase(p, g);
     }
     return nullptr;
 }
@@ -69,7 +136,9 @@ PCase UnsafeCase::Fork()
     auto &lst = Game().GetPreferredBlockList();
     while (m_It != lst.end())
     {
-        return new ActionCase(this, ThePGame(), *m_It++);
+        auto ac = new ActionCase(this, ThePGame(), *m_It++);
+        AddChildren(ac);
+        return ac;
     }
 
     return nullptr;
@@ -77,7 +146,7 @@ PCase UnsafeCase::Fork()
 
 std::string BaseCase::ToString() const
 {
-    if (std::holds_alternative<std::string>(m_Game))
+    if (!std::holds_alternative<PGame>(m_Game))
         return fmt::format("[G=0x------ TS={:5e}]",
                 TotalStates);
     return fmt::format("[G={} TS={:5e}]",
@@ -92,6 +161,13 @@ std::string ForkedCase::ToString() const
             Id);
 }
 
+std::string HolderCase::ToString() const
+{
+    return fmt::format("{}[{}]",
+            BaseCase::ToString(),
+            fmt::join(std::views::transform(m_Heap, [](ActionCase *ac){ return ac->Danger; }), " "));
+}
+
 std::string ActionCase::ToString() const
 {
     return fmt::format("Action{}",
@@ -100,7 +176,7 @@ std::string ActionCase::ToString() const
 
 std::string SafeCase::ToString() const
 {
-    if (std::holds_alternative<std::string>(m_Game))
+    if (!std::holds_alternative<PGame>(m_Game))
         return fmt::format("Safe{}:S--",
                 ForkedCase::ToString());
     return fmt::format("Safe{}:S{}",
@@ -111,7 +187,7 @@ std::string SafeCase::ToString() const
 std::string UnsafeCase::ToString() const
 {
     return fmt::format("Unsafe{}:D{}",
-            BaseCase::ToString(),
+            HolderCase::ToString(),
             Duplication);
 }
 
@@ -154,12 +230,6 @@ public:
         cv.notify_one();
     }
 
-    template <typename T, typename ... Args>
-    void emplace(Args && ... args)
-    {
-        push(new T(std::forward<Args>(args)...));
-    }
-
     void finish()
     {
         {
@@ -199,21 +269,26 @@ int main(int argc, char *argv[]) {
     g_Strategy = cfg;
 
     ConcurrentPriorityQueue queue{};
-    auto root = new BaseCase(nullptr,
+    auto root = new HolderCase(nullptr,
         std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy));
-
-    queue.emplace<ActionCase>(root, root->ThePGame(), cfg.Index);
+    root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
+    auto ac = new ActionCase(root, root->ThePGame(), cfg.Index);
+    root->AddChildren(ac);
+    queue.push(ac);
 
     PCase p;
     while ((p = queue.pop()))
     {
-        fmt::print("Queue {}\n", queue.size());
+#ifndef NDEBUG
+        fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->GetDanger() / root->TotalStates);
         fmt::print("{1}  (@{0})\n",
                 reinterpret_cast<void *>(p),
                 p->ToString());
         std::cin.get();
+#endif
         for (PCase pp; (pp = p->Fork());)
         {
+#ifndef NDEBUG
             if (auto fc = dynamic_cast<ForkedCase *>(p); fc)
                 fmt::print("  >>{1}  (@{0}) *{2}\n",
                         reinterpret_cast<void *>(pp),
@@ -223,7 +298,12 @@ int main(int argc, char *argv[]) {
                 fmt::print("  >>{1}  (@{0})\n",
                         reinterpret_cast<void *>(pp),
                         pp->ToString());
+#endif
             queue.push(pp);
         }
+        if (dynamic_cast<SafeCase *>(p))
+            delete p;
+        else
+            p->Deplete();
     }
 }

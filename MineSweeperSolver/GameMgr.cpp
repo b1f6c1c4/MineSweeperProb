@@ -218,7 +218,12 @@ const BlockProperty *GameMgr::GetBlockProperties() const
 
 double GameMgr::GetBlockProbability(int x, int y) const
 {
-    return m_Solver->GetProbability(GetIndex(x, y));
+    return GetBlockProbability(GetIndex(x, y));
+}
+
+double GameMgr::GetBlockProbability(int id) const
+{
+    return m_Solver->GetProbability(id);
 }
 
 BlockStatus GameMgr::GetInferredStatus(int x, int y) const

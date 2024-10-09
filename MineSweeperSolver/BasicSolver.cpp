@@ -418,7 +418,8 @@ bool BasicSolver::ReduceRestrainMine(int row)
             {
                 m_MatrixAugment[j] -= (int)m_BlockSets[col].size();
                 sum[j] -= m_BlockSets[col].size();
-                ASSERT(m_MatrixAugment[j] >= 0);
+                if (m_MatrixAugment[j] < 0)
+                    throw Infeasible{};
             }
         for (auto blk : m_BlockSets[col])
         {

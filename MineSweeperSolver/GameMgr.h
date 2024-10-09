@@ -70,6 +70,7 @@ public:
     const BlockProperty &SetBlockMine(int x, int y, bool mined);
     [[nodiscard]] const BlockProperty *GetBlockProperties() const;
     [[nodiscard]] double GetBlockProbability(int x, int y) const;
+    [[nodiscard]] double GetBlockProbability(int id) const;
     [[nodiscard]] BlockStatus GetInferredStatus(int x, int y) const;
 
     [[nodiscard]] const Block *GetBestBlocks() const;
