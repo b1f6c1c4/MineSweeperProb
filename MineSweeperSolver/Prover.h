@@ -27,7 +27,9 @@ struct BaseCase
 
     virtual PCase Fork() { throw std::logic_error{ "Do not call this" }; }
 
-private:
+    virtual std::string ToString() const;
+
+protected:
     std::variant<std::string, PGame> m_Game;
 };
 
@@ -40,6 +42,10 @@ struct ForkedCase : BaseCase
 
     PCase Fork() override;
 
+    std::string ToString() const override;
+
+    auto GetDegree() const { return m_Degree; }
+
 private:
     int m_Degree;
 };
@@ -47,23 +53,30 @@ private:
 struct ActionCase : ForkedCase
 {
     using ForkedCase::ForkedCase;
+
+    std::string ToString() const override;
 };
 
 struct SafeCase : ForkedCase
 {
     SafeCase(PCase p, PGame g)
         : ForkedCase{ p, g, g->GetBestBlockList().front() } { }
+
+    std::string ToString() const override;
 };
 
 struct UnsafeCase : BaseCase
 {
     UnsafeCase(PCase p, PGame g)
-        : BaseCase{ p, g }, m_It{ Game().GetPreferredBlockList().begin() }
+        : BaseCase{ p, g },
+          m_It{ Game().GetPreferredBlockList().begin() }
     {
         Duplication = g->GetPreferredBlockCount();
     }
 
     PCase Fork() override;
+
+    std::string ToString() const override;
 
     std::map<int, ActionCase *> Actions;
 

@@ -1,15 +1,17 @@
 #include "facade.hpp"
 #include "Prover.h"
 #include "GameMgr.h"
-#include <fmt/ranges.h>
+#include <fmt/ostream.h>
 #include <algorithm>
 #include <condition_variable>
 #include <memory>
 #include <queue>
 #include <mutex>
 #include <sstream>
+#include <variant>
 
 Strategy g_Strategy;
+static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
 BaseCase::BaseCase(PCase p)
     : parent{ p },
@@ -52,9 +54,8 @@ PCase ForkedCase::Fork()
     {
         auto g = std::make_shared<GameMgr>(Game());
         g->SetBlockDegree(Id, m_Degree++);
-        g->Solve(SolvingState::Heuristic, false);
-        auto ts = g->GetSolver().GetTotalStates();
-        if (!ts)
+        g->Solve(HEUR, false);
+        if (!g->GetStarted()) // infeasible
             continue;
         if (g->GetBestBlockCount())
             return new SafeCase(this, g);
@@ -68,33 +69,79 @@ PCase UnsafeCase::Fork()
     auto &lst = Game().GetPreferredBlockList();
     while (m_It != lst.end())
     {
-        return new ActionCase(this, ThePGame(), *m_It);
+        return new ActionCase(this, ThePGame(), *m_It++);
     }
 
     return nullptr;
+}
+
+std::string BaseCase::ToString() const
+{
+    if (std::holds_alternative<std::string>(m_Game))
+        return fmt::format("[G=0x------ TS={:5e}]",
+                TotalStates);
+    return fmt::format("[G={} TS={:5e}]",
+            reinterpret_cast<void *>(std::get<PGame>(m_Game).get()),
+            TotalStates);
+}
+
+std::string ForkedCase::ToString() const
+{
+    return fmt::format("{}@{}",
+            BaseCase::ToString(),
+            Id);
+}
+
+std::string ActionCase::ToString() const
+{
+    return fmt::format("Action{}",
+            ForkedCase::ToString());
+}
+
+std::string SafeCase::ToString() const
+{
+    if (std::holds_alternative<std::string>(m_Game))
+        return fmt::format("Safe{}:S--",
+                ForkedCase::ToString());
+    return fmt::format("Safe{}:S{}",
+            ForkedCase::ToString(),
+            std::get<PGame>(m_Game)->GetBestBlockCount());
+}
+
+std::string UnsafeCase::ToString() const
+{
+    return fmt::format("Unsafe{}:D{}",
+            BaseCase::ToString(),
+            Duplication);
 }
 
 class ConcurrentPriorityQueue
 {
     std::vector<PCase> c;
     bool finished;
-    std::mutex mtx;
+    mutable std::mutex mtx;
     std::condition_variable cv;
 
     struct Comparer
     {
-        bool operator()(const PCase &lhs,
-                const PCase &rhs) const
+        // check if rhs is more important than lhs
+        bool operator()(const PCase &lhs, const PCase &rhs) const
         {
-            if (lhs->TotalStates > rhs->TotalStates)
+            if (rhs->TotalStates > lhs->TotalStates)
                 return true;
-            if (lhs->TotalStates < rhs->TotalStates)
+            if (rhs->TotalStates < lhs->TotalStates)
                 return false;
-            return lhs->Duplication < rhs->Duplication;
+            return rhs->Duplication > lhs->Duplication;
         }
     };
 
 public:
+    [[nodiscard]] auto size() const
+    {
+        std::lock_guard lock{ mtx };
+        return c.size();
+    }
+
     void push(PCase p)
     {
         {
@@ -160,7 +207,23 @@ int main(int argc, char *argv[]) {
     PCase p;
     while ((p = queue.pop()))
     {
+        fmt::print("Queue {}\n", queue.size());
+        fmt::print("{1}  (@{0})\n",
+                reinterpret_cast<void *>(p),
+                p->ToString());
+        std::cin.get();
         for (PCase pp; (pp = p->Fork());)
+        {
+            if (auto fc = dynamic_cast<ForkedCase *>(p); fc)
+                fmt::print("  >>{1}  (@{0}) *{2}\n",
+                        reinterpret_cast<void *>(pp),
+                        pp->ToString(),
+                        fc->GetDegree() - 1);
+            else
+                fmt::print("  >>{1}  (@{0})\n",
+                        reinterpret_cast<void *>(pp),
+                        pp->ToString());
             queue.push(pp);
+        }
     }
 }

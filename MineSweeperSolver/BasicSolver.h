@@ -24,22 +24,22 @@ struct Infeasible : std::runtime_error
     Infeasible() : std::runtime_error{ "infeasible" } { }
 };
 
-inline SolvingState operator&(SolvingState lhs, SolvingState rhs)
+constexpr inline SolvingState operator&(SolvingState lhs, SolvingState rhs)
 {
     return static_cast<SolvingState>(static_cast<int>(lhs) & static_cast<int>(rhs));
 }
 
-inline SolvingState operator|(SolvingState lhs, SolvingState rhs)
+constexpr inline SolvingState operator|(SolvingState lhs, SolvingState rhs)
 {
     return static_cast<SolvingState>(static_cast<int>(lhs) | static_cast<int>(rhs));
 }
 
-inline SolvingState operator&=(SolvingState &lhs, SolvingState rhs)
+constexpr inline SolvingState operator&=(SolvingState &lhs, SolvingState rhs)
 {
     return lhs = (lhs & rhs);
 }
 
-inline SolvingState operator|=(SolvingState &lhs, SolvingState rhs)
+constexpr inline SolvingState operator|=(SolvingState &lhs, SolvingState rhs)
 {
     return lhs = (lhs | rhs);
 }
