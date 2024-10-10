@@ -881,15 +881,11 @@ void BasicSolver::ProcessSolutions()
     {
         for (auto row = 0; row < m_MatrixAugment.size(); ++row)
         {
-#ifndef NDEBUG
             auto v = 0;
-#endif
             for (auto col = 0; col < m_BlockSets.size(); ++col)
                 if (NZ(m_Matrix[CNT(col)][row], SHF(col)))
                 {
-#ifndef NDEBUG
                     v += so.Dist[col];
-#endif
                     if (flags[col] == 0)
                         continue;
                     if (flags[col] & 1 && so.Dist[col] != 0)
@@ -897,7 +893,8 @@ void BasicSolver::ProcessSolutions()
                     if (flags[col] & 2 && so.Dist[col] != m_BlockSets[col].size())
                         flags[col] &= ~2;
                 }
-            ASSERT(m_MatrixAugment[row] == v);
+            if (m_MatrixAugment[row] != v)
+                throw Infeasible{};
         }
         so.States = double(1);
         for (auto i = 0; i < m_BlockSets.size(); ++i)

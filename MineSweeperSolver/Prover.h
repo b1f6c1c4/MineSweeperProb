@@ -15,6 +15,10 @@ struct BaseCase;
 using PCase = BaseCase *;
 using PGame = std::shared_ptr<GameMgr>;
 
+#ifndef NDEBUG
+#define TRACEBACK
+#endif
+
 struct BaseCase
 {
     BaseCase(PCase p, PGame game);
@@ -34,6 +38,12 @@ struct BaseCase
     virtual PCase Fork() = 0;
 
     virtual std::string ToString() const;
+
+#ifdef TRACEBACK
+    std::string Traceback;
+#else
+#define Traceback ""
+#endif
 
 protected:
     std::variant<std::monostate, std::string, PGame> m_Game;

@@ -2,27 +2,47 @@
 #include "facade.hpp"
 #include "Prover.h"
 #include "GameMgr.h"
+#include <exception>
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
+#include <sys/sysinfo.h>
 #include <condition_variable>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 #include <ranges>
+
+#include <fstream>
+
+#ifndef TRACEBACK
+#define Traceback ""
+#endif
 
 Strategy g_Strategy;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
+std::atomic<unsigned> g_MaxDepth;
+
+auto updateDepth(unsigned d)
+{
+    auto old = g_MaxDepth.load();
+    while (d > old)
+        if (g_MaxDepth.compare_exchange_weak(old, d))
+            break;
+    return d;
+}
+
 BaseCase::BaseCase(PCase p)
     : parent{ p },
       TotalStates{ p->TotalStates },
-      Depth{ p->Depth + 1 },
+      Depth{ updateDepth(p->Depth + 1) },
       Duplication{},
       m_Game{ p->m_Game } { }
 
 BaseCase::BaseCase(PCase p, PGame game)
     : parent{ p },
       TotalStates{ game->GetSolver().GetTotalStates() },
-      Depth{ p ? p->Depth + 1 : 0u },
+      Depth{ p ? updateDepth(p->Depth + 1) : 0u },
       Duplication{},
       m_Game{ std::move(game) } { }
 
@@ -140,9 +160,13 @@ PCase ForkedCase::Fork()
         if (g->GetSolver().GetTotalStates() == 1)
             continue; // guaranteed win
         auto p = Ephermeral ? parent : this;
-        if (g->GetBestBlockCount())
-            return new SafeCase(p, g);
-        return new UnsafeCase(p, g);
+        auto c = g->GetBestBlockCount()
+            ? static_cast<BaseCase *>(new SafeCase(p, g))
+            : new UnsafeCase(p, g);
+#ifdef TRACEBACK
+        c->Traceback = Traceback + fmt::format("{}", m_Degree - 1);
+#endif
+        return c;
     }
     return nullptr;
 }
@@ -155,7 +179,18 @@ PCase ActionCase::Fork()
         g->SetBlockMine(Id, false);
         g->Solve(HEUR, false);
         if (!g->GetStarted()) // infeasible at all
+        {
+            {
+                std::ofstream fout("/tmp/what");
+                Game().Save(fout);
+            }
+            fmt::print("Traceback::\n");
+            for (BaseCase *ptr = this; ptr; ptr = ptr->parent)
+                fmt::print("At {}\n",
+                        ptr->ToString());
+            fmt::print("=======\n");
             throw std::logic_error{ "All ActionCase should be feasible" };
+        }
         if (g->GetSolver().GetTotalStates() == 1)
             return nullptr; // guaranteed win
         m_Game = g;
@@ -212,23 +247,27 @@ std::string ActionCase::ToString() const
 std::string SafeCase::ToString() const
 {
     if (!std::holds_alternative<PGame>(m_Game))
-        return fmt::format("Safe{}",
-                ForkedCase::ToString());
-    return fmt::format("Safe{}:S{}",
+        return fmt::format("Safe{}~{}",
+                ForkedCase::ToString(),
+                Traceback);
+    return fmt::format("Safe{}~{}:S{}",
             ForkedCase::ToString(),
+            Traceback,
             std::get<PGame>(m_Game)->GetBestBlockCount());
 }
 
 std::string UnsafeCase::ToString() const
 {
-    return fmt::format("Unsafe{}:D{}",
+    return fmt::format("Unsafe{}~{}:D{}",
             HolderCase::ToString(),
+            Traceback,
             Duplication);
 }
 
 class ConcurrentPriorityQueue
 {
     std::vector<PCase> c;
+    bool initialized;
     size_t borrowed;
     mutable std::mutex mtx;
     std::condition_variable cv;
@@ -265,6 +304,13 @@ public:
         cv.notify_one();
     }
 
+    // call this when uploaded all seeding tasks
+    void inited()
+    {
+        std::lock_guard lock{ mtx };
+        initialized = true;
+    }
+
     // call this after pop()
     void finish()
     {
@@ -286,9 +332,9 @@ public:
     {
         std::unique_lock lock{ mtx };
         // wake me up if there are new tasks or task generation finished
-        cv.wait(lock, [this]{ return !borrowed || !c.empty(); });
+        cv.wait(lock, [this]{ return initialized && !borrowed || !c.empty(); });
         // check if task generation finished
-        if (!borrowed && c.empty())
+        if (initialized && !borrowed && c.empty())
             return {};
 
         borrowed++;
@@ -297,14 +343,41 @@ public:
         c.pop_back();
         return p;
     }
+
+    bool write_report(HolderCase *root) const
+    {
+        std::unique_lock lock{ mtx };
+        if (initialized && !borrowed && c.empty())
+            return false;
+
+        fmt::print("x{:10f}% curr~{:10f}%@d{}   q{} d{}\n",
+                100.0 * root->GetDanger() / root->TotalStates,
+                100.0 * c.front()->TotalStates / root->TotalStates,
+                c.front()->Depth,
+                c.size(),
+                g_MaxDepth.load());
+
+        return true;
+    }
 };
 
-int main(int argc, char *argv[]) {
-    if (argc != 2)
+int main(int argc, char *argv[])
+{
+    if (argc < 2 || argc > 3)
     {
-        std::cerr << "Usage: FL@[<I>,<J>]-(NH|2|P|2P)-<W>-<H>-T<M>-(SFAR|SNR)\n";
+        std::cout << "Usage: " << argv[0]
+            << R"(FL@\[<I>,<J>\]-(NH|2|P|2P)-<W>-<H>-T<M>-(SFAR|SNR) [<nprocs>])"
+            << std::endl;
         return 1;
     }
+
+#ifdef NDEBUG
+    const bool is_tty = isatty(STDERR_FILENO);
+    using namespace std::chrono_literals;
+    const auto report_interval = is_tty ? 5s : 60s;
+    auto nprocs = argc < 3 ? get_nprocs() : std::atoi(argv[2]);
+#endif
+
     auto cfg = parse(argv[1]);
     if (!cfg.InitialPositionSpecified)
     {
@@ -315,43 +388,63 @@ int main(int argc, char *argv[]) {
     g_Strategy = cfg;
 
     ConcurrentPriorityQueue queue{};
-    auto root = new HolderCase(nullptr,
-        std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy));
+    auto game = std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy);
+    auto root = new HolderCase(nullptr, game);
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
     auto ac = new ActionCase(root, root->ThePGame(), cfg.Index);
     root->AddChildren(ac);
     root->Deplete();
     queue.push(ac);
+    queue.inited();
 
-    PCase p;
-    while ((p = queue.pop()))
+#ifdef NDEBUG
+    std::vector<std::thread> threads;
+    threads.emplace_back([&]()
     {
-#ifndef NDEBUG
-        fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->GetDanger() / root->TotalStates);
-        fmt::print("{1}  (@{0})\n",
-                reinterpret_cast<void *>(p),
-                p->ToString());
-        std::cin.get();
-#endif
-        for (PCase pp; (pp = p->Fork());)
+        do
         {
-#ifndef NDEBUG
-            if (auto fc = dynamic_cast<ForkedCase *>(p); fc)
-                fmt::print("  >>{1}  (@{0}) *{2}\n",
-                        reinterpret_cast<void *>(pp),
-                        pp->ToString(),
-                        fc->GetDegree() - 1);
-            else
-                fmt::print("  >>{1}  (@{0})\n",
-                        reinterpret_cast<void *>(pp),
-                        pp->ToString());
+            std::this_thread::sleep_for(report_interval);
+        } while (queue.write_report(root));
+    });
+    for (auto i = 0; i < nprocs; i++)
+        threads.emplace_back([&]()
+        {
 #endif
-            queue.push(pp);
-        }
-        p->Deplete();
+            PCase p;
+            while ((p = queue.pop()))
+            {
+#ifndef NDEBUG
+                fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->GetDanger() / root->TotalStates);
+                fmt::print("{1}  (@{0})\n",
+                        reinterpret_cast<void *>(p),
+                        p->ToString());
+                std::cin.get();
+#endif
 
-        queue.finish();
-    }
+                for (PCase pp; (pp = p->Fork());)
+                {
+#ifndef NDEBUG
+                    if (auto fc = dynamic_cast<ForkedCase *>(p); fc)
+                        fmt::print("  >>{1}  (@{0}) *{2}\n",
+                                reinterpret_cast<void *>(pp),
+                                pp->ToString(),
+                                fc->GetDegree() - 1);
+                    else
+                        fmt::print("  >>{1}  (@{0})\n",
+                                reinterpret_cast<void *>(pp),
+                                pp->ToString());
+#endif
+                    queue.push(pp);
+                }
+                p->Deplete();
+
+                queue.finish();
+            }
+#ifdef NDEBUG
+        });
+    for (auto &th : threads)
+        th.join();
+#endif
 
     std::cout << root->GetDanger();
 }
