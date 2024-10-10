@@ -186,8 +186,11 @@ void ActionCase::ReportDanger(double v)
 template <bool Ephermeral>
 PCase ForkedCase::Fork()
 {
-    while (m_Degree <= 8)
+    auto [lb, ub] = Game().GetDegreeBounds(Id);
+    while (m_Degree <= ub)
     {
+        if (m_Degree < lb)
+            continue;
         auto g = std::make_shared<GameMgr>(Game());
         g->SetBlockDegree(Id, m_Degree++);
         g->Solve(HEUR, false);

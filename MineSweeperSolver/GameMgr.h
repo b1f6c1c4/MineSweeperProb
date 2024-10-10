@@ -73,6 +73,7 @@ public:
     [[nodiscard]] double GetBlockProbability(int x, int y) const;
     [[nodiscard]] double GetBlockProbability(int id) const;
     [[nodiscard]] BlockStatus GetInferredStatus(int x, int y) const;
+    [[nodiscard]] std::pair<int, int> GetDegreeBounds(int id) const;
 
     [[nodiscard]] const Block *GetBestBlocks() const;
     [[nodiscard]] size_t GetBestBlockCount() const;

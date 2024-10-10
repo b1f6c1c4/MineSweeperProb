@@ -235,6 +235,24 @@ BlockStatus GameMgr::GetInferredStatus(int x, int y) const
     return m_Solver->GetBlockStatus(GetIndex(x, y));
 }
 
+std::pair<int, int> GameMgr::GetDegreeBounds(int id) const
+{
+    auto lb = 0, ub = 0;
+    for (auto b : m_BlocksR[id])
+        switch (m_Solver->GetBlockStatus(b))
+        {
+            case BlockStatus::Mine:
+                lb++;
+                [[fallthrough]];
+            case BlockStatus::Unknown:
+                ub++;
+                break;
+            case BlockStatus::Blank:
+                break;
+        }
+    return { lb, ub };
+}
+
 const Block *GameMgr::GetBestBlocks() const
 {
     if (m_Best.empty())
