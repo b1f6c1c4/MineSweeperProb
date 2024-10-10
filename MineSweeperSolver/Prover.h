@@ -39,6 +39,9 @@ struct BaseCase
     virtual void Deplete() { m_Game = std::monostate{}; }
 
     virtual PCase Fork() = 0;
+    PCase CheckedFork();
+
+    virtual bool IsHolder() const { return false; }
 
     virtual std::string ToString() const;
 
@@ -93,6 +96,8 @@ public:
     void AddChildren(ActionCase *v);
 
     PCase Fork() override { throw std::logic_error{ "Do not call this" }; }
+
+    bool IsHolder() const override { return true; }
 
     std::string ToString() const override;
 

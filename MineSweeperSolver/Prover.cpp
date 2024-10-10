@@ -22,6 +22,7 @@ Strategy g_Strategy;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
 std::atomic<unsigned> g_MaxDepth;
+std::atomic<double> g_MemoryAvailPercent;
 std::atomic<size_t> g_Processed;
 
 auto updateDepth(unsigned d)
@@ -33,7 +34,7 @@ auto updateDepth(unsigned d)
     return d;
 }
 
-double getMemoryAvailPercent()
+void updateMemoryAvailPercent()
 {
     std::ifstream fin("/proc/meminfo");
     size_t total, avail;
@@ -41,7 +42,7 @@ double getMemoryAvailPercent()
     fin >> s >> total >> s;
     fin >> s >> avail >> s;
     fin >> s >> avail >> s;
-    return 100.0 * avail / total;
+    g_MemoryAvailPercent.store(100.0 * avail / total);
 }
 
 BaseCase::BaseCase(PCase p)
@@ -68,6 +69,29 @@ PGame BaseCase::ThePGame()
     std::stringstream ss{ std::get<std::string>(std::move(m_Game)) };
     m_Game = std::make_shared<GameMgr>(ss, g_Strategy);
     return std::get<PGame>(m_Game);
+}
+
+PCase BaseCase::CheckedFork()
+{
+#ifdef TRACEBACK
+    try
+    {
+        return Fork();
+    }
+    catch (const std::exception &err)
+    {
+        fmt::print("Error: {}\n",
+                err.what());
+        fmt::print("Traceback::\n");
+        for (BaseCase *ptr = this; ptr; ptr = ptr->parent)
+            fmt::print("At {}\n",
+                    ptr->ToString());
+        fmt::print("=======\n");
+        throw;
+    }
+#else
+    return Fork();
+#endif
 }
 
 BaseCase &BaseCase::Deflate()
@@ -176,7 +200,7 @@ PCase ForkedCase::Fork()
             ? static_cast<BaseCase *>(new SafeCase(p, g))
             : new UnsafeCase(p, g);
 #ifdef TRACEBACK
-        c->Traceback = Traceback + fmt::format("{}", m_Degree - 1);
+        c->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree - 1);
 #endif
         return c;
     }
@@ -191,18 +215,7 @@ PCase ActionCase::Fork()
         g->SetBlockMine(Id, false);
         g->Solve(HEUR, false);
         if (!g->GetStarted()) // infeasible at all
-        {
-            {
-                std::ofstream fout("/tmp/what");
-                Game().Save(fout);
-            }
-            fmt::print("Traceback::\n");
-            for (BaseCase *ptr = this; ptr; ptr = ptr->parent)
-                fmt::print("At {}\n",
-                        ptr->ToString());
-            fmt::print("=======\n");
             throw std::logic_error{ "All ActionCase should be feasible" };
-        }
         if (g->GetSolver().GetTotalStates() == 1)
             return nullptr; // guaranteed win
         m_Game = g;
@@ -232,7 +245,7 @@ std::string BaseCase::ToString() const
                 TotalStates);
     return fmt::format("[dp{} G={} TS={:3g}]",
             Depth,
-            reinterpret_cast<void *>(std::get<PGame>(m_Game).get()),
+            fmt::ptr(std::get<PGame>(m_Game).get()),
             TotalStates);
 }
 
@@ -280,9 +293,9 @@ class ConcurrentPriorityQueue
 {
     std::vector<PCase> c;
     bool initialized;
-    size_t borrowed;
+    size_t borrowed; // number of thread currently 'processing' tasks
     mutable std::mutex mtx;
-    std::condition_variable cv;
+    std::condition_variable cv, cve;
 
     struct Comparer
     {
@@ -297,20 +310,22 @@ class ConcurrentPriorityQueue
         }
     };
 
+    auto done() const { return initialized && !borrowed && c.empty(); }
+
 public:
     [[nodiscard]] auto size() const
     {
-        std::lock_guard lock{ mtx };
+        std::unique_lock lock{ mtx };
         return c.size();
     }
 
     void push(PCase p)
     {
         {
-            std::lock_guard lock{ mtx };
+            std::unique_lock lock{ mtx };
             c.push_back(p);
             auto it = std::ranges::push_heap(c, Comparer{});
-            if (getMemoryAvailPercent() < 50
+            if (g_MemoryAvailPercent.load() < 50
                 || std::distance(it, c.begin()) >= 1z << 20)
                 p->Deflate();
         }
@@ -320,49 +335,48 @@ public:
     // call this when uploaded all seeding tasks
     void inited()
     {
-        std::lock_guard lock{ mtx };
+        std::unique_lock lock{ mtx };
         initialized = true;
-    }
-
-    // call this after pop()
-    void finish()
-    {
-        auto signal = false;
+        if (done())
         {
-            std::lock_guard lock{ mtx };
-            if (!(--borrowed))
-                signal = c.empty();
-        }
-        // only notify all threads if:
-        // 1) no one is generating (borrowed == 0); and
-        // 2) no pending task in queue
-        if (signal)
             cv.notify_all();
+            cve.notify_all();
+        }
     }
 
-    // remember to call finish() after processing this!
-    PCase pop()
+    PCase pop(bool first)
     {
         std::unique_lock lock{ mtx };
+        if (!first)
+        {
+            // declare that I'm not processing
+            borrowed--;
+            if (done())
+            {
+                cv.notify_all();
+                cve.notify_all();
+                return nullptr;
+            }
+        }
+
         // wake me up if there are new tasks or task generation finished
-        cv.wait(lock, [this]{ return initialized && !borrowed || !c.empty(); });
+        cv.wait(lock, [this]{ return !c.empty() || (initialized && !borrowed); });
         // check if task generation finished
-        if (initialized && !borrowed && c.empty())
-            return {};
+        if (done())
+            return nullptr;
 
         borrowed++;
         std::ranges::pop_heap(c, Comparer{});
         auto p = std::move(c.back());
         c.pop_back();
-        g_Processed.fetch_add(1);
         return p;
     }
 
-    bool write_report(HolderCase *root) const
+    template <typename T>
+    bool write_report(HolderCase *root, T &&t)
     {
         std::unique_lock lock{ mtx };
-        if (initialized && !borrowed && c.empty())
-            return false;
+        cve.wait_for(lock, t);
 
         fmt::print("x{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} m{:.3f}%\n",
                 100.0 * root->GetDanger() / root->TotalStates,
@@ -371,9 +385,18 @@ public:
                 g_Processed.load(),
                 c.size(),
                 g_MaxDepth.load(),
-                getMemoryAvailPercent());
+                g_MemoryAvailPercent.load());
 
-        return true;
+        return !done();
+    }
+
+    template <typename T>
+    bool sleep_for(T &&t)
+    {
+        std::unique_lock lock{ mtx };
+        cve.wait_for(lock, t);
+
+        return !done();
     }
 };
 
@@ -413,48 +436,71 @@ int main(int argc, char *argv[])
     queue.push(ac);
     queue.inited();
 
+    updateMemoryAvailPercent();
 #ifdef NDEBUG
     std::vector<std::thread> threads;
     threads.emplace_back([&]()
     {
-        do
-        {
-            std::this_thread::sleep_for(report_interval);
-        } while (queue.write_report(root));
+        while (queue.sleep_for(2s))
+            updateMemoryAvailPercent();
+    });
+    threads.emplace_back([&]()
+    {
+        while (queue.write_report(root, report_interval));
     });
     for (auto i = 0; i < nprocs; i++)
         threads.emplace_back([&]()
         {
 #endif
-            PCase p;
-            while ((p = queue.pop()))
+            auto first = true;
+            std::vector<PCase> buffer;
+            for (PCase p; (p = queue.pop(first)); first = false)
             {
+                g_Processed++;
 #ifndef NDEBUG
                 fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->GetDanger() / root->TotalStates);
                 fmt::print("{1}  (@{0})\n",
-                        reinterpret_cast<void *>(p),
+                        fmt::ptr(p),
                         p->ToString());
                 std::cin.get();
 #endif
 
-                for (PCase pp; (pp = p->Fork());)
+                std::vector<PCase> buffer;
+                for (PCase pp; (pp = p->CheckedFork());)
                 {
 #ifndef NDEBUG
                     if (auto fc = dynamic_cast<ForkedCase *>(p); fc)
                         fmt::print("  >>{1}  (@{0}) *{2}\n",
-                                reinterpret_cast<void *>(pp),
+                                fmt::ptr(pp),
                                 pp->ToString(),
                                 fc->GetDegree() - 1);
                     else
                         fmt::print("  >>{1}  (@{0})\n",
-                                reinterpret_cast<void *>(pp),
+                                fmt::ptr(pp),
                                 pp->ToString());
 #endif
-                    queue.push(pp);
+                    if (p->IsHolder())
+                        buffer.push_back(pp);
+                    else
+                        queue.push(pp);
                 }
                 p->Deplete();
-
-                queue.finish();
+                // note: we must fully fork the previous
+                // before working on its children
+                for (auto pp : buffer)
+                {
+                    g_Processed++;
+                    for (PCase ppp; (ppp = pp->CheckedFork());)
+                    {
+#ifndef NDEBUG
+                        fmt::print("    >>{1}  (@{0})\n",
+                                fmt::ptr(ppp),
+                                ppp->ToString());
+#endif
+                        queue.push(ppp);
+                    }
+                    pp->Deplete();
+                }
             }
 #ifdef NDEBUG
         });
