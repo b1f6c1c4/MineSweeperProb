@@ -32,6 +32,17 @@ auto updateDepth(unsigned d)
     return d;
 }
 
+double getMemoryAvailPercent()
+{
+    std::ifstream fin("/proc/meminfo");
+    size_t total, avail;
+    std::string s;
+    fin >> s >> total >> s;
+    fin >> s >> avail >> s;
+    fin >> s >> avail >> s;
+    return 100 * avail / total;
+}
+
 BaseCase::BaseCase(PCase p)
     : parent{ p },
       TotalStates{ p->TotalStates },
@@ -202,9 +213,9 @@ PCase ActionCase::Fork()
 PCase UnsafeCase::Fork()
 {
     auto &lst = Game().GetPreferredBlockList();
-    while (m_It != lst.end())
+    while (m_It < lst.size())
     {
-        auto ac = new ActionCase(this, ThePGame(), *m_It++);
+        auto ac = new ActionCase(this, ThePGame(), lst[m_It++]);
         AddChildren(ac);
         return ac;
     }
@@ -296,10 +307,11 @@ public:
     {
         {
             std::lock_guard lock{ mtx };
-            c.push_back(std::move(p));
+            c.push_back(p);
             auto it = std::ranges::push_heap(c, Comparer{});
-            if (std::distance(it, c.begin()) >= 1z << 10)
-                (*it)->Deflate();
+            if (getMemoryAvailPercent() < 50
+                || std::distance(it, c.begin()) >= 1z << 10)
+                p->Deflate();
         }
         cv.notify_one();
     }
@@ -350,12 +362,13 @@ public:
         if (initialized && !borrowed && c.empty())
             return false;
 
-        fmt::print("x{:10f}% curr~{:10f}%@d{}   q{} d{}\n",
+        fmt::print("x{:10f}% curr~{:10f}%@d{}   q{} d{} m{:3f}%\n",
                 100.0 * root->GetDanger() / root->TotalStates,
                 100.0 * c.front()->TotalStates / root->TotalStates,
                 c.front()->Depth,
                 c.size(),
-                g_MaxDepth.load());
+                g_MaxDepth.load(),
+                getMemoryAvailPercent());
 
         return true;
     }

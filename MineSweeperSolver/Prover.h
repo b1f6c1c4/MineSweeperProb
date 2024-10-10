@@ -16,8 +16,11 @@ using PCase = BaseCase *;
 using PGame = std::shared_ptr<GameMgr>;
 
 #ifndef NDEBUG
+#ifndef TRACEBACK
 #define TRACEBACK
 #endif
+#endif
+
 
 struct BaseCase
 {
@@ -86,7 +89,6 @@ public:
     using BaseCase::BaseCase;
 
     using handle_t = decltype(m_Heap)::handle_type;
-    using value_t = decltype(*m_Heap.ordered_begin());
 
     void AddChildren(ActionCase *v);
 
@@ -152,10 +154,10 @@ struct UnsafeCase : HolderCase
 {
     UnsafeCase(PCase p, PGame g)
         : HolderCase{ p, g },
-          m_It{ Game().GetPreferredBlockList().begin() }
+          m_It{ 0 }
     {
         Duplication = g->GetPreferredBlockCount();
-        ReportDanger(nullptr, Game().GetMinProbability() * TotalStates);
+        ReportDanger(nullptr, g->GetMinProbability() * TotalStates);
     }
 
     PCase Fork() override;
@@ -163,5 +165,5 @@ struct UnsafeCase : HolderCase
     std::string ToString() const override;
 
 private:
-    BlockSet::const_iterator m_It;
+    size_t m_It;
 };
