@@ -48,14 +48,14 @@ void updateMemoryAvailPercent()
 BaseCase::BaseCase(PCase p)
     : parent{ p },
       TotalStates{ p->TotalStates },
-      Depth{ updateDepth(p->Depth + 1) },
+      Depth{ p->Depth },
       Duplication{},
       m_Game{ p->m_Game } { }
 
 BaseCase::BaseCase(PCase p, PGame game)
     : parent{ p },
       TotalStates{ game->GetSolver().GetTotalStates() },
-      Depth{ p ? updateDepth(p->Depth + 1) : 0u },
+      Depth{ p ? p->Depth : 0u },
       Duplication{},
       m_Game{ std::move(game) } { }
 
@@ -187,12 +187,12 @@ template <bool Ephermeral>
 PCase ForkedCase::Fork()
 {
     auto [lb, ub] = Game().GetDegreeBounds(Id);
-    while (m_Degree <= ub)
+    for (; m_Degree <= ub; m_Degree++)
     {
         if (m_Degree < lb)
             continue;
         auto g = std::make_shared<GameMgr>(Game());
-        g->SetBlockDegree(Id, m_Degree++);
+        g->SetBlockDegree(Id, m_Degree);
         g->Solve(HEUR, false);
         if (!g->GetStarted()) // infeasible
             continue;
@@ -203,11 +203,19 @@ PCase ForkedCase::Fork()
             ? static_cast<BaseCase *>(new SafeCase(p, g))
             : new UnsafeCase(p, g);
 #ifdef TRACEBACK
-        c->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree - 1);
+        c->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
+        m_Degree++;
         return c;
     }
     return nullptr;
+}
+
+ActionCase::ActionCase(PCase p, PGame g, int id)
+    : ForkedCase{ p, g, id },
+      Danger{ Game().GetBlockProbability(id) * TotalStates }
+{
+    updateDepth(++Depth);
 }
 
 PCase ActionCase::Fork()
@@ -305,6 +313,10 @@ class ConcurrentPriorityQueue
         // check if rhs is more important than lhs
         bool operator()(const PCase &lhs, const PCase &rhs) const
         {
+            if (rhs->Depth < lhs->Depth)
+                return true;
+            if (rhs->Depth > lhs->Depth)
+                return false;
             if (rhs->TotalStates > lhs->TotalStates)
                 return true;
             if (rhs->TotalStates < lhs->TotalStates)
@@ -327,9 +339,8 @@ public:
         {
             std::unique_lock lock{ mtx };
             c.push_back(p);
-            auto it = std::ranges::push_heap(c, Comparer{});
-            if (g_MemoryAvailPercent.load() < 50
-                || std::distance(it, c.begin()) >= 1z << 20)
+            std::ranges::push_heap(c, Comparer{});
+            if (g_MemoryAvailPercent.load() < 90)
                 p->Deflate();
         }
         cv.notify_one();
