@@ -200,9 +200,13 @@ const BlockProperty &GameMgr::SetBlockDegree(int id, int degree)
 
 const BlockProperty &GameMgr::SetBlockMine(int x, int y, bool mined)
 {
+    return SetBlockMine(GetIndex(x, y), mined);
+}
+
+const BlockProperty &GameMgr::SetBlockMine(int id, bool mined)
+{
     if (!m_IsExternal)
         throw std::runtime_error("only external games can be modified");
-    auto id = GetIndex(x, y);
     auto &b = m_Blocks[id];
     b.IsOpen = true;
     b.IsMine = mined;
@@ -294,7 +298,8 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         }
         throw;
     }
-    if (m_IsExternal && m_Solver->GetTotalStates() == 0)
+    if (m_IsExternal && (
+        m_Solver->GetTotalStates() == 0))
     {
         m_Started = false;
         return;
@@ -326,8 +331,14 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
         for (auto i = 0; i < m_Blocks.size(); ++i)
             if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
                 m_Best.push_back(i);
-        ASSERT(!m_Best.empty());
-        return;
+        if (!m_IsExternal)
+        {
+            ASSERT(!m_Best.empty());
+            return;
+        }
+        // Since we can't rely on CanOpenForSure, we must check directly
+        if (!m_Best.empty())
+            return;
     }
 #ifndef NDEBUG
 	if (shortcut)

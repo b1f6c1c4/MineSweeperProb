@@ -15,12 +15,14 @@ static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | Solv
 BaseCase::BaseCase(PCase p)
     : parent{ p },
       TotalStates{ p->TotalStates },
+      Depth{ p->Depth + 1 },
       Duplication{},
       m_Game{ p->m_Game } { }
 
 BaseCase::BaseCase(PCase p, PGame game)
     : parent{ p },
       TotalStates{ game->GetSolver().GetTotalStates() },
+      Depth{ p ? p->Depth + 1 : 0u },
       Duplication{},
       m_Game{ std::move(game) } { }
 
@@ -49,7 +51,7 @@ BaseCase &BaseCase::Deflate()
 
 bool HolderCase::Comparer::operator()(ActionCase *lhs, ActionCase *rhs) const
 {
-    return lhs->Danger < rhs->Danger;
+    return lhs->Danger > rhs->Danger;
 }
 
 void HolderCase::AddChildren(ActionCase *v)
@@ -70,19 +72,31 @@ void HolderCase::ReportDanger(ActionCase *self, double v)
         std::lock_guard lock{ mtx };
         self->Danger += v;
 
-#ifndef NDEBUG
-        fmt::print("[[[{}@{}+={}->{} in {}@{}]]]\n",
-                self->ToString(),
-                fmt::ptr(self),
-                v,
-                self->Danger,
-                ToString(),
-                fmt::ptr(this));
-#endif
-        m_Heap.increase(self->Handle);
+        m_Heap.decrease(self->Handle);
 
         auto next = m_Heap.top()->Danger;
-        increase = next - Danger;
+        increase = next > Danger ? next - Danger : 0;
+#ifndef NDEBUG
+        if (!increase)
+            fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}]]]\n",
+                    self->ToString(),
+                    fmt::ptr(self),
+                    v,
+                    self->Danger,
+                    ToString(),
+                    fmt::ptr(this));
+        else
+            fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}:{:5e}+={:5e}->{:5e}]]]\n",
+                    self->ToString(),
+                    fmt::ptr(self),
+                    v,
+                    self->Danger,
+                    ToString(),
+                    fmt::ptr(this),
+                    Danger,
+                    increase,
+                    next);
+#endif
         Danger = next;
     }
 
@@ -123,12 +137,31 @@ PCase ForkedCase::Fork()
         g->Solve(HEUR, false);
         if (!g->GetStarted()) // infeasible
             continue;
+        if (g->GetSolver().GetTotalStates() == 1)
+            continue; // guaranteed win
         auto p = Ephermeral ? parent : this;
         if (g->GetBestBlockCount())
             return new SafeCase(p, g);
         return new UnsafeCase(p, g);
     }
     return nullptr;
+}
+
+PCase ActionCase::Fork()
+{
+    if (!m_Degree)
+    {
+        auto g = std::make_shared<GameMgr>(Game());
+        g->SetBlockMine(Id, false);
+        g->Solve(HEUR, false);
+        if (!g->GetStarted()) // infeasible at all
+            throw std::logic_error{ "All ActionCase should be feasible" };
+        if (g->GetSolver().GetTotalStates() == 1)
+            return nullptr; // guaranteed win
+        m_Game = g;
+    }
+
+    return ForkedCase::Fork<false>();
 }
 
 PCase UnsafeCase::Fork()
@@ -147,9 +180,11 @@ PCase UnsafeCase::Fork()
 std::string BaseCase::ToString() const
 {
     if (!std::holds_alternative<PGame>(m_Game))
-        return fmt::format("[G=0x------ TS={:5e}]",
+        return fmt::format("[dp{} TS={:3g}]",
+                Depth,
                 TotalStates);
-    return fmt::format("[G={} TS={:5e}]",
+    return fmt::format("[dp{} G={} TS={:3g}]",
+            Depth,
             reinterpret_cast<void *>(std::get<PGame>(m_Game).get()),
             TotalStates);
 }
@@ -163,7 +198,7 @@ std::string ForkedCase::ToString() const
 
 std::string HolderCase::ToString() const
 {
-    return fmt::format("{}[{}]",
+    return fmt::format("{}[{:3g}]",
             BaseCase::ToString(),
             fmt::join(std::views::transform(m_Heap, [](ActionCase *ac){ return ac->Danger; }), " "));
 }
@@ -177,7 +212,7 @@ std::string ActionCase::ToString() const
 std::string SafeCase::ToString() const
 {
     if (!std::holds_alternative<PGame>(m_Game))
-        return fmt::format("Safe{}:S--",
+        return fmt::format("Safe{}",
                 ForkedCase::ToString());
     return fmt::format("Safe{}:S{}",
             ForkedCase::ToString(),
@@ -194,7 +229,7 @@ std::string UnsafeCase::ToString() const
 class ConcurrentPriorityQueue
 {
     std::vector<PCase> c;
-    bool finished;
+    size_t borrowed;
     mutable std::mutex mtx;
     std::condition_variable cv;
 
@@ -230,22 +265,33 @@ public:
         cv.notify_one();
     }
 
+    // call this after pop()
     void finish()
     {
+        auto signal = false;
         {
             std::lock_guard lock{ mtx };
-            finished = true;
+            if (!(--borrowed))
+                signal = c.empty();
         }
-        cv.notify_all();
+        // only notify all threads if:
+        // 1) no one is generating (borrowed == 0); and
+        // 2) no pending task in queue
+        if (signal)
+            cv.notify_all();
     }
 
+    // remember to call finish() after processing this!
     PCase pop()
     {
         std::unique_lock lock{ mtx };
-        cv.wait(lock, [this]{ return finished || !c.empty(); });
-        if (finished && c.empty())
+        // wake me up if there are new tasks or task generation finished
+        cv.wait(lock, [this]{ return !borrowed || !c.empty(); });
+        // check if task generation finished
+        if (!borrowed && c.empty())
             return {};
 
+        borrowed++;
         std::ranges::pop_heap(c, Comparer{});
         auto p = std::move(c.back());
         c.pop_back();
@@ -274,6 +320,7 @@ int main(int argc, char *argv[]) {
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
     auto ac = new ActionCase(root, root->ThePGame(), cfg.Index);
     root->AddChildren(ac);
+    root->Deplete();
     queue.push(ac);
 
     PCase p;
@@ -301,9 +348,10 @@ int main(int argc, char *argv[]) {
 #endif
             queue.push(pp);
         }
-        if (dynamic_cast<SafeCase *>(p))
-            delete p;
-        else
-            p->Deplete();
+        p->Deplete();
+
+        queue.finish();
     }
+
+    std::cout << root->GetDanger();
 }

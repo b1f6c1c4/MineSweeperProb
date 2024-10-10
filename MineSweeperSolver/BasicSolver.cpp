@@ -521,6 +521,9 @@ void BasicSolver::ReduceRestrains()
 
     if (m_Matrix.empty())
     {
+        for (auto v : m_MatrixAugment)
+            if (v)
+                throw Infeasible{};
         m_MatrixAugment.clear();
         return;
     }
@@ -655,7 +658,8 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
                         {
                             if (m_Manager[blk] == BlockStatus::Mine)
                                 continue;
-                            ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+                            if (m_Manager[blk] != BlockStatus::Unknown)
+                                throw Infeasible{};
                             m_Manager[blk] = BlockStatus::Mine;
                             m_RestMines--;
                             m_State = SolvingState::Stale;
@@ -675,7 +679,8 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
                         {
                             if (m_Manager[blk] == BlockStatus::Blank)
                                 continue;
-                            ASSERT(m_Manager[blk] == BlockStatus::Unknown);
+                            if (m_Manager[blk] != BlockStatus::Unknown)
+                                throw Infeasible{};
                             m_Manager[blk] = BlockStatus::Blank;
                             ++CanOpenForSure;
                             m_State = SolvingState::Stale;

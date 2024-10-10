@@ -88,6 +88,9 @@ public:
     BasicSolver(const BasicSolver &other);
     virtual ~BasicSolver();
 
+    // the user shall reduce this number, not BasicSolver
+    // not doing so will not harm the operation of this class,
+    // except for 'shortcut == true' to function
     int CanOpenForSure;
 
     [[nodiscard]] BlockStatus GetBlockStatus(Block block) const;
@@ -116,6 +119,10 @@ protected:
     std::vector<BlockStatus> m_Manager;
     std::vector<BlockSet> m_BlockSets;
     std::vector<int> m_SetIDs;
+    // m_Matrix.size() == (m_BlocksSets.size() + 63) / 64
+    // m_Matrix.front().size() == number of constraints
+    // NZ(m_Matrix[CNT(col)][row], SHF(col))
+    //   <=> m_BlockSets[col] is included in constraint #row
     std::vector<std::vector<Container>> m_Matrix;
     std::vector<int> m_MatrixAugment;
     std::vector<int> m_Minors;

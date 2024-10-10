@@ -23,12 +23,13 @@ struct BaseCase
 
     PCase parent;
     double TotalStates;
+    unsigned Depth;
     int Duplication;
 
     [[nodiscard]] GameMgr &Game() { return *ThePGame(); }
     [[nodiscard]] PGame ThePGame();
     BaseCase &Deflate();
-    void Deplete() { m_Game = std::monostate{}; }
+    virtual void Deplete() { m_Game = std::monostate{}; }
 
     virtual PCase Fork() = 0;
 
@@ -52,7 +53,7 @@ struct ForkedCase : BaseCase
 
     auto GetDegree() const { return m_Degree; }
 
-private:
+protected:
     int m_Degree;
 };
 
@@ -68,6 +69,7 @@ private:
         bool operator()(ActionCase *lhs, ActionCase *rhs) const;
     };
 
+    // the 'largest' elem is the top()
     boost::heap::fibonacci_heap<ActionCase *, boost::heap::compare<Comparer>> m_Heap;
 
 public:
@@ -99,9 +101,19 @@ struct ActionCase : ForkedCase
 {
     ActionCase(PCase p, PGame g, int id)
         : ForkedCase{ p, g, id },
-          Danger{ Game().GetBlockProbability(id) } { }
+          Danger{ Game().GetBlockProbability(id) * TotalStates } { }
 
-    PCase Fork() override { return ForkedCase::Fork<false>(); }
+#ifdef NDEBUG
+    virtual void Deplete() override
+    {
+        if (m_Degree)
+            BaseCase::Deplete();
+        else
+            delete this;
+    }
+#endif
+
+    PCase Fork() override;
 
     std::string ToString() const override;
 
@@ -116,6 +128,10 @@ struct SafeCase : ForkedCase
 {
     SafeCase(PCase p, PGame g)
         : ForkedCase{ p, g, g->GetBestBlockList().front() } { }
+
+#ifdef NDEBUG
+    virtual void Deplete() override { delete this; }
+#endif
 
     PCase Fork() override { return ForkedCase::Fork<true>(); }
 
