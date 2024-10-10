@@ -22,6 +22,7 @@ Strategy g_Strategy;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
 std::atomic<unsigned> g_MaxDepth;
+std::atomic<size_t> g_Processed;
 
 auto updateDepth(unsigned d)
 {
@@ -40,7 +41,7 @@ double getMemoryAvailPercent()
     fin >> s >> total >> s;
     fin >> s >> avail >> s;
     fin >> s >> avail >> s;
-    return 100 * avail / total;
+    return 100.0 * avail / total;
 }
 
 BaseCase::BaseCase(PCase p)
@@ -310,7 +311,7 @@ public:
             c.push_back(p);
             auto it = std::ranges::push_heap(c, Comparer{});
             if (getMemoryAvailPercent() < 50
-                || std::distance(it, c.begin()) >= 1z << 10)
+                || std::distance(it, c.begin()) >= 1z << 20)
                 p->Deflate();
         }
         cv.notify_one();
@@ -353,6 +354,7 @@ public:
         std::ranges::pop_heap(c, Comparer{});
         auto p = std::move(c.back());
         c.pop_back();
+        g_Processed.fetch_add(1);
         return p;
     }
 
@@ -362,10 +364,11 @@ public:
         if (initialized && !borrowed && c.empty())
             return false;
 
-        fmt::print("x{:10f}% curr~{:10f}%@d{}   q{} d{} m{:3f}%\n",
+        fmt::print("x{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} m{:.3f}%\n",
                 100.0 * root->GetDanger() / root->TotalStates,
                 100.0 * c.front()->TotalStates / root->TotalStates,
                 c.front()->Depth,
+                g_Processed.load(),
                 c.size(),
                 g_MaxDepth.load(),
                 getMemoryAvailPercent());
