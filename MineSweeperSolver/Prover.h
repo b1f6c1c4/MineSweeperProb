@@ -116,9 +116,7 @@ protected:
 
 struct ActionCase : ForkedCase
 {
-    ActionCase(PCase p, PGame g, int id)
-        : ForkedCase{ p, g, id },
-          Danger{ Game().GetBlockProbability(id) * TotalStates } { }
+    ActionCase(PCase p, PGame g, int id);
 
 #ifdef NDEBUG
     virtual void Deplete() override
