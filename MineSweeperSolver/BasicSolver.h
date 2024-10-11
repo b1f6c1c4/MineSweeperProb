@@ -19,11 +19,6 @@ enum class SolvingState
     Drained = 0x8000
 };
 
-struct Infeasible : std::runtime_error
-{
-    Infeasible() : std::runtime_error{ "infeasible" } { }
-};
-
 constexpr inline SolvingState operator&(SolvingState lhs, SolvingState rhs)
 {
     return static_cast<SolvingState>(static_cast<int>(lhs) & static_cast<int>(rhs));
@@ -92,6 +87,9 @@ public:
     // not doing so will not harm the operation of this class,
     // except for 'shortcut == true' to function
     int CanOpenForSure;
+
+    // once set, the solver is no longer usable.
+    bool IsInfeasible;
 
     [[nodiscard]] BlockStatus GetBlockStatus(Block block) const;
     [[nodiscard]] const BlockStatus *GetBlockStatuses() const;

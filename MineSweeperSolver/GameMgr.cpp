@@ -4,6 +4,7 @@
 #include "BinomialHelper.h"
 #include "Drainer.h"
 #include <iostream>
+#include <stdexcept>
 #include <utility>
 
 GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
@@ -303,21 +304,17 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
     m_Best.clear();
     m_Preferred.clear();
 
-    try
-    {
-        m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
-    }
-    catch (const Infeasible &)
+    m_Solver->Solve(maxDepth & (SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability), shortcut);
+    if (m_Solver->IsInfeasible)
     {
         if (m_IsExternal)
         {
             m_Started = false;
             return;
         }
-        throw;
+        throw std::runtime_error{ "Infeasible detected" };
     }
-    if (m_IsExternal && (
-        m_Solver->GetTotalStates() == 0))
+    if (m_IsExternal && m_Solver->GetTotalStates() == 0)
     {
         m_Started = false;
         return;

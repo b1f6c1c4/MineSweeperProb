@@ -404,7 +404,10 @@ bool BasicSolver::ReduceRestrainMine(int row)
 {
     auto &sum = m_ReduceCount_Temp;
     if (m_MatrixAugment[row] > sum[row])
-        throw Infeasible{};
+    {
+        IsInfeasible = true;
+        return false;
+    }
     if (m_MatrixAugment[row] != sum[row])
         return false;
 
@@ -419,7 +422,10 @@ bool BasicSolver::ReduceRestrainMine(int row)
                 m_MatrixAugment[j] -= (int)m_BlockSets[col].size();
                 sum[j] -= m_BlockSets[col].size();
                 if (m_MatrixAugment[j] < 0)
-                    throw Infeasible{};
+                {
+                    IsInfeasible = true;
+                    return false;
+                }
             }
         for (auto blk : m_BlockSets[col])
         {
@@ -523,7 +529,7 @@ void BasicSolver::ReduceRestrains()
     {
         for (auto v : m_MatrixAugment)
             if (v)
-                throw Infeasible{};
+                IsInfeasible = true;
         m_MatrixAugment.clear();
         return;
     }
@@ -543,8 +549,12 @@ void BasicSolver::ReduceRestrains()
         }
 
     for (auto row = 0; row < m_MatrixAugment.size(); ++row)
+    {
         if (ReduceRestrainMine(row))
             --row;
+        if (IsInfeasible)
+            return;
+    }
 
     if (m_RestMines >= 0)
         for (auto row = 0; row < m_MatrixAugment.size(); ++row)
@@ -584,6 +594,8 @@ void BasicSolver::SimpleOverlapAll()
                             m_State = SolvingState::Stale;
                             return;
                         }
+                        if (IsInfeasible)
+                            return;
 
                         m_Pairs_Temp[id] = true;
                     }
@@ -659,7 +671,10 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
                             if (m_Manager[blk] == BlockStatus::Mine)
                                 continue;
                             if (m_Manager[blk] != BlockStatus::Unknown)
-                                throw Infeasible{};
+                            {
+                                IsInfeasible = true;
+                                return;
+                            }
                             m_Manager[blk] = BlockStatus::Mine;
                             m_RestMines--;
                             m_State = SolvingState::Stale;
@@ -680,7 +695,10 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
                             if (m_Manager[blk] == BlockStatus::Blank)
                                 continue;
                             if (m_Manager[blk] != BlockStatus::Unknown)
-                                throw Infeasible{};
+                            {
+                                IsInfeasible = true;
+                                return;
+                            }
                             m_Manager[blk] = BlockStatus::Blank;
                             ++CanOpenForSure;
                             m_State = SolvingState::Stale;
@@ -692,7 +710,13 @@ bool BasicSolver::SimpleOverlap(int r1, int r2)
     };
 
     proc(exceptA, ivA0, ivA);
+    if (IsInfeasible)
+        return false;
+
     proc(exceptB, ivB0, ivB);
+    if (IsInfeasible)
+        return false;
+
     proc(intersection, ivC0, ivC);
 
     return false;
@@ -894,7 +918,10 @@ void BasicSolver::ProcessSolutions()
                         flags[col] &= ~2;
                 }
             if (m_MatrixAugment[row] != v)
-                throw Infeasible{};
+            {
+                IsInfeasible = true;
+                return;
+            }
         }
         so.States = double(1);
         for (auto i = 0; i < m_BlockSets.size(); ++i)
