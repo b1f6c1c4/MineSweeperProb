@@ -9,7 +9,7 @@
 
 #define CONT_WIDTH(lst, cnt) ((cnt) == (lst).size() - 1 && SHF(m_BlockSets.size()) > 0 ? SHF(m_BlockSets.size()) : CONT_SIZE)
 
-BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(-1)
+BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), IsInfeasible(false), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(NAN), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(-1)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
@@ -19,7 +19,7 @@ BasicSolver::BasicSolver(size_t count) : CanOpenForSure(0), m_State(SolvingState
     m_Matrix.emplace_back();
 }
 
-BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(Binomial((int)count, mines)), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(mines)
+BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), IsInfeasible(false), m_State(SolvingState::Stale), m_Manager(count, BlockStatus::Unknown), m_Probability(count), m_TotalStates(Binomial((int)count, mines)), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(mines)
 {
     m_BlockSets.emplace_back(count);
     auto &lst = m_BlockSets.back();
@@ -31,7 +31,7 @@ BasicSolver::BasicSolver(size_t count, int mines) : CanOpenForSure(0), m_State(S
     m_MatrixAugment.push_back(mines);
 }
 
-BasicSolver::BasicSolver(const BasicSolver &other) : CanOpenForSure(other.CanOpenForSure), m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_MatrixAugment(other.m_MatrixAugment), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(other.m_RestMines) { }
+BasicSolver::BasicSolver(const BasicSolver &other) : CanOpenForSure(other.CanOpenForSure), IsInfeasible(other.IsInfeasible), m_State(other.m_State), m_Manager(other.m_Manager), m_BlockSets(other.m_BlockSets), m_SetIDs(other.m_SetIDs), m_Matrix(other.m_Matrix), m_MatrixAugment(other.m_MatrixAugment), m_Minors(other.m_Minors), m_Solutions(other.m_Solutions), m_Probability(other.m_Probability), m_TotalStates(other.m_TotalStates), m_Pairs_Temp(nullptr), m_Pairs_Temp_Size(0), m_RestMines(other.m_RestMines) { }
 
 BasicSolver::~BasicSolver()
 {
