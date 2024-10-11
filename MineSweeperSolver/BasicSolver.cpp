@@ -92,7 +92,7 @@ void BasicSolver::AddRestrain(Block blk, bool isMine)
         throw std::runtime_error("mine is not mine at " + std::to_string(blk));
 }
 
-void BasicSolver::AddRestrain(const BlockSet &set, int mines)
+void BasicSolver::AddRestrain(const BlockSet8 &set, int mines)
 {
     auto dMines = 0;
     auto &bin = m_IntersectionCounts_Temp;
@@ -264,7 +264,7 @@ bool BasicSolver::Solve(SolvingState maxDepth, bool shortcut)
     return true;
 }
 
-void BasicSolver::GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const
+void BasicSolver::GetIntersectionCounts(const BlockSet8 &set1, std::vector<int> &sets1, int &mines) const
 {
     sets1.clear();
     sets1.resize(m_BlockSets.size(), 0);

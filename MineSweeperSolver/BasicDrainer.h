@@ -62,7 +62,7 @@ public:
     [[nodiscard]] double GetBestProb() const;
 protected:
     BasicDrainer();
-    std::vector<BlockSet> m_BlocksR;
+    std::vector<BlockSet8> m_BlocksR;
 
     MacroSituation *m_RootMacro;
 

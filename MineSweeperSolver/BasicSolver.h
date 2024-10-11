@@ -1,6 +1,9 @@
 #pragma once
 #include "stdafx.h"
 #include <vector>
+#ifndef __EMSCRIPTEN__
+#include <boost/container/static_vector.hpp>
+#endif
 
 enum class BlockStatus
 {
@@ -41,6 +44,11 @@ constexpr inline SolvingState operator|=(SolvingState &lhs, SolvingState rhs)
 
 typedef int Block;
 typedef std::vector<Block> BlockSet;
+#ifndef __EMSCRIPTEN__
+typedef boost::container::static_vector<Block, 8zu> BlockSet8;
+#else
+typedef BlockSet BlockSet8;
+#endif
 typedef size_t Container;
 
 #define CONT_ZERO static_cast<Container>(0)
@@ -100,7 +108,7 @@ public:
     [[nodiscard]] const std::vector<Solution> &GetSolutions() const;
 
     void AddRestrain(Block blk, bool isMine);
-    void AddRestrain(const BlockSet &set, int mines);
+    void AddRestrain(const BlockSet8 &set, int mines);
     /* maxDepth: what kinds of computation is enabled
      * shortcut == true: return immediately if any CanOpenForSure is found
      * shortcut == false: compute everything
@@ -134,7 +142,7 @@ protected:
      *
      * Note: <sets1> does NOT include confirmed mines NOR confirmed blanks.
      */
-    void GetIntersectionCounts(const BlockSet &set1, std::vector<int> &sets1, int &mines) const;
+    void GetIntersectionCounts(const BlockSet8 &set1, std::vector<int> &sets1, int &mines) const;
 private:
     BlockSet m_Reduce_Temp;
     std::vector<size_t> m_ReduceCount_Temp;

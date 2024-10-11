@@ -22,14 +22,14 @@ public:
 
     bool Solve(SolvingState maxDepth, bool shortcut) override;
 
-    [[nodiscard]] const DistCondQParameters &GetDistInfo(const BlockSet &set, Block blk, int &min);
+    [[nodiscard]] const DistCondQParameters &GetDistInfo(const BlockSet8 &set, Block blk, int &min);
 
-    [[nodiscard]] double ZeroCondQ(const BlockSet &set, Block blk);
-    [[nodiscard]] double ZerosCondQ(const BlockSet &set, Block blk);
-    [[nodiscard]] double ZerosECondQ(const BlockSet &set, Block blk);
-    [[nodiscard]] double UpperBoundCondQ(const BlockSet &set, Block blk);
-    [[nodiscard]] const std::vector<double> &DistributionCondQ(const BlockSet &set, Block blk, int &min);
-    [[nodiscard]] double QuantityCondQ(const BlockSet &set, Block blk);
+    [[nodiscard]] double ZeroCondQ(const BlockSet8 &set, Block blk);
+    [[nodiscard]] double ZerosCondQ(const BlockSet8 &set, Block blk);
+    [[nodiscard]] double ZerosECondQ(const BlockSet8 &set, Block blk);
+    [[nodiscard]] double UpperBoundCondQ(const BlockSet8 &set, Block blk);
+    [[nodiscard]] const std::vector<double> &DistributionCondQ(const BlockSet8 &set, Block blk, int &min);
+    [[nodiscard]] double QuantityCondQ(const BlockSet8 &set, Block blk);
 
     friend class Drainer;
 private:
@@ -48,7 +48,7 @@ private:
      * IN blk: which block to consider
      * OUT min: number of confirmed mines in <set>
      */
-    [[nodiscard]] DistCondQParameters PackParameters(const BlockSet &set, Block blk, int &min) const;
+    [[nodiscard]] DistCondQParameters PackParameters(const BlockSet8 &set, Block blk, int &min) const;
 
     /* Compute <par>.m_Halves */
     void GetHalves(DistCondQParameters &par) const;

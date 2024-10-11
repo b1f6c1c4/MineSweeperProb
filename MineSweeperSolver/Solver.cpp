@@ -25,41 +25,41 @@ bool Solver::Solve(SolvingState maxDepth, bool shortcut)
     return false;
 }
 
-const DistCondQParameters &Solver::GetDistInfo(const BlockSet &set, Block blk, int &min)
+const DistCondQParameters &Solver::GetDistInfo(const BlockSet8 &set, Block blk, int &min)
 {
     return UCondQ(PackParameters(set, blk, min));
 }
 
-double Solver::ZeroCondQ(const BlockSet &set, Block blk)
+double Solver::ZeroCondQ(const BlockSet8 &set, Block blk)
 {
     int min;
     return ZCondQ(PackParameters(set, blk, min)).m_Result.front();
 }
 
-double Solver::ZerosCondQ(const BlockSet &set, Block blk)
+double Solver::ZerosCondQ(const BlockSet8 &set, Block blk)
 {
     int min;
     return UCondQ(PackParameters(set, blk, min)).m_Probability;
 }
 
-double Solver::ZerosECondQ(const BlockSet &set, Block blk)
+double Solver::ZerosECondQ(const BlockSet8 &set, Block blk)
 {
     int min;
     return UCondQ(PackParameters(set, blk, min)).m_Expectation;
 }
 
-double Solver::UpperBoundCondQ(const BlockSet &set, Block blk)
+double Solver::UpperBoundCondQ(const BlockSet8 &set, Block blk)
 {
     int min;
     return UCondQ(PackParameters(set, blk, min)).m_UpperBound;
 }
 
-const std::vector<double> &Solver::DistributionCondQ(const BlockSet &set, Block blk, int &min)
+const std::vector<double> &Solver::DistributionCondQ(const BlockSet8 &set, Block blk, int &min)
 {
     return DistCondQ(PackParameters(set, blk, min)).m_Result;
 }
 
-double Solver::QuantityCondQ(const BlockSet &set, Block blk)
+double Solver::QuantityCondQ(const BlockSet8 &set, Block blk)
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
     int dMines;
@@ -97,7 +97,7 @@ void Solver::Add(std::vector<double> &from, const std::vector<double> &cases)
     dicN.swap(from);
 }
 
-DistCondQParameters Solver::PackParameters(const BlockSet &set, Block blk, int &min) const
+DistCondQParameters Solver::PackParameters(const BlockSet8 &set, Block blk, int &min) const
 {
     DistCondQParameters par(m_SetIDs[blk], 0);
     int dMines;
