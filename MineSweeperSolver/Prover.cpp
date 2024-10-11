@@ -239,10 +239,9 @@ PCase ActionCase::Fork()
 
 PCase UnsafeCase::Fork()
 {
-    auto &lst = Game().GetPreferredBlockList();
-    while (m_It < lst.size())
+    while (m_It != m_List.end())
     {
-        auto ac = new ActionCase(this, ThePGame(), lst[m_It++]);
+        auto ac = new ActionCase(this, ThePGame(), *m_It++);
         AddChildren(ac);
         return ac;
     }
@@ -346,7 +345,8 @@ public:
             std::unique_lock lock{ mtx };
             c.push_back(p);
             std::ranges::push_heap(c, Comparer{});
-            if (g_MemoryAvailPercent.load() < 90)
+            if (g_MemoryAvailPercent.load() < 10
+                    || p->ShallDeflate())
                 p->Deflate();
         }
         cv.notify_one();

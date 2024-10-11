@@ -42,6 +42,7 @@ struct BaseCase
     PCase CheckedFork();
 
     virtual bool IsHolder() const { return false; }
+    virtual bool ShallDeflate() const { return false; }
 
     virtual std::string ToString() const;
 
@@ -160,16 +161,20 @@ struct UnsafeCase : HolderCase
 {
     UnsafeCase(PCase p, PGame g)
         : HolderCase{ p, g },
-          m_It{ 0 }
+          m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
+          m_It{ m_List.begin() }
     {
         Duplication = g->GetPreferredBlockCount();
         ReportDanger(nullptr, g->GetMinProbability() * TotalStates);
     }
+
+    bool ShallDeflate() const override { return true; }
 
     PCase Fork() override;
 
     std::string ToString() const override;
 
 private:
-    size_t m_It;
+    BlockSet m_List;
+    BlockSet::iterator m_It;
 };
