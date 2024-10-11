@@ -9,7 +9,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <variant>
-#include <boost/heap/fibonacci_heap.hpp>
+#include <boost/heap/d_ary_heap.hpp>
 
 struct BaseCase;
 using PCase = BaseCase *;
@@ -86,7 +86,10 @@ private:
     };
 
     // the 'largest' elem is the top()
-    boost::heap::fibonacci_heap<ActionCase *, boost::heap::compare<Comparer>> m_Heap;
+    boost::heap::d_ary_heap<ActionCase *,
+        boost::heap::arity<4>,
+        boost::heap::compare<Comparer>,
+        boost::heap::mutable_<true>> m_Heap;
 
 public:
     using BaseCase::BaseCase;

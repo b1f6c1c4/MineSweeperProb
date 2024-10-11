@@ -5,6 +5,7 @@
 #include <exception>
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
+#include <iterator>
 #include <sys/sysinfo.h>
 #include <condition_variable>
 #include <sstream>
@@ -128,7 +129,7 @@ void HolderCase::ReportDanger(ActionCase *self, double v)
         std::lock_guard lock{ mtx };
         self->Danger += v;
 
-        m_Heap.decrease(self->Handle);
+        m_Heap.update(self->Handle);
 
         auto next = m_Heap.top()->Danger;
         increase = next > Danger ? next - Danger : 0;
@@ -269,9 +270,13 @@ std::string ForkedCase::ToString() const
 
 std::string HolderCase::ToString() const
 {
+    std::vector<double> tmp;
+    std::transform(m_Heap.ordered_begin(), m_Heap.ordered_end(),
+            std::back_inserter(tmp),
+            [](ActionCase *ac){ return ac->Danger; });
     return fmt::format("{}[{:3g}]",
             BaseCase::ToString(),
-            fmt::join(std::views::transform(m_Heap, [](ActionCase *ac){ return ac->Danger; }), " "));
+            fmt::join(tmp, " "));
 }
 
 std::string ActionCase::ToString() const
