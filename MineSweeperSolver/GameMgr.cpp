@@ -59,6 +59,7 @@ GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(
             READ(blk.Degree);
             READ(blk.IsOpen);
             READ(blk.IsMine);
+            READ(blk.IsRelevant2);
             if (blk.IsOpen)
                 m_Solver->AddRestrain(blk.Index, blk.IsMine);
         }
@@ -674,6 +675,7 @@ void GameMgr::Save(std::ostream &sw) const
             WRITE(blk.Degree);
             WRITE(blk.IsOpen);
             WRITE(blk.IsMine);
+            WRITE(blk.IsRelevant2);
         }
 }
 
