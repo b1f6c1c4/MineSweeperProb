@@ -2,6 +2,7 @@
 #include "facade.hpp"
 #include "Prover.h"
 #include "GameMgr.h"
+#include <mimalloc-new-delete.h>
 #include <exception>
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
