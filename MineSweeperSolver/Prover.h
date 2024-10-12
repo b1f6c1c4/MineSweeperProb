@@ -4,6 +4,7 @@
 #include "GameMgr.h"
 #include "BinomialHelper.h"
 #include <atomic>
+#include <concepts>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -21,6 +22,29 @@ using PGame = std::shared_ptr<GameMgr>;
 #endif
 #endif
 
+class Trie
+{
+public:
+    struct node_t
+    {
+        std::mutex mtx;
+        std::atomic<PCase> p;
+        // degree: 9 if unopened
+        std::array<std::atomic<node_t *>, 11zu> next;
+    };
+
+private:
+    node_t root;
+    std::atomic<size_t> cnt;
+    node_t *ensure(node_t *ptr, int d);
+
+public:
+    node_t *find(PCase c, int special = -1);
+
+    [[nodiscard]] auto size() const { return cnt.load(std::memory_order_relaxed); }
+};
+
+using node_t = Trie::node_t;
 
 struct BaseCase
 {
@@ -53,6 +77,8 @@ struct BaseCase
 #define Traceback ""
 #endif
 
+    int LargestModifiedIndex;
+
 protected:
     std::variant<std::monostate, std::string, PGame> m_Game;
 };
@@ -60,7 +86,10 @@ protected:
 struct ForkedCase : BaseCase
 {
     ForkedCase(PCase p, PGame g, int id)
-        : BaseCase{ p, g }, Id{ id }, m_Degree{} { }
+        : BaseCase{ p, g }, Id{ id }, m_Degree{}
+    {
+        LargestModifiedIndex = std::max(LargestModifiedIndex, Id);
+    }
 
     int Id;
 

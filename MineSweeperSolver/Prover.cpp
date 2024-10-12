@@ -3,7 +3,6 @@
 #include "Prover.h"
 #include "GameMgr.h"
 #include <mimalloc-new-delete.h>
-#include <exception>
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
 #include <iterator>
@@ -14,26 +13,27 @@
 #include <thread>
 #include <ranges>
 
-#include <fstream>
-
 #ifndef TRACEBACK
 #define Traceback ""
 #endif
 
+Trie g_Trie{};
 Strategy g_Strategy;
+PCase g_InvalidCase;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
 std::atomic<unsigned> g_MaxDepth;
 std::atomic<double> g_MemoryAvailPercent;
 std::atomic<size_t> g_Processed;
 
-auto updateDepth(unsigned d)
+template <typename T>
+std::optional<T> updateMax(std::atomic<T> &v, T d)
 {
-    auto old = g_MaxDepth.load();
+    auto old = v.load();
     while (d > old)
-        if (g_MaxDepth.compare_exchange_weak(old, d))
-            break;
-    return d;
+        if (v.compare_exchange_weak(old, d))
+            return d;
+    return {};
 }
 
 void updateMemoryAvailPercent()
@@ -47,11 +47,44 @@ void updateMemoryAvailPercent()
     g_MemoryAvailPercent.store(100.0 * avail / total);
 }
 
+node_t *Trie::find(PCase c, int special)
+{
+    auto ptr = &root;
+    auto sid = c->IsHolder() ? -1 : static_cast<ForkedCase *>(c)->Id;
+    for (auto id = 0; id <= c->LargestModifiedIndex; id++)
+    {
+        auto blk = c->Game().GetBlockProperties()[id];
+        auto degree = id == sid ? special : blk.IsOpen ? blk.Degree : 9;
+        ptr = ensure(ptr, degree);
+    }
+    return ptr;
+}
+
+node_t *Trie::ensure(node_t *ptr, int d)
+{
+    if (d < 0 || d >= ptr->next.size())
+        throw std::logic_error{ "Index out of bound" };
+    auto &nxt = ptr->next[d];
+    auto next = nxt.load(std::memory_order_acquire);
+    if (next)
+        return next;
+
+    std::lock_guard lock{ ptr->mtx };
+    if ((next = nxt.load(std::memory_order_relaxed)))
+        return next;
+
+    next = new node_t{};
+    ++cnt;
+    nxt.store(next, std::memory_order_release);
+    return next;
+}
+
 BaseCase::BaseCase(PCase p)
     : parent{ p },
       TotalStates{ p->TotalStates },
       Depth{ p->Depth },
       Duplication{},
+      LargestModifiedIndex{ p->LargestModifiedIndex },
       m_Game{ p->m_Game } { }
 
 BaseCase::BaseCase(PCase p, PGame game)
@@ -59,6 +92,7 @@ BaseCase::BaseCase(PCase p, PGame game)
       TotalStates{ game->GetSolver().GetTotalStates() },
       Depth{ p ? p->Depth : 0u },
       Duplication{},
+      LargestModifiedIndex{ p ? p->LargestModifiedIndex : 0 },
       m_Game{ std::move(game) } { }
 
 BaseCase::~BaseCase() = default;
@@ -204,20 +238,44 @@ PCase ForkedCase::Fork()
     {
         if (m_Degree < lb)
             continue;
-        auto g = std::make_shared<GameMgr>(Game());
-        g->SetBlockDegree(Id, m_Degree);
-        g->Solve(HEUR, false);
-        if (!g->GetStarted()) // infeasible
-            continue;
-        if (g->GetSolver().GetTotalStates() == 1)
-            continue; // guaranteed win
-        auto p = Ephermeral ? parent : this;
-        auto c = g->GetBestBlockCount()
-            ? static_cast<BaseCase *>(new SafeCase(p, g))
-            : new UnsafeCase(p, g);
+
+        auto node = g_Trie.find(this, m_Degree);
+        PCase c;
+        if ((c = node->p.load(std::memory_order_acquire)))
+            goto child;
+
+        {
+            std::lock_guard lock{ node->mtx };
+            if ((c = node->p.load(std::memory_order_relaxed)))
+                goto child;
+
+            auto g = std::make_shared<GameMgr>(Game());
+            g->SetBlockDegree(Id, m_Degree);
+            g->Solve(HEUR, false);
+            if (!g->GetStarted() // infeasible
+                    || g->GetSolver().GetTotalStates() == 1) // guaranteed win
+            {
+                node->p.store(g_InvalidCase, std::memory_order_relaxed);
+                continue;
+            }
+
+            auto p = Ephermeral ? parent : this;
+            if (g->GetBestBlockCount())
+                c = new SafeCase(p, g);
+            else
+                c = new UnsafeCase(p, g);
+            if constexpr (Ephermeral) {
+                c->LargestModifiedIndex = LargestModifiedIndex;
+            }
 #ifdef TRACEBACK
-        c->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
+            c->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
+            node->p.store(c, std::memory_order_release);
+        }
+child:
+        if (c == g_InvalidCase)
+            continue;
+
         m_Degree++;
         return c;
     }
@@ -228,7 +286,7 @@ ActionCase::ActionCase(PCase p, PGame g, int id)
     : ForkedCase{ p, g, id },
       Danger{ Game().GetBlockProbability(id) * TotalStates }
 {
-    updateDepth(++Depth);
+    updateMax(g_MaxDepth, ++Depth);
 }
 
 PCase ActionCase::Fork()
@@ -272,11 +330,13 @@ PCase UnsafeCase::Fork()
 std::string BaseCase::ToString() const
 {
     if (!std::holds_alternative<PGame>(m_Game))
-        return fmt::format("[dp{} TS={:3g}]",
+        return fmt::format("[dp{} LMI{} TS={:3g}]",
                 Depth,
+                LargestModifiedIndex,
                 TotalStates);
-    return fmt::format("[dp{} G={} TS={:3g}]",
+    return fmt::format("[dp{} LMI{} G={} TS={:3g}]",
             Depth,
+            LargestModifiedIndex,
             fmt::ptr(std::get<PGame>(m_Game).get()),
             TotalStates);
 }
@@ -418,13 +478,14 @@ public:
         std::unique_lock lock{ mtx };
         cve.wait_for(lock, t);
 
-        fmt::print("x{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} m{:.3f}%\n",
+        fmt::print("x{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} t{} m{:.3f}%\n",
                 100.0 * root->GetDanger() / root->TotalStates,
                 100.0 * c.front()->TotalStates / root->TotalStates,
                 c.front()->Depth,
                 g_Processed.load(),
                 c.size(),
                 g_MaxDepth.load(),
+                g_Trie.size(),
                 g_MemoryAvailPercent.load());
 
         return !done();
@@ -469,6 +530,7 @@ int main(int argc, char *argv[])
     ConcurrentPriorityQueue queue{};
     auto game = std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, &g_Strategy);
     auto root = new HolderCase(nullptr, game);
+    g_InvalidCase = root; // random value
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
     auto ac = new ActionCase(root, root->ThePGame(), cfg.Index);
     root->AddChildren(ac);
