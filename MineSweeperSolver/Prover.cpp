@@ -103,9 +103,19 @@ PGame BaseCase::ThePGame()
     if (std::holds_alternative<PGame>(m_Game))
         return std::get<PGame>(m_Game);
 
-    std::stringstream ss{ std::get<std::string>(std::move(m_Game)) };
-    m_Game = std::make_shared<GameMgr>(ss, &g_Strategy);
-    return std::get<PGame>(m_Game);
+    if (std::holds_alternative<std::string>(m_Game))
+    {
+        std::stringstream ss{ std::get<std::string>(std::move(m_Game)) };
+        m_Game = std::make_shared<GameMgr>(ss, &g_Strategy);
+        return std::get<PGame>(m_Game);
+    }
+
+#ifdef TRACEBACK
+    fmt::print("ERROR: Attempts to get depleted:\n");
+    PrintTraceback();
+#endif
+
+    throw std::logic_error{ "Already depleted" };
 }
 
 PCase BaseCase::CheckedFork()
@@ -243,12 +253,12 @@ PCase ForkedCase::Fork()
         auto node = g_Trie.find(this, m_Degree);
         PCase c;
         if ((c = node->p.load(std::memory_order_acquire)))
-            goto child;
+            continue;
 
         {
             std::lock_guard lock{ node->mtx };
             if ((c = node->p.load(std::memory_order_relaxed)))
-                goto child;
+                continue;
 
             auto g = std::make_shared<GameMgr>(Game());
             g->SetBlockDegree(Id, m_Degree);
@@ -271,7 +281,8 @@ PCase ForkedCase::Fork()
 #ifdef TRACEBACK
             c->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
-            node->p.store(c, std::memory_order_release);
+            // TODO: actually store the results
+            // node->p.store(c, std::memory_order_release);
         }
 child:
         if (c == g_InvalidCase)
@@ -427,7 +438,7 @@ public:
             c.push_back(p);
             std::ranges::push_heap(c, Comparer{});
             if (g_MemoryAvailPercent.load() < 10
-                    || p->ShallDeflate())
+                || p->ShallDeflate() && g_MemoryAvailPercent.load() < 20)
                 p->Deflate();
         }
         cv.notify_one();
