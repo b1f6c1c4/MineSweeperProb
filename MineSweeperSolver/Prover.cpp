@@ -20,7 +20,7 @@
 
 Trie g_Trie{};
 Strategy g_Strategy;
-PCase g_InvalidCase;
+RCase g_InvalidCase;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
 std::atomic<unsigned> g_MaxDepth;
@@ -165,84 +165,70 @@ bool HolderCase::Comparer::operator()(ActionCase *lhs, ActionCase *rhs) const
 
 void HolderCase::AddChildren(ActionCase *v)
 {
-    std::lock_guard lock{ mtx };
+    std::unique_lock lock{ mtx };
     v->Handle = m_Heap.push(v);
 }
 
-bool HolderCase::ReportDanger(ActionCase *self, double v)
+void HolderCase::ReportDanger(ActionCase *self, double v)
 {
-    auto increase = 0.0;
     if (!self)
-    {
-        increase = Danger = v; // initial danger prediction from UnsafeCase
-    }
+        return ReportDangerUp(Danger = v); // initial danger prediction from UnsafeCase
+
+    std::unique_lock lock{ mtx };
+
+    self->Danger += v;
+
+    m_Heap.update(self->Handle);
+
+    auto next = m_Heap.top()->Danger;
+
+    auto increase = next > Danger ? next - Danger : 0;
+#ifndef NDEBUG
+    if (!increase)
+        fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}]]]\n",
+                self->ToString(),
+                fmt::ptr(self),
+                v,
+                self->Danger,
+                ToString(),
+                fmt::ptr(this));
     else
-    {
-        std::lock_guard lock{ mtx };
-
-        self->Danger += v;
-
-        m_Heap.update(self->Handle);
-
-        auto next = m_Heap.top()->Danger;
-
-        increase = next > Danger ? next - Danger : 0;
-#ifndef NDEBUG
-        if (!increase)
-            fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}]]]\n",
-                    self->ToString(),
-                    fmt::ptr(self),
-                    v,
-                    self->Danger,
-                    ToString(),
-                    fmt::ptr(this));
-        else
-            fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}:{:5e}+={:5e}->{:5e}]]]\n",
-                    self->ToString(),
-                    fmt::ptr(self),
-                    v,
-                    self->Danger,
-                    ToString(),
-                    fmt::ptr(this),
-                    Danger,
-                    increase,
-                    next);
+        fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}:{:5e}+={:5e}->{:5e}]]]\n",
+                self->ToString(),
+                fmt::ptr(self),
+                v,
+                self->Danger,
+                ToString(),
+                fmt::ptr(this),
+                Danger,
+                increase,
+                next);
 #endif
-        Danger = next;
-    }
+    Danger = next;
+    lock.unlock();
 
-    if (increase && parent)
-    {
-#ifndef NDEBUG
-        auto ac = dynamic_cast<ActionCase *>(parent);
-        if (!ac)
-            throw std::logic_error{ "Parent of ActionCase must be HolderCase!" };
-#else
-        auto ac = reinterpret_cast<ActionCase *>(parent);
-#endif
-        return ac->ReportDanger(increase);
-    }
-    return false;
+    ReportDangerUp(increase);
 }
 
-bool ActionCase::ReportDanger(double v)
+void ActionCase::ReportDanger(double v)
 {
     if (!v)
-        return false;
+        return;
 
 #ifndef NDEBUG
     auto hc = dynamic_cast<HolderCase *>(parent);
     if (!hc)
         throw std::logic_error{ "Parent of ActionCase must be HolderCase!" };
 #else
-    auto hc = reinterpret_cast<HolderCase *>(parent);
+    auto hc = static_cast<HolderCase *>(parent);
 #endif
-    return hc->ReportDanger(this, v);
+    hc->ReportDanger(this, v);
 }
 
 template <bool Ephermeral>
-PCase ForkedCase::Fork()
+RCase ForkedCase::Fork()
 {
+    auto p = static_cast<ActionCase *>(Ephermeral ? parent : this);
     auto [lb, ub] = Game().GetDegreeBounds(Id);
     for (; m_Degree <= ub; m_Degree++)
     {
@@ -250,14 +236,14 @@ PCase ForkedCase::Fork()
             continue;
 
         auto node = g_Trie.find(this, m_Degree);
-        PCase c;
+        RCase c;
         if ((c = node->p.load(std::memory_order_acquire)))
-            continue;
+            goto child;
 
         {
             std::lock_guard lock{ node->mtx };
             if ((c = node->p.load(std::memory_order_relaxed)))
-                continue;
+                goto child;
 
             auto g = std::make_shared<GameMgr>(Game());
             g->SetBlockDegree(Id, m_Degree);
@@ -269,26 +255,27 @@ PCase ForkedCase::Fork()
                 continue;
             }
 
-            auto p = Ephermeral ? parent : this;
             if (g->GetBestBlockCount())
-                c = new SafeCase(p, g);
+                c = new SafeCase(p, g, LargestModifiedIndex);
             else
-                c = new UnsafeCase(p, g);
-            if constexpr (Ephermeral) {
-                c->LargestModifiedIndex = LargestModifiedIndex;
-            }
+                c = new UnsafeCase(p, g, LargestModifiedIndex);
 #ifdef TRACEBACK
-            c->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
+            c->operator PCase()->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
-            // TODO: actually store the results
-            // node->p.store(c, std::memory_order_release);
+            node->p.store(c, std::memory_order_release);
+            m_Degree++;
+            return c;
         }
 child:
         if (c == g_InvalidCase)
             continue;
-
-        m_Degree++;
-        return c;
+        p->ReportDanger(c->GatherDangerAndAssignParent(p));
+        // note that we shouldn't report c to main queue
+#ifndef NDEBUG
+        fmt::print("DUPLICATION on {} (@{})\n",
+            c->operator PCase()->ToString(),
+            fmt::ptr(c->operator PCase()));
+#endif
     }
     return nullptr;
 }
@@ -314,16 +301,46 @@ PCase ActionCase::Fork()
         m_Game = g;
     }
 
-    return ForkedCase::Fork<false>();
+    return ReportingCase::ToPCase(ForkedCase::Fork<false>());
 }
 
-UnsafeCase::UnsafeCase(PCase p, PGame g)
+PCase SafeCase::Fork()
+{
+    auto c = ForkedCase::Fork<true>();
+    if (c)
+    {
+        std::unique_lock lock{ m_Mutex };
+        // ensure child is registered before handing it to main()
+        m_Children.push_back(c);
+    }
+    return ReportingCase::ToPCase(c);
+}
+
+double SafeCase::GatherDangerAndAssignParent(ActionCase *c)
+{
+    auto sum = 0.0;
+    std::shared_lock lock{ m_Mutex };
+    for (auto r : m_Children)
+        sum += r->GatherDangerAndAssignParent(c);
+    return sum;
+}
+
+UnsafeCase::UnsafeCase(PCase p, PGame g, int lmi)
     : HolderCase{ p, g },
       m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
       m_It{ m_List.begin() }
 {
+    LargestModifiedIndex = lmi;
     Duplication = g->GetPreferredBlockCount();
     ReportDanger(nullptr, g->GetMinProbability() * TotalStates);
+}
+
+void UnsafeCase::ReportDangerUp(double v)
+{
+    std::shared_lock lock{ mtx };
+    static_cast<ActionCase *>(parent)->ReportDanger(v);
+    for (auto c : m_AdditionalParents)
+        c->ReportDanger(v);
 }
 
 PCase UnsafeCase::Fork()
@@ -336,6 +353,13 @@ PCase UnsafeCase::Fork()
     }
 
     return nullptr;
+}
+
+double UnsafeCase::GatherDangerAndAssignParent(ActionCase *c)
+{
+    std::unique_lock lock{ mtx };
+    m_AdditionalParents.push_back(c);
+    return Danger;
 }
 
 std::string BaseCase::ToString() const
@@ -390,10 +414,11 @@ std::string SafeCase::ToString() const
 
 std::string UnsafeCase::ToString() const
 {
-    return fmt::format("Unsafe{}~{}:D{}",
+    return fmt::format("Unsafe{}~{}:D{}P{}",
             HolderCase::ToString(),
             Traceback,
-            Duplication);
+            Duplication,
+            m_AdditionalParents | std::views::transform([](ActionCase *c) { return fmt::ptr(c); }));
 }
 
 class ConcurrentPriorityQueue
@@ -543,7 +568,7 @@ int main(int argc, char *argv[])
     ConcurrentPriorityQueue queue{};
     auto game = std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, &g_Strategy);
     auto root = new HolderCase(nullptr, game);
-    g_InvalidCase = root; // random value
+    g_InvalidCase = reinterpret_cast<ReportingCase *>(root); // random value
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
     auto ac = new ActionCase(root, root->ThePGame(), cfg.Index);
     root->AddChildren(ac);
