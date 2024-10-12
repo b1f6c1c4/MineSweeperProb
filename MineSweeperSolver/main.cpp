@@ -1,60 +1,14 @@
 #include <csignal>
 #include <ctime>
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <set>
 #include <sys/sysinfo.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "Util.h"
 #include "random.h"
 #include "facade.hpp"
-
-NLOHMANN_JSON_SERIALIZE_ENUM(LogicMethod, {
-    { LogicMethod::Passive, "PL" },
-    { LogicMethod::Single, "SL" },
-    { LogicMethod::SingleExtended, "SLE" },
-    { LogicMethod::Double, "DL" },
-    { LogicMethod::DoubleExtended, "DLE" },
-    { LogicMethod::Full, "FL" },
-})
-
-std::string to_string(const std::vector<HeuristicMethod> &dt) {
-    if (dt.empty())
-        return "NH";
-    std::string str;
-    for (auto m: dt)
-        switch (m) {
-            case HeuristicMethod::None:
-                str.push_back(' ');
-                break;
-            case HeuristicMethod::MinMineProb:
-                str.push_back('P');
-                break;
-            case HeuristicMethod::MaxZeroProb:
-                str.push_back('Z');
-                break;
-            case HeuristicMethod::MaxZerosProb:
-                str.push_back('S');
-                break;
-            case HeuristicMethod::MaxZerosExp:
-                str.push_back('E');
-                break;
-            case HeuristicMethod::MaxQuantityExp:
-                str.push_back('Q');
-                break;
-            case HeuristicMethod::MinFrontierDist:
-                str.push_back('F');
-                break;
-            case HeuristicMethod::MaxUpperBound:
-                str.push_back('U');
-                break;
-            case HeuristicMethod::Relevant2:
-                str.push_back('2');
-                break;
-        }
-    return str;
-}
 
 static pid_t g_monitor;
 static std::sig_atomic_t g_exiting = 0;
@@ -294,8 +248,7 @@ int main(int argc, char *argv[]) {
     sigaction(SIGTERM, &sa, nullptr);
     sigaction(SIGALRM, &sa, nullptr);
 
-    timespec start_of_computation;
-    clock_gettime(CLOCK_MONOTONIC, &start_of_computation);
+    NanoTimer timer_computation{};
 
     auto old_alarm = g_alarm;
     alarm(report_interval);
@@ -339,9 +292,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    finish:;
-    timespec end_of_computation;
-    clock_gettime(CLOCK_MONOTONIC, &end_of_computation);
+finish:
+    timer_computation.stop();
 
     close(fd[0]);
     kill(g_monitor, SIGTERM);
@@ -354,39 +306,15 @@ int main(int argc, char *argv[]) {
         exit(3);
     }
 
-    nlohmann::json j;
+    auto j = to_json(cfg);
     j["string"] = argv[1];
-    j["game"]["width"] = cfg.Width;
-    j["game"]["height"] = cfg.Height;
-    j["game"]["mines"] = cfg.TotalMines;
-    j["game"]["snr"] = cfg.IsSNR;
-    j["strategy"]["logic"] = cfg.Logic;
-    if (!cfg.InitialPositionSpecified)
-        j["strategy"]["initial"] = nullptr;
-    else
-        j["strategy"]["initial"] = { { "x", cfg.Index % cfg.Width + 1 },
-                                     { "y", cfg.Index / cfg.Width + 1 } };
-    if (!cfg.HeuristicEnabled)
-        j["strategy"]["heuristic"] = "Pure";
-    else {
-        j["strategy"]["heuristic"] = to_string(cfg.DecisionTree);
-    }
-    if (!cfg.ExhaustEnabled)
-        j["strategy"]["exhaust"] = 0;
-    else
-        j["strategy"]["exhaust"] = cfg.ExhaustCriterion;
-    if (!cfg.PruningEnabled)
-        j["strategy"]["pruning"] = 0;
-    else
-        j["strategy"]["pruning"] = cfg.PruningCriterion;
     j["result"]["pass"] = succeeded;
     j["result"]["fail"] = received - succeeded;
     j["result"]["error"] = errored;
     j["result"]["timeout"] = timeout;
     j["result"]["strange"] = strange;
-    j["exec"]["duration"] = static_cast<double>(end_of_computation.tv_sec - start_of_computation.tv_sec)
-                            + static_cast<double>(end_of_computation.tv_nsec - start_of_computation.tv_nsec) * 1e-9;
+    j["exec"]["duration"] = timer_computation.seconds();
     j["exec"]["cpu"] = nprocs;
-    j["exec"]["speed"] = static_cast<double>(received) / j["exec"]["duration"].get<double>() / nprocs;
+    j["exec"]["speed"] = static_cast<double>(received) / timer_computation.seconds() / nprocs;
     std::cout << j << std::endl;
 }

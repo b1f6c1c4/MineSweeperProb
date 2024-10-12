@@ -41,9 +41,11 @@ if(EMSCRIPTEN)
     target_link_libraries(MineSweeperSolver PRIVATE embind)
 else()
     find_package(Boost 1.81.0 REQUIRED)
+    target_sources(mws PRIVATE Util.cpp)
+    target_link_libraries(mws PUBLIC nlohmann_json::nlohmann_json)
+    target_link_libraries(mws PUBLIC pthread)
+
     add_executable(MineSweeperSolver main.cpp)
-    target_link_libraries(MineSweeperSolver PRIVATE nlohmann_json::nlohmann_json)
-    target_link_libraries(MineSweeperSolver PRIVATE pthread)
 
     add_executable(MineSweeperProver Prover.cpp)
     target_link_libraries(MineSweeperProver PRIVATE mws)

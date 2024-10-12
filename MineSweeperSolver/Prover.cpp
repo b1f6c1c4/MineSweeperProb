@@ -2,6 +2,7 @@
 #include "facade.hpp"
 #include "Prover.h"
 #include "GameMgr.h"
+#include "Util.h"
 #include <mimalloc-new-delete.h>
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
@@ -516,6 +517,8 @@ int main(int argc, char *argv[])
     using namespace std::chrono_literals;
     const auto report_interval = is_tty ? 5s : 60s;
     auto nprocs = argc < 3 ? get_nprocs() : std::atoi(argv[2]);
+#else
+    auto nprocs = 1;
 #endif
 
     auto cfg = parse(argv[1]);
@@ -550,6 +553,10 @@ int main(int argc, char *argv[])
     {
         while (queue.write_report(root, report_interval));
     });
+#endif
+
+    NanoTimer timer_computation{};
+#ifdef NDEBUG
     for (auto i = 0; i < nprocs; i++)
         threads.emplace_back([&]()
         {
@@ -612,6 +619,14 @@ int main(int argc, char *argv[])
     for (auto &th : threads)
         th.join();
 #endif
+    timer_computation.stop();
 
-    std::cout << root->GetDanger();
+    auto j = to_json(cfg);
+    j["string"] = argv[1];
+    j["result"]["danger"] = root->GetDanger();
+    j["result"]["ratio"] = 100.0 * root->GetDanger() / root->TotalStates;
+    j["exec"]["duration"] = timer_computation.seconds();
+    j["exec"]["cpu"] = nprocs;
+    j["exec"]["speed"] = static_cast<double>(g_Processed.load()) / timer_computation.seconds() / nprocs;
+    std::cout << j << std::endl;
 }
