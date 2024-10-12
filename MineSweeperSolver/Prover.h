@@ -33,7 +33,7 @@ struct BaseCase
     unsigned Depth;
     int Duplication;
 
-    [[nodiscard]] GameMgr &Game() { return *ThePGame(); }
+    [[nodiscard]] const GameMgr &Game() { return *ThePGame(); }
     [[nodiscard]] PGame ThePGame();
     BaseCase &Deflate();
     virtual void Deplete() { m_Game = std::monostate{}; }
@@ -48,6 +48,7 @@ struct BaseCase
 
 #ifdef TRACEBACK
     std::string Traceback;
+    void PrintTraceback() const;
 #else
 #define Traceback ""
 #endif
@@ -105,7 +106,7 @@ public:
 
     std::string ToString() const override;
 
-    void ReportDanger(ActionCase *self, double v);
+    bool ReportDanger(ActionCase *self, double v);
 
     auto GetDanger() const { return Danger; }
 
@@ -122,21 +123,11 @@ struct ActionCase : ForkedCase
 {
     ActionCase(PCase p, PGame g, int id);
 
-#ifdef NDEBUG
-    virtual void Deplete() override
-    {
-        if (m_Degree)
-            BaseCase::Deplete();
-        else
-            delete this;
-    }
-#endif
-
     PCase Fork() override;
 
     std::string ToString() const override;
 
-    void ReportDanger(double v);
+    bool ReportDanger(double v);
 
     // accumulated danger; protected by parent->mtx
     double Danger;
@@ -159,14 +150,7 @@ struct SafeCase : ForkedCase
 
 struct UnsafeCase : HolderCase
 {
-    UnsafeCase(PCase p, PGame g)
-        : HolderCase{ p, g },
-          m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
-          m_It{ m_List.begin() }
-    {
-        Duplication = g->GetPreferredBlockCount();
-        ReportDanger(nullptr, g->GetMinProbability() * TotalStates);
-    }
+    UnsafeCase(PCase p, PGame g);
 
     bool ShallDeflate() const override { return true; }
 

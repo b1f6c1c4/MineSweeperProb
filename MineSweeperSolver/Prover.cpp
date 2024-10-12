@@ -84,17 +84,24 @@ PCase BaseCase::CheckedFork()
     {
         fmt::print("Error: {}\n",
                 err.what());
-        fmt::print("Traceback::\n");
-        for (BaseCase *ptr = this; ptr; ptr = ptr->parent)
-            fmt::print("At {}\n",
-                    ptr->ToString());
-        fmt::print("=======\n");
+        PrintTraceback();
         throw;
     }
 #else
     return Fork();
 #endif
 }
+
+#ifdef TRACEBACK
+void BaseCase::PrintTraceback() const
+{
+    fmt::print("Traceback::\n");
+    for (auto ptr = this; ptr; ptr = ptr->parent)
+        fmt::print("At {}\n",
+                ptr->ToString());
+    fmt::print("=======\n");
+}
+#endif
 
 BaseCase &BaseCase::Deflate()
 {
@@ -118,7 +125,7 @@ void HolderCase::AddChildren(ActionCase *v)
     v->Handle = m_Heap.push(v);
 }
 
-void HolderCase::ReportDanger(ActionCase *self, double v)
+bool HolderCase::ReportDanger(ActionCase *self, double v)
 {
     auto increase = 0.0;
     if (!self)
@@ -128,11 +135,13 @@ void HolderCase::ReportDanger(ActionCase *self, double v)
     else
     {
         std::lock_guard lock{ mtx };
+
         self->Danger += v;
 
         m_Heap.update(self->Handle);
 
         auto next = m_Heap.top()->Danger;
+
         increase = next > Danger ? next - Danger : 0;
 #ifndef NDEBUG
         if (!increase)
@@ -167,14 +176,16 @@ void HolderCase::ReportDanger(ActionCase *self, double v)
 #else
         auto ac = reinterpret_cast<ActionCase *>(parent);
 #endif
-        ac->ReportDanger(increase);
+        return ac->ReportDanger(increase);
     }
+    return false;
 }
 
-void ActionCase::ReportDanger(double v)
+bool ActionCase::ReportDanger(double v)
 {
     if (!v)
-        return;
+        return false;
+
 #ifndef NDEBUG
     auto hc = dynamic_cast<HolderCase *>(parent);
     if (!hc)
@@ -182,7 +193,7 @@ void ActionCase::ReportDanger(double v)
 #else
     auto hc = reinterpret_cast<HolderCase *>(parent);
 #endif
-    hc->ReportDanger(this, v);
+    return hc->ReportDanger(this, v);
 }
 
 template <bool Ephermeral>
@@ -235,6 +246,15 @@ PCase ActionCase::Fork()
     }
 
     return ForkedCase::Fork<false>();
+}
+
+UnsafeCase::UnsafeCase(PCase p, PGame g)
+    : HolderCase{ p, g },
+      m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
+      m_It{ m_List.begin() }
+{
+    Duplication = g->GetPreferredBlockCount();
+    ReportDanger(nullptr, g->GetMinProbability() * TotalStates);
 }
 
 PCase UnsafeCase::Fork()
@@ -510,6 +530,9 @@ int main(int argc, char *argv[])
                 for (auto pp : buffer)
                 {
                     g_Processed++;
+#ifndef NDEBUG
+                    fmt::print("  >@{0}\n", fmt::ptr(pp));
+#endif
                     for (PCase ppp; (ppp = pp->CheckedFork());)
                     {
 #ifndef NDEBUG
