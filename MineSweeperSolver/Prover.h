@@ -13,7 +13,13 @@
 #include <boost/heap/d_ary_heap.hpp>
 
 struct BaseCase;
+struct ForkedCase;
+struct SafeCase;
+struct ActionCase;
+struct UnsafeCase;
+
 using PCase = BaseCase *;
+using FCase = ForkedCase *;
 using PGame = std::shared_ptr<GameMgr>;
 
 #ifndef NDEBUG
@@ -39,7 +45,7 @@ private:
     node_t *ensure(node_t *ptr, int d);
 
 public:
-    node_t *find(PCase c, int special = -1);
+    node_t *find(FCase c, int special = -1);
 
     [[nodiscard]] auto size() const { return cnt.load(std::memory_order_relaxed); }
 };
@@ -103,8 +109,6 @@ struct ForkedCase : BaseCase
 protected:
     int m_Degree;
 };
-
-struct ActionCase;
 
 struct HolderCase : BaseCase
 {

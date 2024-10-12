@@ -48,14 +48,13 @@ void updateMemoryAvailPercent()
     g_MemoryAvailPercent.store(100.0 * avail / total);
 }
 
-node_t *Trie::find(PCase c, int special)
+node_t *Trie::find(FCase c, int special)
 {
     auto ptr = &root;
-    auto sid = c->IsHolder() ? -1 : static_cast<ForkedCase *>(c)->Id;
     for (auto id = 0; id <= c->LargestModifiedIndex; id++)
     {
         auto blk = c->Game().GetBlockProperties()[id];
-        auto degree = id == sid ? special : blk.IsOpen ? blk.Degree : 9;
+        auto degree = id == c->Id ? special : blk.IsOpen ? blk.Degree : 9;
         ptr = ensure(ptr, degree);
     }
     return ptr;
