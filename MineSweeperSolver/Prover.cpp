@@ -69,7 +69,7 @@ PGame BaseCase::ThePGame()
         return std::get<PGame>(m_Game);
 
     std::stringstream ss{ std::get<std::string>(std::move(m_Game)) };
-    m_Game = std::make_shared<GameMgr>(ss, g_Strategy);
+    m_Game = std::make_shared<GameMgr>(ss, &g_Strategy);
     return std::get<PGame>(m_Game);
 }
 
@@ -467,7 +467,7 @@ int main(int argc, char *argv[])
     g_Strategy = cfg;
 
     ConcurrentPriorityQueue queue{};
-    auto game = std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, g_Strategy);
+    auto game = std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, &g_Strategy);
     auto root = new HolderCase(nullptr, game);
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
     auto ac = new ActionCase(root, root->ThePGame(), cfg.Index);

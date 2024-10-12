@@ -150,7 +150,7 @@ Configuration parse(const char *hsh)
 
 bool run(const Configuration &Config)
 {
-    GameMgr mgr(Config.Width, Config.Height, Config.TotalMines, Config.IsSNR, Config, false);
+    GameMgr mgr(Config.Width, Config.Height, Config.TotalMines, Config.IsSNR, &Config, false);
     mgr.Automatic();
     return mgr.GetSucceed();
 }

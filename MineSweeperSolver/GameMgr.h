@@ -36,15 +36,15 @@ class
     GameMgr
 {
 public:
-    GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess = false);
-    GameMgr(int width, int height, int totalMines, Strategy strategy);
-    GameMgr(std::istream &sr, Strategy strategy);
+    GameMgr(int width, int height, int totalMines, bool isSNR, const Strategy *strategy, bool allowWrongGuess = false);
+    GameMgr(int width, int height, int totalMines, const Strategy *strategy);
+    GameMgr(std::istream &sr, const Strategy *strategy);
     GameMgr(const GameMgr &) = default;
     GameMgr(GameMgr &&) noexcept = default;
     GameMgr &operator=(const GameMgr &) = default;
     GameMgr &operator=(GameMgr &&) noexcept = default;
 
-    Strategy BasicStrategy;
+    const Strategy *BasicStrategy;
 
     Solver &GetSolver();
     [[nodiscard]] const Solver &GetSolver() const;

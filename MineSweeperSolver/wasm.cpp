@@ -123,7 +123,7 @@ private:
     std::string revert(GameMgr &m, size_t n) const {
         auto &mo = memo[n];
         std::stringstream ss{ mo.first };
-        m = GameMgr{ ss, st };
+        m = GameMgr{ ss, &st };
         return mo.second;
     }
 };
@@ -190,8 +190,8 @@ EMSCRIPTEN_BINDINGS(mws) {
     register_vector<Block>("BlockSet");
     register_vector<double>("VectorDouble");
     class_<GameMgr>("GameMgr")
-        .constructor<int, int, int, bool, Strategy, bool>()
-        .constructor<int, int, int, Strategy>()
+        .constructor<int, int, int, bool, const Strategy *, bool>()
+        .constructor<int, int, int, const Strategy *>()
         .function("openBlock", &GameMgr::OpenBlock)
         .function("solve", &GameMgr::Solve)
         .function("semiAutomaticStep", &GameMgr::SemiAutomaticStep)

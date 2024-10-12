@@ -7,9 +7,9 @@
 #include <stdexcept>
 #include <utility>
 
-GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy strategy, bool allowWrongGuess) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
+GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, const Strategy *strategy, bool allowWrongGuess) : BasicStrategy(strategy), m_IsExternal(false), m_AllowWrongGuess(allowWrongGuess), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(isSNR), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(width * height - totalMines), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
 {
-    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double)
+    if (BasicStrategy->Logic == LogicMethod::Single || BasicStrategy->Logic == LogicMethod::Double)
         m_Solver.emplace(m_TotalWidth * m_TotalHeight);
     else
         m_Solver.emplace(m_TotalWidth * m_TotalHeight, m_TotalMines);
@@ -17,9 +17,9 @@ GameMgr::GameMgr(int width, int height, int totalMines, bool isSNR, Strategy str
     m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
+GameMgr::GameMgr(int width, int height, int totalMines, const Strategy *strategy) : BasicStrategy(strategy), m_IsExternal(true), m_AllowWrongGuess(false), m_TotalWidth(width), m_TotalHeight(height), m_TotalMines(totalMines), m_IsSNR(false), m_Settled(true), m_Started(true), m_Succeed(false), m_ToOpen(-1), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(-1)
 {
-    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || m_TotalMines == -1)
+    if (BasicStrategy->Logic == LogicMethod::Single || BasicStrategy->Logic == LogicMethod::Double || m_TotalMines == -1)
         m_Solver.emplace(m_TotalWidth * m_TotalHeight);
     else
         m_Solver.emplace(m_TotalWidth * m_TotalHeight, m_TotalMines);
@@ -30,7 +30,7 @@ GameMgr::GameMgr(int width, int height, int totalMines, Strategy strategy) : Bas
         m_AllBits = log2(Binomial(m_TotalWidth * m_TotalHeight, m_TotalMines));
 }
 
-GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(strategy)), m_IsExternal(false), m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(0)
+GameMgr::GameMgr(std::istream &sr, const Strategy *strategy) : BasicStrategy(strategy), m_IsExternal(false), m_AllowWrongGuess(false), m_TotalWidth(0), m_TotalHeight(0), m_TotalMines(0), m_IsSNR(false), m_Settled(false), m_Started(true), m_Succeed(false), m_ToOpen(0), m_WrongGuesses(0), m_Solver{}, m_Drainer{}, m_LastProbe(0)
 {
 #define READ(val) sr.read(reinterpret_cast<char *>(&(val)), sizeof(val))
     READ(m_IsExternal);
@@ -45,7 +45,7 @@ GameMgr::GameMgr(std::istream &sr, Strategy strategy) : BasicStrategy(std::move(
     READ(m_WrongGuesses);
     READ(m_LastProbe);
 
-    if (BasicStrategy.Logic == LogicMethod::Single || BasicStrategy.Logic == LogicMethod::Double || !m_TotalMines)
+    if (BasicStrategy->Logic == LogicMethod::Single || BasicStrategy->Logic == LogicMethod::Double || !m_TotalMines)
         m_Solver.emplace(m_TotalWidth * m_TotalHeight);
     else
         m_Solver.emplace(m_TotalWidth * m_TotalHeight, m_TotalMines);
@@ -363,13 +363,13 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
                 throw std::runtime_error("not open but blank");
 #endif
 
-    if (!BasicStrategy.HeuristicEnabled ||
+    if (!BasicStrategy->HeuristicEnabled ||
         (maxDepth & SolvingState::Heuristic) == SolvingState::Stale &&
         (maxDepth & SolvingState::Drained) == SolvingState::Stale)
         return;
 
-    if ((maxDepth & SolvingState::Drained) == SolvingState::Drained && BasicStrategy.ExhaustEnabled)
-        if (!m_Drainer && m_Solver->GetTotalStates() <= (BasicStrategy.PruningEnabled ? BasicStrategy.PruningCriterion : BasicStrategy.ExhaustCriterion) &&
+    if ((maxDepth & SolvingState::Drained) == SolvingState::Drained && BasicStrategy->ExhaustEnabled)
+        if (!m_Drainer && m_Solver->GetTotalStates() <= (BasicStrategy->PruningEnabled ? BasicStrategy->PruningCriterion : BasicStrategy->ExhaustCriterion) &&
             (m_Solver->GetTotalStates() > 2 || m_ToOpen > 1))
         {
             EnableDrainer(true);
@@ -386,7 +386,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             m_Preferred = m_Drainer->GetBestBlocks();
     }
 
-    if (!BasicStrategy.HeuristicEnabled)
+    if (!BasicStrategy->HeuristicEnabled)
         return;
 
     if (m_Preferred.empty())
@@ -399,7 +399,7 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
 
 #define LARGEST(exp) Largest(m_Preferred, [this](Block blk) { return exp; } )
 
-    for (auto heu : BasicStrategy.DecisionTree)
+    for (auto heu : BasicStrategy->DecisionTree)
         switch (heu)
         {
         case HeuristicMethod::MinMineProb:
@@ -534,9 +534,9 @@ void GameMgr::AutomaticStep(SolvingState maxDepth)
     if (!m_Started)
         return;
 
-    if (!m_Settled && BasicStrategy.InitialPositionSpecified)
+    if (!m_Settled && BasicStrategy->InitialPositionSpecified)
     {
-        OpenBlockImpl(m_LastProbe = BasicStrategy.Index);
+        OpenBlockImpl(m_LastProbe = BasicStrategy->Index);
         return;
     }
 
@@ -550,7 +550,7 @@ void GameMgr::Automatic(bool drain)
         throw std::runtime_error("external games cannot be automated");
 
     SolvingState st;
-    switch (BasicStrategy.Logic)
+    switch (BasicStrategy->Logic)
     {
     case LogicMethod::Passive:
         st = SolvingState::Stale;
@@ -571,14 +571,14 @@ void GameMgr::Automatic(bool drain)
     }
 
     if (!m_Settled)
-        if (BasicStrategy.InitialPositionSpecified)
-            OpenBlockImpl(m_LastProbe = BasicStrategy.Index);
-        else if (!BasicStrategy.HeuristicEnabled)
+        if (BasicStrategy->InitialPositionSpecified)
+            OpenBlockImpl(m_LastProbe = BasicStrategy->Index);
+        else if (!BasicStrategy->HeuristicEnabled)
             OpenBlockImpl(m_LastProbe = RandomInteger(m_Blocks.size()));
 
     if (st == SolvingState::Stale) // Passive Logic
     {
-        if (!BasicStrategy.HeuristicEnabled)
+        if (!BasicStrategy->HeuristicEnabled)
         {
             m_Started = false;
             return;
@@ -601,7 +601,7 @@ void GameMgr::Automatic(bool drain)
         {
             SemiAutomatic(st);
 
-            if (!BasicStrategy.HeuristicEnabled)
+            if (!BasicStrategy->HeuristicEnabled)
             {
                 m_Started = false;
                 break;
