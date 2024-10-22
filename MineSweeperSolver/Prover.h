@@ -1,6 +1,8 @@
 #pragma once
 #include <atomic>
+#include <boost/thread/pthread/shared_mutex.hpp>
 #include <concepts>
+#include <condition_variable>
 #include <forward_list>
 #include <limits>
 #include <memory>
@@ -99,6 +101,7 @@ struct BaseCase
     int LargestModifiedIndex;
 
     void *RegistryNext;
+    void *QueueNext;
 
 protected:
     std::variant<std::monostate, std::string, PGame> m_Game;
@@ -216,37 +219,64 @@ private:
 class CaseRegistry
 {
     std::atomic<ACase> m_ActionCases;
-    std::atomic<unsigned> m_MaxStep;
 
-    mutable std::shared_mutex m_Mutex;
+    // some statistics, never locked
+    std::atomic<unsigned> m_MaxStep;
+    std::atomic<size_t> m_Processed, m_Pending;
+    // count number of outstanding cases
+    std::atomic<size_t> m_ACases, m_SCases, m_UCases;
+    std::atomic<size_t> m_ReapedSCases;
+
+    // rlocked by anything below
+    // wlocked by m_MaxDepth, m_Reaping, m_Completed change
+    mutable boost::upgrade_mutex m_Mutex;
+
+    // a depth has two stages: forking and reaping
+    //
+    // when m_Reaping == false:
+    //   m_PendingD0Cases ===Fork()>>>  m_PendingD1Cases
+    //                                  m_D1SafeCases
+    //                                  m_UnsafeCases.front()
+    //
+    // when m_Reaping == true:
+    //   m_D0SafeCases    ===>>>  delete
+    //
     unsigned m_MaxDepth;
-    std::forward_list<std::atomic<SCase>> m_SafeCases;
+    bool m_Reaping, m_Completed;
+
+    // it is guaranteed that (whenever rlocked by m_Mutex)
+    // when m_Reaping == false:
+    //   m_D0SafeCases <=> Depth == m_MaxDepth - 1
+    //     [[not changing]]
+    //   m_D1SafeCases <=> Depth == m_MaxDepth
+    //     [[being created]]
+    // when m_Reaping == true:
+    //   m_D0SafeCases <=> Depth == m_MaxDepth - 2
+    //     [[being removed]]
+    //   m_D1SafeCases <=> Depth == m_MaxDepth - 1
+    //     [[not changing]]
+    std::atomic<SCase> m_D0SafeCases, m_D1SafeCases;
+
+    // m_unsafeCases.front() <=> Depth == m_MaxDepth
     std::forward_list<std::atomic<UCase>> m_UnsafeCases;
 
-    std::atomic<size_t> m_ACases, m_SCases, m_UCases;
+    // it is guaranteed that (whenever rlocked by m_Mutex)
+    // m_PendingD0Cases <=> Depth == m_MaxDepth - 1
+    //    only decreasing
+    // m_PendingD1Cases <=> Depth == m_MaxDepth
+    //    only increasing
+    std::atomic<PCase> m_PendingD0Cases, m_PendingD1Cases;
 
-    auto &ensureList(auto &lst, unsigned d)
-    {
-        std::shared_lock lock{ m_Mutex };
-        if (d > m_MaxDepth)
-        {
-            lock.unlock();
-            std::unique_lock wlock{ m_Mutex };
-            while (d > m_MaxDepth)
-            {
-                m_MaxDepth++;
-                m_SafeCases.emplace_front();
-                m_UnsafeCases.emplace_front();
-            }
-            auto &atm = lst.front();
-            wlock.unlock();
-            return atm;
-        }
-        auto &atm = *std::next(lst.begin(), m_MaxDepth - d);
-        lock.unlock();
-        return atm;
-    }
+    // locked for ResolveDanger
+    // always rlock m_Mutex first then m_MutexRDaRS
+    std::mutex m_MutexRDaRS;
 
+    // wait for a stage change
+    boost::condition_variable_any m_CVStage;
+    // wait for completion
+    boost::condition_variable_any m_CVCompletion;
+
+    // you must hold rlock of m_Mutex before calling this!
     void updateMax(std::atomic<unsigned> &v, unsigned d)
     {
         auto old = v.load();
@@ -256,36 +286,81 @@ class CaseRegistry
         return;
     }
 
+    // you must hold rlock of m_Mutex before calling this!
     template <typename T>
         requires std::derived_from<T, BaseCase>
     void push(std::atomic<T *> &atm, T *v)
     {
-        auto &rn = *reinterpret_cast<T **>(&v->RegistryNext);
+        constexpr auto MPtr = std::is_same_v<T, BaseCase> ? &BaseCase::QueueNext : &BaseCase::RegistryNext;
+        auto &rn = *reinterpret_cast<T **>(&v->*MPtr);
         rn = atm.load(std::memory_order_acquire);
         while (!atm.compare_exchange_weak(rn, v));
     }
 
-    void ForeachActionCases(auto &&fun)
+    // you must hold rlock of m_Mutex before calling this!
+    // m_Borrowed is increased by one iff succeeded
+    template <typename T>
+        requires std::derived_from<T, BaseCase>
+    auto pop(std::atomic<T *> &atm)
     {
-        for (auto ac = m_ActionCases.load(std::memory_order_acquire); ac; ac = reinterpret_cast<ACase>(ac->RegistryNext))
-            fun(ac);
+        constexpr auto MPtr = std::is_same_v<T, BaseCase> ? &BaseCase::QueueNext : &BaseCase::RegistryNext;
+        auto c = atm.load(std::memory_order_acquire);
+        if (!c) return c;
+        ++m_Borrowed;
+        while (atm.compare_exchange_weak(c, reinterpret_cast<T *>(c->*MPtr), std::memory_order_acquire))
+            if (!c) { --m_Borrowed; return c; }
+        c->*MPtr = nullptr;
+        return c;
     }
 
-    void ForeachUnsafeCases(auto &&fun)
+    // you must hold rlock of m_Mutex before calling this!
+    template <typename T>
+        requires std::derived_from<T, BaseCase>
+    void foreach(std::atomic<T *> &atm, auto &&fun)
     {
-        auto it = [this]{ std::shared_lock lock{ m_Mutex }; return m_UnsafeCases.begin(); }();
-        for (; it != m_UnsafeCases.end(); ++it)
-            for (auto uc = it->load(std::memory_order_acquire); uc; uc = reinterpret_cast<UCase>(uc->RegistryNext))
-                fun(uc);
+        for (auto ptr = atm.load(std::memory_order_acquire); ptr; ptr = reinterpret_cast<T *>(ptr->RegistryNext))
+            fun(ptr);
     }
+
+    // you must hold rlock of m_Mutex before calling this!
+    void foreachUnsafeCases(auto &&fun)
+    {
+        auto it = [this]{ boost::shared_lock lock{ m_Mutex }; return m_UnsafeCases.begin(); }();
+        for (; it != m_UnsafeCases.end(); ++it)
+            foreach(*it, fun);
+    }
+
+    // you must hold rlock of m_Mutex before calling this!
+    void Fork(PCase p);
+    void Enqueue(PCase p);
 
 public:
+    // only indirectly called from CaseRegistry::Fork(PCase)
     void Save(ACase ac);
     void Save(SCase ac);
     void Save(UCase uc);
 
-    // only the dedicated thread can call this
-    size_t ResolveDangerAndReapSafes(HCase root, unsigned depth);
+    // worker thread entry
+    void Process();
+
+    template <typename T>
+    bool Resolve(T &&t)
+    {
+        std::shared_lock lock{ m_Mutex };
+        m_CVCompletion.wait_for(lock, t);
+        return !done();
+    }
+
+    template <typename T>
+    bool Wait(T &&t)
+    {
+        std::shared_lock lock{ m_Mutex };
+        m_CVCompletion.wait_for(lock, t);
+        return !done();
+    }
+
+    // anyone can call this
+    void ResolveDanger(HCase root);
 
     auto GetDepth() const
     {
@@ -303,4 +378,6 @@ public:
                 m_UCases.load(std::memory_order_relaxed)
                 );
     }
+
+    auto GetPending() { return m_Pending.load(std::memory_order_relaxed); }
 };

@@ -25,7 +25,6 @@ static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | Solv
 
 CaseRegistry g_Registry{};
 std::atomic<double> g_MemoryAvailPercent;
-std::atomic<size_t> g_Processed;
 
 void updateMemoryAvailPercent()
 {
@@ -77,6 +76,7 @@ BaseCase::BaseCase(PCase p)
       Duplication{},
       LargestModifiedIndex{ p->LargestModifiedIndex },
       RegistryNext{},
+      QueueNext{},
       m_Game{ p->m_Game } { }
 
 BaseCase::BaseCase(PCase p, PGame game)
@@ -87,6 +87,7 @@ BaseCase::BaseCase(PCase p, PGame game)
       Duplication{},
       LargestModifiedIndex{ p ? p->LargestModifiedIndex : 0 },
       RegistryNext{},
+      QueueNext{},
       m_Game{ std::move(game) } { }
 
 BaseCase::~BaseCase() = default;
@@ -430,159 +431,178 @@ void CaseRegistry::Save(ACase ac)
 void CaseRegistry::Save(SCase sc)
 {
     ++m_SCases;
-    push(ensureList(m_SafeCases, sc->Depth), sc);
+    boost::shared_lock lock{ m_Mutex };
+    if (sc->Depth != m_MaxDepth)
+        throw std::logic_error{ "Depth not matching" };
+    push(m_D1SafeCases, sc);
 }
 
 void CaseRegistry::Save(UCase uc)
 {
     ++m_UCases;
-    push(ensureList(m_UnsafeCases, uc->Depth), uc);
+    boost::shared_lock lock{ m_Mutex };
+    if (uc->Depth != m_MaxDepth)
+        throw std::logic_error{ "Depth not matching" };
+    push(m_UnsafeCases.front(), uc);
 }
 
-size_t CaseRegistry::ResolveDangerAndReapSafes(HCase root, unsigned depth)
+void CaseRegistry::Process()
 {
-    ForeachActionCases([](ACase ac){ ac->ResetDanger(); });
-    ForeachUnsafeCases([=](UCase uc){ uc->ResolveDangerAndReport(uc->Depth < depth); });
+    PCase c;
+
+    boost::upgrade_lock lock{ m_Mutex };
+
+again:
+    // anything could happen during this time, so check
+    if (m_Completed)
+        return nullptr;
+    if (m_Reaping)
+        goto reaping;
+    goto forking;
+
+forking:
+    if ((c = pop(m_PendingD0Cases))) { return c; }
+    // D0 is now empty, we need to enter reaping stage
+    if (lock.try_lock_upgrade())
+    {
+        // we offically enter reaping stage
+        m_MaxDepth++, m_Reaping = true;
+        m_UnsafeCases.emplace_front();
+        m_PendingD0Cases.store(
+                m_PendingD1Cases.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+        m_PendingD1Cases.store(nullptr, std::memory_order_relaxed);
+        m_CVStage.notify_all();
+        goto again;
+    }
+    goto wait;
+
+reaping:
+    while ((c = pop(m_D0SafeCases)))
+    {
+        ++m_ReapedSCases;
+        delete c;
+        --m_Borrowed;
+    }
+    // D0 is now empty, we need to enter forking stage
+    if (m_Borrowed.load(std::memory_order_relaxed))
+        goto wait;
+    {
+        boost::upgrade_to_unique_lock wlock{ lock };
+        if (m_Borrowed.load(std::memory_order_relaxed))
+            goto wait;
+        // we offically enter forking stage
+        m_Reaping = false;
+        m_D0SafeCases.store(
+                m_D1SafeCases.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+        m_D1SafeCases.store(nullptr, std::memory_order_relaxed);
+
+        if ((m_Completed = !(c = pop(m_PendingD0Cases))))
+            m_CVCompletion.notify_all();
+        m_CVStage.notify_all();
+        return c;
+    }
+
+wait:
+    // someone else is still processing, so
+    // we are no longer responsible for anything.
+    // sleep until the next stage is reached
+    m_CVStage.wait(lock);
+    goto again;
+}
+
+void CaseRegistry::Enqueue(PCase c)
+{
+    boost::shared_lock lock{ m_Mutex };
+    if (m_Completed) throw std::logic_error{ "It shouldn't be completed" };
+    if (m_Reaping) throw std::logic_error{ "It shouldn't be reaping" };
+    if (c->Depth != m_MaxDepth + 1)
+        throw std::logic_error{ "Depth not matching" };
+    push(m_PendingD1Cases, c);
+}
+
+size_t CaseRegistry::ResolveDanger(HCase root)
+{
+    foreach(m_ActionCases, [](ACase ac){ ac->ResetDanger(); });
+    foreachUnsafeCases([=](UCase uc){ uc->ReportDanger(); });
     root->ResolveDanger();
-
-    std::shared_lock lock{ m_Mutex };
-    auto it = std::next(m_SafeCases.begin(), depth < m_MaxDepth ? m_MaxDepth - depth : 0);
-    lock.unlock();
-    auto cnt = 0zu;
-    for (; it != m_SafeCases.end(); ++it)
-    {
-        for (auto sc = it->load(std::memory_order_acquire); sc;)
-        {
-            auto next = reinterpret_cast<SCase>(sc->RegistryNext);
-            delete sc;
-            --m_SCases, ++cnt;
-            sc = next;
-        }
-        it->store(nullptr, std::memory_order_release);
-    }
-    return cnt;
 }
 
-class ConcurrentPriorityQueue
+void CaseRegistry::Fork(PCase p)
 {
-    std::vector<PCase> c;
-    bool initialized;
-    size_t borrowed; // number of thread currently 'processing' tasks
-    mutable std::mutex mtx;
-    std::condition_variable cv, cve;
-
-    struct Comparer
+    m_Processed++;
+#ifndef NDEBUG
+    fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->Danger / root->TotalStates);
+    fmt::print("{1}  (@{0})\n",
+            fmt::ptr(p),
+            p->ToString());
+    std::cin.get();
+#endif
+    std::vector<PCase> buffer;
+    for (PCase pp; (pp = p->CheckedFork());)
     {
-        // check if rhs is more important than lhs
-        bool operator()(const PCase &lhs, const PCase &rhs) const
+#ifndef NDEBUG
+        if (auto fc = dynamic_cast<FCase>(p); fc)
+            fmt::print("  >>{1}  (@{0}) *{2}\n",
+                    fmt::ptr(pp),
+                    pp->ToString(),
+                    fc->GetDegree() - 1);
+        else
+            fmt::print("  >>{1}  (@{0})\n",
+                    fmt::ptr(pp),
+                    pp->ToString());
+#endif
+        if (p->IsHolder())
+            buffer.push_back(pp);
+        else
+            Enqueue(pp);
+    }
+    p->Deplete();
+    // note: we must fully fork the previous
+    // before working on its children
+    for (auto pp : buffer)
+    {
+        m_Processed++;
+#ifndef NDEBUG
+        fmt::print("  >@{0}\n", fmt::ptr(pp));
+#endif
+        for (PCase ppp; (ppp = pp->CheckedFork());)
         {
-            if (rhs->Depth < lhs->Depth)
-                return true;
-            if (rhs->Depth > lhs->Depth)
-                return false;
-            if (rhs->TotalStates > lhs->TotalStates)
-                return true;
-            if (rhs->TotalStates < lhs->TotalStates)
-                return false;
-            return rhs->Duplication > lhs->Duplication;
+#ifndef NDEBUG
+            fmt::print("    >>{1}  (@{0})\n",
+                    fmt::ptr(ppp),
+                    ppp->ToString());
+#endif
+            Enqueue(ppp);
         }
-    };
-
-    auto done() const { return initialized && !borrowed && c.empty(); }
-
-public:
-    [[nodiscard]] auto size() const
-    {
-        std::unique_lock lock{ mtx };
-        return c.size();
+        pp->Deplete();
     }
+}
 
-    void push(PCase p)
-    {
-        {
-            std::unique_lock lock{ mtx };
-            c.push_back(p);
-            std::ranges::push_heap(c, Comparer{});
-            if (g_MemoryAvailPercent.load() < 10
-                || p->ShallDeflate() && g_MemoryAvailPercent.load() < 20)
-                p->Deflate();
-        }
-        cv.notify_one();
-    }
+template <typename T>
+bool write_report(HCase root, T &&t)
+{
+    std::unique_lock lock{ mtx };
+    cve.wait_for(lock, t);
 
-    // call this when uploaded all seeding tasks
-    void inited()
-    {
-        std::unique_lock lock{ mtx };
-        initialized = true;
-        if (done())
-        {
-            cv.notify_all();
-            cve.notify_all();
-        }
-    }
+    fmt::print("x");
+    auto cnt = g_Registry.ResolveDangerAndReapSafes(root, c.front()->Depth);
+    fmt::print("{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} s{} asu{}+{} t{} m{:.3f}%\n",
+            100.0 * root->Danger / root->TotalStates,
+            100.0 * c.front()->TotalStates / root->TotalStates,
+            c.front()->Depth,
+            g_Processed.load(),
+            c.size(),
+            g_Registry.GetDepth(),
+            g_Registry.GetStep(),
+            g_Registry.GetCases(),
+            cnt,
+            g_Trie.size(),
+            g_MemoryAvailPercent.load());
 
-    PCase pop(bool first)
-    {
-        std::unique_lock lock{ mtx };
-        if (!first)
-        {
-            // declare that I'm not processing
-            borrowed--;
-            if (done())
-            {
-                cv.notify_all();
-                cve.notify_all();
-                return nullptr;
-            }
-        }
-
-        // wake me up if there are new tasks or task generation finished
-        cv.wait(lock, [this]{ return !c.empty() || (initialized && !borrowed); });
-        // check if task generation finished
-        if (done())
-            return nullptr;
-
-        borrowed++;
-        std::ranges::pop_heap(c, Comparer{});
-        auto p = std::move(c.back());
-        c.pop_back();
-        return p;
-    }
-
-    template <typename T>
-    bool write_report(HCase root, T &&t)
-    {
-        std::unique_lock lock{ mtx };
-        cve.wait_for(lock, t);
-
-        fmt::print("x");
-        auto cnt = g_Registry.ResolveDangerAndReapSafes(root, c.front()->Depth);
-        fmt::print("{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} s{} asu{}+{} t{} m{:.3f}%\n",
-                100.0 * root->Danger / root->TotalStates,
-                100.0 * c.front()->TotalStates / root->TotalStates,
-                c.front()->Depth,
-                g_Processed.load(),
-                c.size(),
-                g_Registry.GetDepth(),
-                g_Registry.GetStep(),
-                g_Registry.GetCases(),
-                cnt,
-                g_Trie.size(),
-                g_MemoryAvailPercent.load());
-
-        return !done();
-    }
-
-    template <typename T>
-    bool sleep_for(T &&t)
-    {
-        std::unique_lock lock{ mtx };
-        cve.wait_for(lock, t);
-
-        return !done();
-    }
-};
+    return !done();
+}
 
 int main(int argc, char *argv[])
 {
@@ -651,57 +671,8 @@ int main(int argc, char *argv[])
         {
 #endif
             auto first = true;
-            std::vector<PCase> buffer;
             for (PCase p; (p = queue.pop(first)); first = false)
             {
-                g_Processed++;
-#ifndef NDEBUG
-                fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->Danger / root->TotalStates);
-                fmt::print("{1}  (@{0})\n",
-                        fmt::ptr(p),
-                        p->ToString());
-                std::cin.get();
-#endif
-
-                std::vector<PCase> buffer;
-                for (PCase pp; (pp = p->CheckedFork());)
-                {
-#ifndef NDEBUG
-                    if (auto fc = dynamic_cast<FCase>(p); fc)
-                        fmt::print("  >>{1}  (@{0}) *{2}\n",
-                                fmt::ptr(pp),
-                                pp->ToString(),
-                                fc->GetDegree() - 1);
-                    else
-                        fmt::print("  >>{1}  (@{0})\n",
-                                fmt::ptr(pp),
-                                pp->ToString());
-#endif
-                    if (p->IsHolder())
-                        buffer.push_back(pp);
-                    else
-                        queue.push(pp);
-                }
-                p->Deplete();
-                // note: we must fully fork the previous
-                // before working on its children
-                for (auto pp : buffer)
-                {
-                    g_Processed++;
-#ifndef NDEBUG
-                    fmt::print("  >@{0}\n", fmt::ptr(pp));
-#endif
-                    for (PCase ppp; (ppp = pp->CheckedFork());)
-                    {
-#ifndef NDEBUG
-                        fmt::print("    >>{1}  (@{0})\n",
-                                fmt::ptr(ppp),
-                                ppp->ToString());
-#endif
-                        queue.push(ppp);
-                    }
-                    pp->Deplete();
-                }
             }
 #ifdef NDEBUG
         });
