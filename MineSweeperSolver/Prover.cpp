@@ -164,7 +164,7 @@ void ReportingCase::AssignParent(FCase p)
     AdditionalParents.push_back(p);
 }
 
-void ReportingCase::ResovleParents(std::set<ACase> &parents, std::queue<SCase> &sc)
+void ReportingCase::ResolveParents(std::set<ACase> &parents, std::queue<SCase> &sc)
 {
     std::shared_lock lock{ ParentsMtx };
     auto p = operator PCase()->parent;
@@ -258,6 +258,13 @@ PCase ActionCase::Fork()
     return ForkedCase::Fork();
 }
 
+SafeCase::SafeCase(PCase p, PGame g, int lmi)
+    : ForkedCase{ p, g, g->GetBestBlockList().front() }
+{
+    LargestModifiedIndex = std::max(LargestModifiedIndex, lmi);
+    g_Registry.Save(this);
+}
+
 UnsafeCase::UnsafeCase(PCase p, PGame g, int lmi)
     : HolderCase{ p, g, g->GetMinProbability() * TotalStates },
       m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
@@ -305,25 +312,50 @@ void HolderCase::ResolveDanger()
 #endif
 }
 
-void UnsafeCase::ResolveDangerAndReport()
+void UnsafeCase::ResolveDangerAndReport(bool materialize)
 {
     ResolveDanger();
 
-    std::set<ACase> parents;
-    std::queue<SCase> sc;
-    ResovleParents(parents, sc);
-    while (!sc.empty())
+    if (!m_IsMaterialized.load(std::memory_order_acquire))
     {
-        sc.front()->ResovleParents(parents, sc);
-        sc.pop();
-    }
+        std::set<ACase> parents;
+        std::queue<SCase> sc;
+        ResolveParents(parents, sc);
+        while (!sc.empty())
+        {
+            sc.front()->ResolveParents(parents, sc);
+            sc.pop();
+        }
 #ifndef NDEBUG
-    fmt::print("{} ==> {}\n",
-        ToString(),
-        parents | std::views::transform([](ACase c) { return fmt::ptr(c); }));
+        fmt::print("{} ==> {}\n",
+            ToString(),
+            parents | std::views::transform([](ACase c) { return fmt::ptr(c); }));
 #endif
-    for (auto ac : parents)
-        ac->Danger += Danger;
+        if (materialize)
+        {
+            // when materialize == true, it is guaranteed that
+            // no thread will call ReportingCase::AssignParent(FCase)
+            // so no need to lock any mutex at all
+            parent = nullptr;
+            AdditionalParents.clear();
+            AdditionalParents.reserve(parents.size());
+            std::copy(parents.begin(), parents.end(), std::back_insert_iterator(AdditionalParents));
+            m_IsMaterialized.store(true, std::memory_order_release);
+        }
+
+        for (auto ac : parents)
+            ac->Danger += Danger;
+    }
+    else
+    {
+#ifndef NDEBUG
+        fmt::print("{} ==> {}\n",
+            ToString(),
+            AdditionalParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
+#endif
+        for (auto fc : AdditionalParents)
+            static_cast<ACase>(fc)->Danger += Danger;
+    }
 }
 
 std::string BaseCase::ToString() const
@@ -390,38 +422,45 @@ std::string UnsafeCase::ToString() const
 
 void CaseRegistry::Save(ACase ac)
 {
+    ++m_ACases;
     updateMax(m_MaxStep, ac->Step);
-    push<ActionCase>(m_ActionCases, ac);
+    push(m_ActionCases, ac);
+}
+
+void CaseRegistry::Save(SCase sc)
+{
+    ++m_SCases;
+    push(ensureList(m_SafeCases, sc->Depth), sc);
 }
 
 void CaseRegistry::Save(UCase uc)
 {
-    std::shared_lock lock{ m_Mutex };
-    if (uc->Depth > m_MaxDepth)
-    {
-        lock.unlock();
-        std::unique_lock wlock{ m_Mutex };
-        while (uc->Depth > m_MaxDepth)
-        {
-            m_MaxDepth++;
-            m_UnsafeCases.emplace_front();
-        }
-        auto &atm = m_UnsafeCases.front();
-        wlock.unlock();
-        push<UnsafeCase>(atm, uc);
-        return;
-    }
-
-    auto &atm = *std::next(m_UnsafeCases.begin(), m_MaxDepth - uc->Depth);
-    lock.unlock();
-    push<UnsafeCase>(atm, uc);
+    ++m_UCases;
+    push(ensureList(m_UnsafeCases, uc->Depth), uc);
 }
 
-void CaseRegistry::ResolveDanger(HCase root)
+size_t CaseRegistry::ResolveDangerAndReapSafes(HCase root, unsigned depth)
 {
     ForeachActionCases([](ACase ac){ ac->ResetDanger(); });
-    ForeachUnsafeCases([](UCase uc){ uc->ResolveDangerAndReport(); });
+    ForeachUnsafeCases([=](UCase uc){ uc->ResolveDangerAndReport(uc->Depth < depth); });
     root->ResolveDanger();
+
+    std::shared_lock lock{ m_Mutex };
+    auto it = std::next(m_SafeCases.begin(), depth < m_MaxDepth ? m_MaxDepth - depth : 0);
+    lock.unlock();
+    auto cnt = 0zu;
+    for (; it != m_SafeCases.end(); ++it)
+    {
+        for (auto sc = it->load(std::memory_order_acquire); sc;)
+        {
+            auto next = reinterpret_cast<SCase>(sc->RegistryNext);
+            delete sc;
+            --m_SCases, ++cnt;
+            sc = next;
+        }
+        it->store(nullptr, std::memory_order_release);
+    }
+    return cnt;
 }
 
 class ConcurrentPriorityQueue
@@ -517,8 +556,9 @@ public:
         std::unique_lock lock{ mtx };
         cve.wait_for(lock, t);
 
-        g_Registry.ResolveDanger(root);
-        fmt::print("x{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} s{} t{} m{:.3f}%\n",
+        fmt::print("x");
+        auto cnt = g_Registry.ResolveDangerAndReapSafes(root, c.front()->Depth);
+        fmt::print("{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} s{} asu{}+{} t{} m{:.3f}%\n",
                 100.0 * root->Danger / root->TotalStates,
                 100.0 * c.front()->TotalStates / root->TotalStates,
                 c.front()->Depth,
@@ -526,6 +566,8 @@ public:
                 c.size(),
                 g_Registry.GetDepth(),
                 g_Registry.GetStep(),
+                g_Registry.GetCases(),
+                cnt,
                 g_Trie.size(),
                 g_MemoryAvailPercent.load());
 
@@ -551,6 +593,13 @@ int main(int argc, char *argv[])
             << std::endl;
         return 1;
     }
+
+#define CHK(T) \
+    fmt::print("sizeof(" #T ")={}\n", sizeof(T))
+
+    CHK(ActionCase);
+    CHK(SafeCase);
+    CHK(UnsafeCase);
 
 #ifdef NDEBUG
     const bool is_tty = isatty(STDERR_FILENO);
@@ -659,7 +708,7 @@ int main(int argc, char *argv[])
     for (auto &th : threads)
         th.join();
 #endif
-    g_Registry.ResolveDanger(root);
+    g_Registry.ResolveDangerAndReapSafes(root, std::numeric_limits<unsigned>::max());
     timer_computation.stop();
 
     auto j = to_json(cfg);

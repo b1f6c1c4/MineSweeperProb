@@ -4,6 +4,7 @@
 #include <forward_list>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <set>
 #include <shared_mutex>
@@ -106,7 +107,7 @@ protected:
 struct ReportingCase
 {
     void AssignParent(FCase p);
-    void ResovleParents(std::set<ACase> &parents, std::queue<SCase> &sc);
+    void ResolveParents(std::set<ACase> &parents, std::queue<SCase> &sc);
 
     virtual operator PCase() = 0;
     static auto ToPCase(RCase c) { return c ? c->operator PCase() : nullptr; }
@@ -184,11 +185,7 @@ struct ActionCase : ForkedCase
 
 struct SafeCase : ForkedCase, ReportingCase
 {
-    SafeCase(PCase p, PGame g, int lmi)
-        : ForkedCase{ p, g, g->GetBestBlockList().front() }
-    {
-        LargestModifiedIndex = std::max(LargestModifiedIndex, lmi);
-    }
+    SafeCase(PCase p, PGame g, int lmi);
 
     std::string ToString() const override;
 
@@ -208,11 +205,12 @@ struct UnsafeCase : HolderCase, ReportingCase
     operator PCase() override { return this; }
 
     // only the dedicated thread can call this
-    void ResolveDangerAndReport();
+    void ResolveDangerAndReport(bool materialize);
 
 private:
     BlockSet m_List;
     BlockSet::iterator m_It;
+    std::atomic<bool> m_IsMaterialized;
 };
 
 class CaseRegistry
@@ -222,7 +220,32 @@ class CaseRegistry
 
     mutable std::shared_mutex m_Mutex;
     unsigned m_MaxDepth;
+    std::forward_list<std::atomic<SCase>> m_SafeCases;
     std::forward_list<std::atomic<UCase>> m_UnsafeCases;
+
+    std::atomic<size_t> m_ACases, m_SCases, m_UCases;
+
+    auto &ensureList(auto &lst, unsigned d)
+    {
+        std::shared_lock lock{ m_Mutex };
+        if (d > m_MaxDepth)
+        {
+            lock.unlock();
+            std::unique_lock wlock{ m_Mutex };
+            while (d > m_MaxDepth)
+            {
+                m_MaxDepth++;
+                m_SafeCases.emplace_front();
+                m_UnsafeCases.emplace_front();
+            }
+            auto &atm = lst.front();
+            wlock.unlock();
+            return atm;
+        }
+        auto &atm = *std::next(lst.begin(), m_MaxDepth - d);
+        lock.unlock();
+        return atm;
+    }
 
     void updateMax(std::atomic<unsigned> &v, unsigned d)
     {
@@ -258,10 +281,11 @@ class CaseRegistry
 
 public:
     void Save(ACase ac);
+    void Save(SCase ac);
     void Save(UCase uc);
 
     // only the dedicated thread can call this
-    void ResolveDanger(HCase root);
+    size_t ResolveDangerAndReapSafes(HCase root, unsigned depth);
 
     auto GetDepth() const
     {
@@ -270,4 +294,13 @@ public:
     }
 
     auto GetStep() const { return m_MaxStep.load(std::memory_order_relaxed); }
+
+    auto GetCases() const
+    {
+        return std::make_tuple(
+                m_ACases.load(std::memory_order_relaxed),
+                m_SCases.load(std::memory_order_relaxed),
+                m_UCases.load(std::memory_order_relaxed)
+                );
+    }
 };
