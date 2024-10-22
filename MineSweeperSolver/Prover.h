@@ -70,7 +70,6 @@ struct BaseCase
     explicit BaseCase(PCase p);
     virtual ~BaseCase();
 
-    PCase parent;
     double TotalStates;
     // Depth: number of opened blocks
     // Step: number of actions
@@ -94,6 +93,7 @@ struct BaseCase
 #ifdef TRACEBACK
     std::string Traceback;
     void PrintTraceback() const;
+    virtual const BaseCase GetAnyParent() const { return nullptr; }
 #else
 #define Traceback ""
 #endif
@@ -109,14 +109,27 @@ protected:
 
 struct ReportingCase
 {
-    void AssignParent(FCase p);
-    void ResolveParents(std::set<ACase> &parents, std::queue<SCase> &sc);
+    void AssignParent(FCase p)
+    {
+        std::lock_guard lock{ ParentsMtx };
+        if (p->IsAction())
+            AllParents.insert(static_cast<ACase>(p));
+        else
+            AllParents.insert_range(static_cast<SCase>(p)->AllParents);
+    }
 
     virtual operator PCase() = 0;
-    static auto ToPCase(RCase c) { return c ? c->operator PCase() : nullptr; }
+    const BaseCase GetAnyParent() const
+    {
+        std::lock_guard lock{ ParentsMtx };
+        if (AllParents.empty())
+            return nullptr;
+        return AllParents.front();
+    }
 
-    std::shared_mutex ParentsMtx;
-    std::vector<FCase> AdditionalParents;
+protected:
+    std::mutex ParentsMtx;
+    std::set<ACase> AllParents;
 };
 
 struct ForkedCase : BaseCase
@@ -167,7 +180,7 @@ struct HolderCase : BaseCase
 
 struct ActionCase : ForkedCase
 {
-    ActionCase(PCase p, PGame g, int id);
+    ActionCase(HCase p, PGame g, int id);
 
     PCase Fork() override;
 
@@ -181,6 +194,11 @@ struct ActionCase : ForkedCase
     // only the dedicated thread can access it
     double Danger;
 
+#ifdef TRACEBACK
+    HCase Parent;
+    const BaseCase GetAnyParent() const override { return Parent; }
+#endif
+
     ACase Sibling;
 
     void ResetDanger() { Danger = IntrinsicDanger; }
@@ -193,6 +211,10 @@ struct SafeCase : ForkedCase, ReportingCase
     std::string ToString() const override;
 
     operator PCase() override { return this; }
+
+#ifdef TRACEBACK
+    using ReportingCase::GetAnyParent;
+#endif
 };
 
 struct UnsafeCase : HolderCase, ReportingCase
@@ -201,19 +223,26 @@ struct UnsafeCase : HolderCase, ReportingCase
 
     bool ShallDeflate() const override { return true; }
 
+    void ResolveParents();
+
     PCase Fork() override;
+
+    // before ResolveParents(): DO NOT CALL
+    // after ResolveParents(): thread-safe
+    void ReportDanger();
 
     std::string ToString() const override;
 
     operator PCase() override { return this; }
 
-    // only the dedicated thread can call this
-    void ResolveDangerAndReport(bool materialize);
+#ifdef TRACEBACK
+    using ReportingCase::GetAnyParent;
+#endif
 
 private:
     BlockSet m_List;
     BlockSet::iterator m_It;
-    std::atomic<bool> m_IsMaterialized;
+    std::vector<ACase> m_CachedParents;
 };
 
 class CaseRegistry

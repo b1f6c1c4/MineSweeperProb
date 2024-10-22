@@ -69,8 +69,7 @@ node_t *Trie::ensure(node_t *ptr, int d)
 }
 
 BaseCase::BaseCase(PCase p)
-    : parent{ p },
-      TotalStates{ p->TotalStates },
+    : TotalStates{ p->TotalStates },
       Depth{ p->Depth },
       Step{ p->Step },
       Duplication{},
@@ -80,8 +79,7 @@ BaseCase::BaseCase(PCase p)
       m_Game{ p->m_Game } { }
 
 BaseCase::BaseCase(PCase p, PGame game)
-    : parent{ p },
-      TotalStates{ game->GetSolver().GetTotalStates() },
+    : TotalStates{ game->GetSolver().GetTotalStates() },
       Depth{ p ? p->Depth : 0u },
       Step{ p ? p->Step : 0u },
       Duplication{},
@@ -135,7 +133,7 @@ PCase BaseCase::CheckedFork()
 void BaseCase::PrintTraceback() const
 {
     fmt::print("Traceback::\n");
-    for (auto ptr = this; ptr; ptr = ptr->parent)
+    for (auto ptr = this; ptr; ptr = ptr->GetAnyParent())
         fmt::print("At {}\n",
                 ptr->ToString());
     fmt::print("=======\n");
@@ -162,22 +160,7 @@ void HolderCase::AddChildren(ACase v)
 void ReportingCase::AssignParent(FCase p)
 {
     std::shared_lock lock{ ParentsMtx };
-    AdditionalParents.push_back(p);
-}
-
-void ReportingCase::ResolveParents(std::set<ACase> &parents, std::queue<SCase> &sc)
-{
-    std::shared_lock lock{ ParentsMtx };
-    auto p = operator PCase()->parent;
-    if (p->IsAction())
-        parents.insert(static_cast<ACase>(p));
-    else
-        sc.push(static_cast<SCase>(p));
-    for (auto fc : AdditionalParents)
-        if (fc->IsAction())
-            parents.insert(static_cast<ACase>(fc));
-        else
-            sc.push(static_cast<SCase>(fc));
+    AllParents.push_back(p);
 }
 
 PCase ForkedCase::Fork()
@@ -212,6 +195,7 @@ PCase ForkedCase::Fork()
                 c = new SafeCase(this, g, LargestModifiedIndex);
             else
                 c = new UnsafeCase(this, g, LargestModifiedIndex);
+            c->AssignParent(this);
 #ifdef TRACEBACK
             c->operator PCase()->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
@@ -233,13 +217,16 @@ child:
     return nullptr;
 }
 
-ActionCase::ActionCase(PCase p, PGame g, int id)
+ActionCase::ActionCase(HCase p, PGame g, int id)
     : ForkedCase{ p, g, id },
       IntrinsicDanger{ Game().GetBlockProbability(id) * TotalStates },
-      Danger{ IntrinsicDanger }
+      Danger{ IntrinsicDanger },
+#ifdef TRACEBACK
+      Parent{ p },
+#endif
+      Sibling{}
 {
     ++Depth, ++Step;
-    g_Registry.Save(this);
 }
 
 PCase ActionCase::Fork()
@@ -263,7 +250,6 @@ SafeCase::SafeCase(PCase p, PGame g, int lmi)
     : ForkedCase{ p, g, g->GetBestBlockList().front() }
 {
     LargestModifiedIndex = std::max(LargestModifiedIndex, lmi);
-    g_Registry.Save(this);
 }
 
 UnsafeCase::UnsafeCase(PCase p, PGame g, int lmi)
@@ -273,7 +259,12 @@ UnsafeCase::UnsafeCase(PCase p, PGame g, int lmi)
 {
     LargestModifiedIndex = lmi;
     Duplication = g->GetPreferredBlockCount();
-    g_Registry.Save(this);
+}
+
+void UnsafeCase::ResolveParents()
+{
+    m_CachedParents.assign(AllParents.begin(), AllParents.end());
+    AllParents.clear();
 }
 
 PCase UnsafeCase::Fork()
@@ -286,6 +277,19 @@ PCase UnsafeCase::Fork()
     }
 
     return nullptr;
+}
+
+void UnsafeCase::ReportDanger()
+{
+    ResolveDanger();
+
+#ifndef NDEBUG
+    fmt::print("{} ==> {}\n",
+        ToString(),
+        AllParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
+#endif
+    for (auto ac : AllParents)
+        ac->Danger += Danger;
 }
 
 void HolderCase::ResolveDanger()
@@ -311,52 +315,6 @@ void HolderCase::ResolveDanger()
         ToString(),
         fmt::join(tmp, ";"));
 #endif
-}
-
-void UnsafeCase::ResolveDangerAndReport(bool materialize)
-{
-    ResolveDanger();
-
-    if (!m_IsMaterialized.load(std::memory_order_acquire))
-    {
-        std::set<ACase> parents;
-        std::queue<SCase> sc;
-        ResolveParents(parents, sc);
-        while (!sc.empty())
-        {
-            sc.front()->ResolveParents(parents, sc);
-            sc.pop();
-        }
-#ifndef NDEBUG
-        fmt::print("{} ==> {}\n",
-            ToString(),
-            parents | std::views::transform([](ACase c) { return fmt::ptr(c); }));
-#endif
-        if (materialize)
-        {
-            // when materialize == true, it is guaranteed that
-            // no thread will call ReportingCase::AssignParent(FCase)
-            // so no need to lock any mutex at all
-            parent = nullptr;
-            AdditionalParents.clear();
-            AdditionalParents.reserve(parents.size());
-            std::copy(parents.begin(), parents.end(), std::back_insert_iterator(AdditionalParents));
-            m_IsMaterialized.store(true, std::memory_order_release);
-        }
-
-        for (auto ac : parents)
-            ac->Danger += Danger;
-    }
-    else
-    {
-#ifndef NDEBUG
-        fmt::print("{} ==> {}\n",
-            ToString(),
-            AdditionalParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
-#endif
-        for (auto fc : AdditionalParents)
-            static_cast<ACase>(fc)->Danger += Danger;
-    }
 }
 
 std::string BaseCase::ToString() const
