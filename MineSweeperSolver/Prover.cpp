@@ -23,19 +23,9 @@ Strategy g_Strategy;
 RCase g_InvalidCase;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
-std::atomic<unsigned> g_MaxDepth;
+CaseRegistry g_Registry{};
 std::atomic<double> g_MemoryAvailPercent;
 std::atomic<size_t> g_Processed;
-
-template <typename T>
-std::optional<T> updateMax(std::atomic<T> &v, T d)
-{
-    auto old = v.load();
-    while (d > old)
-        if (v.compare_exchange_weak(old, d))
-            return d;
-    return {};
-}
 
 void updateMemoryAvailPercent()
 {
@@ -83,16 +73,20 @@ BaseCase::BaseCase(PCase p)
     : parent{ p },
       TotalStates{ p->TotalStates },
       Depth{ p->Depth },
+      Step{ p->Step },
       Duplication{},
       LargestModifiedIndex{ p->LargestModifiedIndex },
+      RegistryNext{},
       m_Game{ p->m_Game } { }
 
 BaseCase::BaseCase(PCase p, PGame game)
     : parent{ p },
       TotalStates{ game->GetSolver().GetTotalStates() },
       Depth{ p ? p->Depth : 0u },
+      Step{ p ? p->Step : 0u },
       Duplication{},
       LargestModifiedIndex{ p ? p->LargestModifiedIndex : 0 },
+      RegistryNext{},
       m_Game{ std::move(game) } { }
 
 BaseCase::~BaseCase() = default;
@@ -158,77 +152,35 @@ BaseCase &BaseCase::Deflate()
     return *this;
 }
 
-bool HolderCase::Comparer::operator()(ActionCase *lhs, ActionCase *rhs) const
+void HolderCase::AddChildren(ACase v)
 {
-    return lhs->Danger > rhs->Danger;
+    v->Sibling = Child;
+    Child = v;
 }
 
-void HolderCase::AddChildren(ActionCase *v)
+void ReportingCase::AssignParent(FCase p)
 {
-    std::unique_lock lock{ mtx };
-    v->Handle = m_Heap.push(v);
+    std::shared_lock lock{ ParentsMtx };
+    AdditionalParents.push_back(p);
 }
 
-void HolderCase::ReportDanger(ActionCase *self, double v)
+void ReportingCase::ResovleParents(std::set<ACase> &parents, std::queue<SCase> &sc)
 {
-    if (!self)
-        return ReportDangerUp(Danger = v); // initial danger prediction from UnsafeCase
-
-    std::unique_lock lock{ mtx };
-
-    self->Danger += v;
-
-    m_Heap.update(self->Handle);
-
-    auto next = m_Heap.top()->Danger;
-
-    auto increase = next > Danger ? next - Danger : 0;
-#ifndef NDEBUG
-    if (!increase)
-        fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}]]]\n",
-                self->ToString(),
-                fmt::ptr(self),
-                v,
-                self->Danger,
-                ToString(),
-                fmt::ptr(this));
+    std::shared_lock lock{ ParentsMtx };
+    auto p = operator PCase()->parent;
+    if (p->IsAction())
+        parents.insert(static_cast<ACase>(p));
     else
-        fmt::print("[[[{}@{}+={:3g}->{:5e} in {}@{}:{:5e}+={:5e}->{:5e}]]]\n",
-                self->ToString(),
-                fmt::ptr(self),
-                v,
-                self->Danger,
-                ToString(),
-                fmt::ptr(this),
-                Danger,
-                increase,
-                next);
-#endif
-    Danger = next;
-    lock.unlock();
-
-    ReportDangerUp(increase);
+        sc.push(static_cast<SCase>(p));
+    for (auto fc : AdditionalParents)
+        if (fc->IsAction())
+            parents.insert(static_cast<ACase>(fc));
+        else
+            sc.push(static_cast<SCase>(fc));
 }
 
-void ActionCase::ReportDanger(double v)
+PCase ForkedCase::Fork()
 {
-    if (!v)
-        return;
-
-#ifndef NDEBUG
-    auto hc = dynamic_cast<HolderCase *>(parent);
-    if (!hc)
-        throw std::logic_error{ "Parent of ActionCase must be HolderCase!" };
-#else
-    auto hc = static_cast<HolderCase *>(parent);
-#endif
-    hc->ReportDanger(this, v);
-}
-
-template <bool Ephermeral>
-RCase ForkedCase::Fork()
-{
-    auto p = static_cast<ActionCase *>(Ephermeral ? parent : this);
     auto [lb, ub] = Game().GetDegreeBounds(Id);
     for (; m_Degree <= ub; m_Degree++)
     {
@@ -256,20 +208,20 @@ RCase ForkedCase::Fork()
             }
 
             if (g->GetBestBlockCount())
-                c = new SafeCase(p, g, LargestModifiedIndex);
+                c = new SafeCase(this, g, LargestModifiedIndex);
             else
-                c = new UnsafeCase(p, g, LargestModifiedIndex);
+                c = new UnsafeCase(this, g, LargestModifiedIndex);
 #ifdef TRACEBACK
             c->operator PCase()->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
             node->p.store(c, std::memory_order_release);
             m_Degree++;
-            return c;
+            return c->operator PCase();
         }
 child:
         if (c == g_InvalidCase)
             continue;
-        p->ReportDanger(c->GatherDangerAndAssignParent(p));
+        c->AssignParent(this);
         // note that we shouldn't report c to main queue
 #ifndef NDEBUG
         fmt::print("DUPLICATION on {} (@{})\n",
@@ -282,9 +234,11 @@ child:
 
 ActionCase::ActionCase(PCase p, PGame g, int id)
     : ForkedCase{ p, g, id },
-      Danger{ Game().GetBlockProbability(id) * TotalStates }
+      IntrinsicDanger{ Game().GetBlockProbability(id) * TotalStates },
+      Danger{ IntrinsicDanger }
 {
-    updateMax(g_MaxDepth, ++Depth);
+    ++Depth, ++Step;
+    g_Registry.Save(this);
 }
 
 PCase ActionCase::Fork()
@@ -301,46 +255,17 @@ PCase ActionCase::Fork()
         m_Game = g;
     }
 
-    return ReportingCase::ToPCase(ForkedCase::Fork<false>());
-}
-
-PCase SafeCase::Fork()
-{
-    auto c = ForkedCase::Fork<true>();
-    if (c)
-    {
-        std::unique_lock lock{ m_Mutex };
-        // ensure child is registered before handing it to main()
-        m_Children.push_back(c);
-    }
-    return ReportingCase::ToPCase(c);
-}
-
-double SafeCase::GatherDangerAndAssignParent(ActionCase *c)
-{
-    auto sum = 0.0;
-    std::shared_lock lock{ m_Mutex };
-    for (auto r : m_Children)
-        sum += r->GatherDangerAndAssignParent(c);
-    return sum;
+    return ForkedCase::Fork();
 }
 
 UnsafeCase::UnsafeCase(PCase p, PGame g, int lmi)
-    : HolderCase{ p, g },
+    : HolderCase{ p, g, g->GetMinProbability() * TotalStates },
       m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
       m_It{ m_List.begin() }
 {
     LargestModifiedIndex = lmi;
     Duplication = g->GetPreferredBlockCount();
-    ReportDanger(nullptr, g->GetMinProbability() * TotalStates);
-}
-
-void UnsafeCase::ReportDangerUp(double v)
-{
-    std::shared_lock lock{ mtx };
-    static_cast<ActionCase *>(parent)->ReportDanger(v);
-    for (auto c : m_AdditionalParents)
-        c->ReportDanger(v);
+    g_Registry.Save(this);
 }
 
 PCase UnsafeCase::Fork()
@@ -355,22 +280,63 @@ PCase UnsafeCase::Fork()
     return nullptr;
 }
 
-double UnsafeCase::GatherDangerAndAssignParent(ActionCase *c)
+void HolderCase::ResolveDanger()
 {
-    std::unique_lock lock{ mtx };
-    m_AdditionalParents.push_back(c);
-    return Danger;
+    auto ac = Child.load(std::memory_order_acquire);
+    if (!ac) // not yet forked; report the intrinsic danger
+        return;
+
+#ifndef NDEBUG
+    std::vector<std::string> tmp;
+#endif
+    auto d = std::numeric_limits<decltype(Danger)>::infinity();
+    for (; ac; ac = ac->Sibling)
+    {
+        d = std::min(d, ac->Danger);
+#ifndef NDEBUG
+        tmp.push_back(fmt::format("@{}D{}", fmt::ptr(ac), ac->Danger));
+#endif
+    }
+    Danger = d;
+#ifndef NDEBUG
+    fmt::print("{} <== {}\n",
+        ToString(),
+        fmt::join(tmp, ";"));
+#endif
+}
+
+void UnsafeCase::ResolveDangerAndReport()
+{
+    ResolveDanger();
+
+    std::set<ACase> parents;
+    std::queue<SCase> sc;
+    ResovleParents(parents, sc);
+    while (!sc.empty())
+    {
+        sc.front()->ResovleParents(parents, sc);
+        sc.pop();
+    }
+#ifndef NDEBUG
+    fmt::print("{} ==> {}\n",
+        ToString(),
+        parents | std::views::transform([](ACase c) { return fmt::ptr(c); }));
+#endif
+    for (auto ac : parents)
+        ac->Danger += Danger;
 }
 
 std::string BaseCase::ToString() const
 {
     if (!std::holds_alternative<PGame>(m_Game))
-        return fmt::format("[dp{} LMI{} TS={:3g}]",
+        return fmt::format("[d{}s{}i{} TS{}]",
                 Depth,
+                Step,
                 LargestModifiedIndex,
                 TotalStates);
-    return fmt::format("[dp{} LMI{} G={} TS={:3g}]",
+    return fmt::format("[d{}s{}i{} G={} TS{}]",
             Depth,
+            Step,
             LargestModifiedIndex,
             fmt::ptr(std::get<PGame>(m_Game).get()),
             TotalStates);
@@ -386,9 +352,8 @@ std::string ForkedCase::ToString() const
 std::string HolderCase::ToString() const
 {
     std::vector<double> tmp;
-    std::transform(m_Heap.ordered_begin(), m_Heap.ordered_end(),
-            std::back_inserter(tmp),
-            [](ActionCase *ac){ return ac->Danger; });
+    for (auto c = Child.load(); c; c = c->Sibling)
+        tmp.push_back(c->Danger);
     return fmt::format("{}[{:3g}]",
             BaseCase::ToString(),
             fmt::join(tmp, " "));
@@ -403,13 +368,15 @@ std::string ActionCase::ToString() const
 std::string SafeCase::ToString() const
 {
     if (!std::holds_alternative<PGame>(m_Game))
-        return fmt::format("Safe{}~{}",
+        return fmt::format("Safe{}~{}:P{}",
                 ForkedCase::ToString(),
-                Traceback);
-    return fmt::format("Safe{}~{}:S{}",
+                Traceback,
+                AdditionalParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
+    return fmt::format("Safe{}~{}:S{}P{}",
             ForkedCase::ToString(),
             Traceback,
-            std::get<PGame>(m_Game)->GetBestBlockCount());
+            std::get<PGame>(m_Game)->GetBestBlockCount(),
+            AdditionalParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
 }
 
 std::string UnsafeCase::ToString() const
@@ -418,7 +385,43 @@ std::string UnsafeCase::ToString() const
             HolderCase::ToString(),
             Traceback,
             Duplication,
-            m_AdditionalParents | std::views::transform([](ActionCase *c) { return fmt::ptr(c); }));
+            AdditionalParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
+}
+
+void CaseRegistry::Save(ACase ac)
+{
+    updateMax(m_MaxStep, ac->Step);
+    push<ActionCase>(m_ActionCases, ac);
+}
+
+void CaseRegistry::Save(UCase uc)
+{
+    std::shared_lock lock{ m_Mutex };
+    if (uc->Depth > m_MaxDepth)
+    {
+        lock.unlock();
+        std::unique_lock wlock{ m_Mutex };
+        while (uc->Depth > m_MaxDepth)
+        {
+            m_MaxDepth++;
+            m_UnsafeCases.emplace_front();
+        }
+        auto &atm = m_UnsafeCases.front();
+        wlock.unlock();
+        push<UnsafeCase>(atm, uc);
+        return;
+    }
+
+    auto &atm = *std::next(m_UnsafeCases.begin(), m_MaxDepth - uc->Depth);
+    lock.unlock();
+    push<UnsafeCase>(atm, uc);
+}
+
+void CaseRegistry::ResolveDanger(HCase root)
+{
+    ForeachActionCases([](ACase ac){ ac->ResetDanger(); });
+    ForeachUnsafeCases([](UCase uc){ uc->ResolveDangerAndReport(); });
+    root->ResolveDanger();
 }
 
 class ConcurrentPriorityQueue
@@ -509,18 +512,20 @@ public:
     }
 
     template <typename T>
-    bool write_report(HolderCase *root, T &&t)
+    bool write_report(HCase root, T &&t)
     {
         std::unique_lock lock{ mtx };
         cve.wait_for(lock, t);
 
-        fmt::print("x{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} t{} m{:.3f}%\n",
-                100.0 * root->GetDanger() / root->TotalStates,
+        g_Registry.ResolveDanger(root);
+        fmt::print("x{:.10f}% curr~{:.10f}%@d{}   p{} q{} d{} s{} t{} m{:.3f}%\n",
+                100.0 * root->Danger / root->TotalStates,
                 100.0 * c.front()->TotalStates / root->TotalStates,
                 c.front()->Depth,
                 g_Processed.load(),
                 c.size(),
-                g_MaxDepth.load(),
+                g_Registry.GetDepth(),
+                g_Registry.GetStep(),
                 g_Trie.size(),
                 g_MemoryAvailPercent.load());
 
@@ -567,8 +572,8 @@ int main(int argc, char *argv[])
 
     ConcurrentPriorityQueue queue{};
     auto game = std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, &g_Strategy);
-    auto root = new HolderCase(nullptr, game);
-    g_InvalidCase = reinterpret_cast<ReportingCase *>(root); // random value
+    auto root = new HolderCase(nullptr, game, 0);
+    g_InvalidCase = reinterpret_cast<RCase>(root); // random value
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
     auto ac = new ActionCase(root, root->ThePGame(), cfg.Index);
     root->AddChildren(ac);
@@ -602,7 +607,7 @@ int main(int argc, char *argv[])
             {
                 g_Processed++;
 #ifndef NDEBUG
-                fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->GetDanger() / root->TotalStates);
+                fmt::print("Queue {}, Root danger = {:8f}%\n", queue.size(), 100.0 * root->Danger / root->TotalStates);
                 fmt::print("{1}  (@{0})\n",
                         fmt::ptr(p),
                         p->ToString());
@@ -613,7 +618,7 @@ int main(int argc, char *argv[])
                 for (PCase pp; (pp = p->CheckedFork());)
                 {
 #ifndef NDEBUG
-                    if (auto fc = dynamic_cast<ForkedCase *>(p); fc)
+                    if (auto fc = dynamic_cast<FCase>(p); fc)
                         fmt::print("  >>{1}  (@{0}) *{2}\n",
                                 fmt::ptr(pp),
                                 pp->ToString(),
@@ -654,12 +659,13 @@ int main(int argc, char *argv[])
     for (auto &th : threads)
         th.join();
 #endif
+    g_Registry.ResolveDanger(root);
     timer_computation.stop();
 
     auto j = to_json(cfg);
     j["string"] = argv[1];
-    j["result"]["danger"] = root->GetDanger();
-    j["result"]["ratio"] = 100.0 * root->GetDanger() / root->TotalStates;
+    j["result"]["danger"] = root->Danger;
+    j["result"]["ratio"] = 100.0 * root->Danger / root->TotalStates;
     j["exec"]["duration"] = timer_computation.seconds();
     j["exec"]["cpu"] = nprocs;
     j["exec"]["speed"] = static_cast<double>(g_Processed.load()) / timer_computation.seconds() / nprocs;
