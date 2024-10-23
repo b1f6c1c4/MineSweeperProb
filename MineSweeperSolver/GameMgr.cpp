@@ -67,7 +67,7 @@ GameMgr::GameMgr(std::istream &sr, const Strategy *strategy) : BasicStrategy(str
         for (auto &blk : m_Blocks)
             if (blk.IsOpen && !blk.IsMine && blk.Degree >= 0)
             {
-                m_Solver->AddRestrain(m_BlocksR[blk.Index], blk.Degree);
+                m_Solver->AddRestrain((*m_BlocksR)[blk.Index], blk.Degree);
                 UpdateRelevant2Info(blk.Index);
             }
     }
@@ -194,7 +194,7 @@ const BlockProperty &GameMgr::SetBlockDegree(int id, int degree)
     auto &b = m_Blocks[id];
     b.Degree = degree;
     b.IsOpen = true;
-    m_Solver->AddRestrain(m_BlocksR[id], degree);
+    m_Solver->AddRestrain((*m_BlocksR)[id], degree);
     m_Solver->AddRestrain(id, false);
     UpdateRelevant2Info(id);
     return b;
@@ -240,7 +240,7 @@ BlockStatus GameMgr::GetInferredStatus(int x, int y) const
 std::pair<int, int> GameMgr::GetDegreeBounds(int id) const
 {
     auto lb = 0, ub = 0;
-    for (auto b : m_BlocksR[id])
+    for (auto b : (*m_BlocksR)[id])
         switch (m_Solver->GetBlockStatus(b))
         {
             case BlockStatus::Mine:
@@ -357,9 +357,9 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             return;
     }
 #ifndef NDEBUG
-	if (shortcut)
-		for (auto i = 0; i < m_Blocks.size(); ++i)
-			if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
+    if (shortcut)
+        for (auto i = 0; i < m_Blocks.size(); ++i)
+            if (!m_Blocks[i].IsOpen && m_Solver->GetBlockStatus(i) == BlockStatus::Blank)
                 throw std::runtime_error("not open but blank");
 #endif
 
@@ -406,22 +406,22 @@ void GameMgr::Solve(SolvingState maxDepth, bool shortcut)
             LARGEST(-m_Solver->GetProbability(blk));
             break;
         case HeuristicMethod::MaxZeroProb:
-            LARGEST(m_Solver->ZeroCondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
+            LARGEST(m_Solver->ZeroCondQ((*m_BlocksR)[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         case HeuristicMethod::MaxZerosProb:
-            LARGEST(m_Solver->ZerosCondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
+            LARGEST(m_Solver->ZerosCondQ((*m_BlocksR)[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         case HeuristicMethod::MaxZerosExp:
-            LARGEST(m_Solver->ZerosECondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
+            LARGEST(m_Solver->ZerosECondQ((*m_BlocksR)[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         case HeuristicMethod::MaxQuantityExp:
-            LARGEST(m_Solver->QuantityCondQ(m_BlocksR[blk], blk));
+            LARGEST(m_Solver->QuantityCondQ((*m_BlocksR)[blk], blk));
             break;
         case HeuristicMethod::MinFrontierDist:
             LARGEST(-FrontierDist(blk));
             break;
         case HeuristicMethod::MaxUpperBound:
-            LARGEST(m_Solver->UpperBoundCondQ(m_BlocksR[blk], blk) * (1 - m_Solver->GetProbability(blk)));
+            LARGEST(m_Solver->UpperBoundCondQ((*m_BlocksR)[blk], blk) * (1 - m_Solver->GetProbability(blk)));
             break;
         case HeuristicMethod::Relevant2:
             LARGEST(static_cast<int>(m_Blocks[blk].IsRelevant2));
@@ -693,7 +693,7 @@ again:
         if (id == initID)
             goto again;
         if (m_IsSNR) {
-            for (auto &blk : m_BlocksR[initID])
+            for (auto &blk : (*m_BlocksR)[initID])
                 if (id == blk)
                     goto again;
         }
@@ -709,36 +709,51 @@ again:
         if (m_Blocks[i].IsMine)
             continue;
         m_Blocks[i].Degree = 0;
-        for (auto &id : m_BlocksR[i])
+        for (auto &id : (*m_BlocksR)[i])
             if (m_Blocks[id].IsMine)
                 ++m_Blocks[i].Degree;
     }
 }
 
+std::map<std::pair<int, int>, BS8s> BlocksRCache;
+
+PBS8s CacheBlocksR(int w, int h)
+{
+    if (auto it = BlocksRCache.find({ w, h }); it != BlocksRCache.end())
+        return &it->second;
+    BS8s mbr;
+    mbr.reserve(w * h);
+    for (auto i = 0; i < w; ++i)
+        for (auto j = 0; j < h; ++j)
+        {
+            mbr.emplace_back();
+            auto &blkR = mbr.back();
+            blkR.reserve(8);
+            for (auto di = -1; di <= 1; ++di)
+                if (i + di >= 0 && i + di < w)
+                    for (auto dj = -1; dj <= 1; ++dj)
+                        if (j + dj >= 0 && j + dj < h)
+                            if (di != 0 || dj != 0)
+                                blkR.push_back((i + di) * h + (j + dj));
+        }
+    return &(BlocksRCache[std::make_pair(w, h)] = std::move(mbr));
+}
+
 void GameMgr::GenerateBlocksR()
 {
     m_Blocks.reserve(m_TotalWidth * m_TotalHeight);
-    m_BlocksR.reserve(m_TotalWidth * m_TotalHeight);
+    m_BlocksR = CacheBlocksR(m_TotalWidth, m_TotalHeight);
 
     for (auto i = 0; i < m_TotalWidth; ++i)
         for (auto j = 0; j < m_TotalHeight; ++j)
         {
             m_Blocks.emplace_back();
-            m_BlocksR.emplace_back();
             auto &blk = m_Blocks.back();
-            auto &blkR = m_BlocksR.back();
             blk.Index = GetIndex(i, j);
             blk.X = i;
             blk.Y = j;
             blk.IsOpen = false;
             blk.IsMine = false;
-            blkR.reserve(8);
-            for (auto di = -1; di <= 1; ++di)
-                if (i + di >= 0 && i + di < m_TotalWidth)
-                    for (auto dj = -1; dj <= 1; ++dj)
-                        if (j + dj >= 0 && j + dj < m_TotalHeight)
-                            if (di != 0 || dj != 0)
-                                blkR.push_back(GetIndex(i + di, j + dj));
         }
 }
 
@@ -783,10 +798,10 @@ void GameMgr::OpenBlockImpl(int id)
     m_Solver->AddRestrain(id, false);
     if (m_Blocks[id].Degree == 0)
     {
-        for (auto &blk : m_BlocksR[id])
+        for (auto &blk : (*m_BlocksR)[id])
             OpenBlockImpl(blk);
     }
-    m_Solver->AddRestrain(m_BlocksR[id], m_Blocks[id].Degree);
+    m_Solver->AddRestrain((*m_BlocksR)[id], m_Blocks[id].Degree);
 
     if (--m_ToOpen == 0)
     {
@@ -797,11 +812,11 @@ void GameMgr::OpenBlockImpl(int id)
 
 void GameMgr::UpdateRelevant2Info(int id)
 {
-    for (auto blk : m_BlocksR[id])
+    for (auto blk : (*m_BlocksR)[id])
     {
         if (m_Blocks[blk].IsOpen)
             continue;
-        for (auto b : m_BlocksR[blk])
+        for (auto b : (*m_BlocksR)[blk])
             m_Blocks[b].IsRelevant2 = true;
     }
 }

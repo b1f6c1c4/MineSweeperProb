@@ -158,4 +158,5 @@ bool run(const Configuration &Config)
 void cache(const Configuration &Config)
 {
     CacheBinomials(Config.Width * Config.Height, Config.TotalMines);
+    CacheBlocksR(Config.Width, Config.Height);
 }

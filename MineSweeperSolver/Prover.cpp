@@ -399,11 +399,14 @@ void CaseRegistry::Enqueue(RCase rc, TLL &rcs)
     {
         rcs.ucs << static_cast<UCase>(pc);
         ++m_UCases;
+        pc->Deflate();
     }
     else
     {
         rcs.scs << static_cast<SCase>(pc);
         ++m_SCases;
+        if (g_MemoryAvailPercent.load(std::memory_order_relaxed) < 30)
+            pc->Deflate();
     }
 }
 

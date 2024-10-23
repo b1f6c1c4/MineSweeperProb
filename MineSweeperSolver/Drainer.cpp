@@ -13,7 +13,7 @@ Drainer::Drainer(const GameMgr &mgr) : m_Mgr(mgr)
     m_DMines.resize(m_Blocks.size(), 0);
     for (auto i = 0; i < m_Blocks.size(); ++i)
     {
-        for (auto blk : m_Mgr.m_BlocksR[m_Blocks[i]])
+        for (auto blk : (*m_Mgr.m_BlocksR)[m_Blocks[i]])
             switch (m_Mgr.m_Solver->GetBlockStatus(blk))
             {
             case BlockStatus::Unknown:

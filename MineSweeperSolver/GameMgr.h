@@ -18,6 +18,11 @@ struct
     bool IsRelevant2;
 };
 
+using BS8s = std::vector<BlockSet8>;
+using PBS8s = const BS8s *;
+
+PBS8s CacheBlocksR(int w, int h);
+
 template <typename T>
 struct EmptyCopyable : std::unique_ptr<T>
 {
@@ -108,7 +113,7 @@ private:
     bool m_IsSNR;
     bool m_Settled, m_Started, m_Succeed;
     std::vector<BlockProperty> m_Blocks;
-    std::vector<BlockSet8> m_BlocksR; // each block's neighbor
+    PBS8s m_BlocksR; // each block's neighbor
     int m_ToOpen, m_WrongGuesses;
     std::optional<Solver> m_Solver;
     double m_AllBits;

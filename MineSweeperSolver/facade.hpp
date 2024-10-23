@@ -24,6 +24,7 @@ Configuration parse(const char *hsh);
 bool run(const Configuration &Config);
 
 /* Pre-compute binomials, which are used in Solvers.
+ * Pre-compute BlocksR, which are used in GameMgrs.
  *
  * Note: This function is NOT thread-safe.
  */
