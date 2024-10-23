@@ -71,7 +71,6 @@ BaseCase::BaseCase(PCase p)
     : TotalStates{ p->TotalStates },
       Depth{ p->Depth },
       Step{ p->Step },
-      Duplication{},
       LargestModifiedIndex{ p->LargestModifiedIndex },
       RegistryNext{},
       m_Game{ p->m_Game } { }
@@ -80,7 +79,6 @@ BaseCase::BaseCase(PCase p, PGame game)
     : TotalStates{ game->GetSolver().GetTotalStates() },
       Depth{ p ? p->Depth : 0u },
       Step{ p ? p->Step : 0u },
-      Duplication{},
       LargestModifiedIndex{ p ? p->LargestModifiedIndex : 0 },
       RegistryNext{},
       m_Game{ std::move(game) } { }
@@ -219,7 +217,7 @@ ActionCase::ActionCase(HCase p, PGame g, int id)
 #endif
       Sibling{}
 {
-    ++Depth, ++Step;
+    ++Step;
 }
 
 RCase ActionCase::Fork()
@@ -242,6 +240,7 @@ RCase ActionCase::Fork()
 SafeCase::SafeCase(PCase p, PGame g, int lmi)
     : ForkedCase{ p, g, g->GetBestBlockList().front() }
 {
+    ++Depth;
     LargestModifiedIndex = std::max(LargestModifiedIndex, lmi);
 }
 
@@ -250,8 +249,8 @@ UnsafeCase::UnsafeCase(PCase p, PGame g, int lmi)
       m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
       m_It{ m_List.begin() }
 {
+    ++Depth;
     LargestModifiedIndex = lmi;
-    Duplication = g->GetPreferredBlockCount();
 }
 
 void UnsafeCase::ResolveParents()
@@ -279,9 +278,9 @@ void UnsafeCase::ReportDanger()
 #ifndef NDEBUG
     fmt::print("{} ==> {}\n",
         ToString(),
-        AllParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
+        m_CachedParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
 #endif
-    for (auto ac : AllParents)
+    for (auto ac : m_CachedParents)
         ac->Danger += Danger;
 }
 
@@ -365,11 +364,11 @@ std::string SafeCase::ToString() const
 
 std::string UnsafeCase::ToString() const
 {
-    return fmt::format("Unsafe{}~{}:D{}P{}",
+    return fmt::format("Unsafe{}~{}:P{}+{}",
             HolderCase::ToString(),
             Traceback,
-            Duplication,
-            AllParents | std::views::transform([](FCase c) { return fmt::ptr(c); }));
+            AllParents.size(),
+            m_CachedParents.size());
 }
 
 void CaseRegistry::updateMax(std::atomic<unsigned> &v, unsigned d)
@@ -381,8 +380,8 @@ void CaseRegistry::updateMax(std::atomic<unsigned> &v, unsigned d)
     return;
 }
 
-#ifdef TRACEBACK
 void CaseRegistry::Process(SCase sc, TLLS &scs, TLLU &ucs)
+#ifdef TRACEBACK
 try
 #endif
 {
@@ -401,6 +400,10 @@ try
                 sc->GetDegree() - 1);
 #endif
         ++m_QCases;
+#ifndef NDEBUG
+        if (rc->operator PCase()->Depth != m_MaxDepth)
+            throw std::logic_error{ "Depth not matching" };
+#endif
         if (rc->operator PCase()->IsHolder())
             ucs << static_cast<UCase>(rc), ++m_UCases;
         else
@@ -419,20 +422,24 @@ catch (const std::exception &err)
 }
 #endif
 
-#ifdef TRACEBACK
 void CaseRegistry::Process(UCase uc, TLLS &scs, TLLU &ucs)
+#ifdef TRACEBACK
 try
 #endif
 {
     ++m_Processed;
     --m_QCases;
+    uc->ResolveParents();
 #ifndef NDEBUG
     fmt::print("{1}  (@{0})\n", fmt::ptr(uc), uc->ToString());
     std::cin.get();
 #endif
-    uc->ResolveParents();
     for (ACase ac; (ac = uc->Fork());)
     {
+#ifndef NDEBUG
+        if (ac->Depth != m_MaxDepth - 1)
+            throw std::logic_error{ "Depth not matching" };
+#endif
         ++m_ACases;
         Process(ac, scs, ucs);
     }
@@ -448,8 +455,8 @@ catch (const std::exception &err)
 }
 #endif
 
-#ifdef TRACEBACK
 void CaseRegistry::Process(ACase ac, TLLS &scs, TLLU &ucs)
+#ifdef TRACEBACK
 try
 #endif
 {
@@ -465,6 +472,10 @@ try
                 rc->operator PCase()->ToString());
 #endif
         ++m_QCases;
+#ifndef NDEBUG
+        if (rc->operator PCase()->Depth != m_MaxDepth)
+            throw std::logic_error{ "Depth not matching" };
+#endif
         if (rc->operator PCase()->IsHolder())
             ucs << static_cast<UCase>(rc), ++m_UCases;
         else
@@ -514,7 +525,7 @@ struct StupidLock
         StupidLock &lck;
         bool is_locked;
         explicit Upgrader(StupidLock &l)
-            : lck{ l }, is_locked{ lck.mtx.try_lock() } { }
+            : lck{ l }, is_locked{ lck.mtx.try_unlock_upgrade_and_lock() } { }
         ~Upgrader()
         {
             if (is_locked)
@@ -546,6 +557,7 @@ again:
     // anything could happen during this time, so check
     if (m_Completed)
         return;
+lagain:
     while ((sc = pop(m_D0SafeCases)))
         Process(sc, scs, ucs), delete sc;
     while ((uc = pop(m_D0UnsafeCases)))
@@ -553,13 +565,15 @@ again:
     std::move(scs) >> m_D1SafeCases;
     std::move(ucs) >> m_D1UnsafeCases;
     std::move(ucx) >> m_UnsafeCases.front();
-    // D0 is now empty, we need to enter reaping stage
+    // D0 is now empty, we need to enter next stage
     if (auto wlock = lock.Upgrade(); !wlock)
     {
         // someone else is still processing, so
         // we are no longer responsible for anything.
-        // sleep until the next stage is reached
-        m_CVStage.wait(lock);
+        // sleep until the next stage is reached.
+        // don't sleep indefinitely though, as some threads
+        // may shared_lock{ m_Mutex } without doing stage change
+        m_CVStage.wait_for(lock, boost::chrono::milliseconds{ 10 });
         goto again;
     }
     else // necessary `else' here to keep wlock alive
@@ -577,10 +591,17 @@ again:
             m_CVCompletion.notify_all();
             return;
         }
+        goto lagain;
     }
 }
 
 void CaseRegistry::ResolveDanger()
+{
+    boost::shared_lock lock{ m_Mutex };
+    ResolveDangerImpl();
+}
+
+void CaseRegistry::ResolveDangerImpl()
 {
     foreach(m_ActionCases, [](ACase ac){ ac->ResetDanger(); });
     foreachUnsafeCases([](UCase uc){ uc->ReportDanger(); });
@@ -598,14 +619,14 @@ CaseRegistry::CaseRegistry(HCase root, int id)
     TLLU ucs;
     Process(ac, scs, ucs);
     m_UnsafeCases.emplace_front();
-    std::move(scs) >> m_D0SafeCases;
-    std::move(ucs) >> m_D0UnsafeCases;
+    std::move(scs) >> m_D1SafeCases;
+    std::move(ucs) >> m_D1UnsafeCases;
 }
 
 void CaseRegistry::WriteReport()
 {
     fmt::print("x");
-    ResolveDanger();
+    ResolveDangerImpl();
     fmt::print("{:.10f}% p{} q{} d{} s{} a{}s{}u{} t{} m{:.3f}%\n",
             100.0 * root->Danger / root->TotalStates,
             m_Processed.load(std::memory_order_relaxed),

@@ -75,7 +75,6 @@ struct BaseCase
     // Depth: number of opened blocks
     // Step: number of actions
     unsigned Depth, Step;
-    int Duplication;
 
     [[nodiscard]] const GameMgr &Game() { return *ThePGame(); }
     [[nodiscard]] PGame ThePGame();
@@ -121,7 +120,6 @@ struct ForkedCase : BaseCase
     ForkedCase(PCase p, PGame g, int id)
         : BaseCase{ p, g }, Id{ id }, m_Degree{}
     {
-        ++Depth;
         LargestModifiedIndex = std::max(LargestModifiedIndex, Id);
     }
 
@@ -303,7 +301,7 @@ class CaseRegistry
     {
         auto c = atm.load(std::memory_order_acquire);
         if (!c) return c;
-        while (atm.compare_exchange_weak(c, reinterpret_cast<T *>(c->RegistryNext), std::memory_order_acquire))
+        while (!atm.compare_exchange_weak(c, reinterpret_cast<T *>(c->RegistryNext), std::memory_order_acquire))
             if (!c) { return c; }
         c->RegistryNext = nullptr;
         return c;
@@ -321,9 +319,8 @@ class CaseRegistry
     // you must hold rlock of m_Mutex before calling this!
     void foreachUnsafeCases(auto &&fun)
     {
-        auto it = [this]{ boost::shared_lock lock{ m_Mutex }; return m_UnsafeCases.begin(); }();
-        for (; it != m_UnsafeCases.end(); ++it)
-            foreach(*it, fun);
+        for (auto &atm : m_UnsafeCases)
+            foreach(atm, fun);
     }
 
     // you must hold rlock of m_Mutex before calling this!
@@ -333,6 +330,7 @@ class CaseRegistry
     void WriteReport();
 
     HCase root;
+    void ResolveDangerImpl();
 
 public:
     CaseRegistry(HCase root, int id);
