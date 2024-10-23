@@ -508,7 +508,7 @@ struct StupidLock
     {
         if (!is_locked)
             throw std::logic_error{ "Unlocking twice" };
-        mtx.unlock_upgrade();
+        mtx.unlock_shared();
         is_locked = false;
     }
 
@@ -516,7 +516,7 @@ struct StupidLock
     {
         if (is_locked)
             throw std::logic_error{ "Unlocking twice" };
-        mtx.lock_upgrade();
+        mtx.lock_shared();
         is_locked = true;
     }
 
@@ -525,11 +525,11 @@ struct StupidLock
         StupidLock &lck;
         bool is_locked;
         explicit Upgrader(StupidLock &l)
-            : lck{ l }, is_locked{ lck.mtx.try_unlock_upgrade_and_lock() } { }
+            : lck{ l }, is_locked{ lck.mtx.try_unlock_shared_and_lock() } { }
         ~Upgrader()
         {
             if (is_locked)
-                lck.mtx.unlock_and_lock_upgrade();
+                lck.mtx.unlock_and_lock_shared();
         }
         operator bool() { return is_locked; }
     };
@@ -583,14 +583,15 @@ lagain:
         m_UnsafeCases.emplace_front();
         m_D1SafeCases >> m_D0SafeCases;
         m_D1UnsafeCases >> m_D0UnsafeCases;
-        m_CVStage.notify_all();
         if (!m_D0SafeCases.load(std::memory_order_relaxed)
             && !m_D0UnsafeCases.load(std::memory_order_relaxed))
         {
             m_Completed = true;
+            m_CVStage.notify_all();
             m_CVCompletion.notify_all();
             return;
         }
+        m_CVStage.notify_all();
         goto lagain;
     }
 }

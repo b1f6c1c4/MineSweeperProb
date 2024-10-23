@@ -1,4 +1,5 @@
 #pragma once
+#define BOOST_THREAD_PROVIDES_SHARED_MUTEX_UPWARDS_CONVERSIONS
 #include <atomic>
 #include <boost/thread/pthread/shared_mutex.hpp>
 #include <concepts>
@@ -344,7 +345,7 @@ public:
         boost::shared_lock lock{ m_Mutex };
         m_CVStage.wait_for(lock, t);
         WriteReport();
-        return m_Completed;
+        return !m_Completed;
     }
 
     template <typename T>
@@ -352,7 +353,7 @@ public:
     {
         boost::shared_lock lock{ m_Mutex };
         m_CVCompletion.wait_for(lock, t);
-        return m_Completed;
+        return !m_Completed;
     }
 
     // anyone can call this at any time
