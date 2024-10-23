@@ -24,6 +24,7 @@ struct HolderCase;
 struct SafeCase;
 struct ActionCase;
 struct UnsafeCase;
+class CaseRegistry;
 
 using PCase = BaseCase *;
 using RCase = ReportingCase *;
@@ -81,9 +82,6 @@ struct BaseCase
     BaseCase &Deflate();
     void Deplete() { m_Game = std::monostate{}; }
 
-    virtual PCase Fork() = 0;
-    PCase CheckedFork();
-
     virtual bool IsHolder() const { return false; }
     virtual bool IsAction() const { return false; }
     virtual bool ShallDeflate() const { return false; }
@@ -93,7 +91,7 @@ struct BaseCase
 #ifdef TRACEBACK
     std::string Traceback;
     void PrintTraceback() const;
-    virtual const BaseCase GetAnyParent() const { return nullptr; }
+    virtual const BaseCase *GetAnyParent() const { return nullptr; }
 #else
 #define Traceback ""
 #endif
@@ -101,7 +99,6 @@ struct BaseCase
     int LargestModifiedIndex;
 
     void *RegistryNext;
-    void *QueueNext;
 
 protected:
     std::variant<std::monostate, std::string, PGame> m_Game;
@@ -109,26 +106,13 @@ protected:
 
 struct ReportingCase
 {
-    void AssignParent(FCase p)
-    {
-        std::lock_guard lock{ ParentsMtx };
-        if (p->IsAction())
-            AllParents.insert(static_cast<ACase>(p));
-        else
-            AllParents.insert_range(static_cast<SCase>(p)->AllParents);
-    }
+    void AssignParent(FCase p);
 
     virtual operator PCase() = 0;
-    const BaseCase GetAnyParent() const
-    {
-        std::lock_guard lock{ ParentsMtx };
-        if (AllParents.empty())
-            return nullptr;
-        return AllParents.front();
-    }
+    const BaseCase *GetAnyParent() const;
 
 protected:
-    std::mutex ParentsMtx;
+    mutable std::mutex ParentsMtx;
     std::set<ACase> AllParents;
 };
 
@@ -143,7 +127,7 @@ struct ForkedCase : BaseCase
 
     int Id;
 
-    PCase Fork() override;
+    virtual RCase Fork();
 
     std::string ToString() const override;
 
@@ -158,16 +142,9 @@ struct HolderCase : BaseCase
     HolderCase(PCase p, PGame game, double d)
         : BaseCase{ p, game }, Danger{ d } { }
 
-    // only callable by the single thread calling Fork()
-    void AddChildren(ACase v);
-
-    PCase Fork() override { throw std::logic_error{ "Do not call this" }; }
-
     bool IsHolder() const override { return true; }
 
     std::string ToString() const override;
-
-    std::atomic<ACase> Child;
 
     // if Child == nullptr, Danger is the unsafe's intrinsic danger
     // if Child != nullptr, Danger is min(Danger of children)
@@ -176,13 +153,21 @@ struct HolderCase : BaseCase
 
     // only the dedicated thread can call this
     void ResolveDanger();
+
+    friend class CaseRegistry;
+
+protected:
+    // only callable by the single thread calling Fork()
+    void AddChildren(ACase v);
+
+    std::atomic<ACase> Child;
 };
 
 struct ActionCase : ForkedCase
 {
     ActionCase(HCase p, PGame g, int id);
 
-    PCase Fork() override;
+    RCase Fork() override;
 
     bool IsAction() const override { return true; }
 
@@ -196,7 +181,7 @@ struct ActionCase : ForkedCase
 
 #ifdef TRACEBACK
     HCase Parent;
-    const BaseCase GetAnyParent() const override { return Parent; }
+    const BaseCase *GetAnyParent() const override { return Parent; }
 #endif
 
     ACase Sibling;
@@ -225,7 +210,7 @@ struct UnsafeCase : HolderCase, ReportingCase
 
     void ResolveParents();
 
-    PCase Fork() override;
+    ACase Fork();
 
     // before ResolveParents(): DO NOT CALL
     // after ResolveParents(): thread-safe
@@ -254,91 +239,73 @@ class CaseRegistry
     std::atomic<size_t> m_Processed, m_Pending;
     // count number of outstanding cases
     std::atomic<size_t> m_ACases, m_SCases, m_UCases;
-    std::atomic<size_t> m_ReapedSCases;
+    std::atomic<size_t> m_QCases;
 
     // rlocked by anything below
-    // wlocked by m_MaxDepth, m_Reaping, m_Completed change
+    // wlocked by m_MaxDepth, m_Completed change
     mutable boost::upgrade_mutex m_Mutex;
-
-    // a depth has two stages: forking and reaping
-    //
-    // when m_Reaping == false:
-    //   m_PendingD0Cases ===Fork()>>>  m_PendingD1Cases
-    //                                  m_D1SafeCases
-    //                                  m_UnsafeCases.front()
-    //
-    // when m_Reaping == true:
-    //   m_D0SafeCases    ===>>>  delete
-    //
     unsigned m_MaxDepth;
-    bool m_Reaping, m_Completed;
+    bool m_Completed;
 
     // it is guaranteed that (whenever rlocked by m_Mutex)
-    // when m_Reaping == false:
     //   m_D0SafeCases <=> Depth == m_MaxDepth - 1
-    //     [[not changing]]
     //   m_D1SafeCases <=> Depth == m_MaxDepth
-    //     [[being created]]
-    // when m_Reaping == true:
-    //   m_D0SafeCases <=> Depth == m_MaxDepth - 2
-    //     [[being removed]]
-    //   m_D1SafeCases <=> Depth == m_MaxDepth - 1
-    //     [[not changing]]
+    //   m_D1UnsafeCases <=> Depth == m_MaxDepth
     std::atomic<SCase> m_D0SafeCases, m_D1SafeCases;
-
-    // m_unsafeCases.front() <=> Depth == m_MaxDepth
+    std::atomic<UCase> m_D0UnsafeCases, m_D1UnsafeCases;
+    // m_UnsafeCases.front() <=> Depth == m_MaxDepth - 1
     std::forward_list<std::atomic<UCase>> m_UnsafeCases;
 
-    // it is guaranteed that (whenever rlocked by m_Mutex)
-    // m_PendingD0Cases <=> Depth == m_MaxDepth - 1
-    //    only decreasing
-    // m_PendingD1Cases <=> Depth == m_MaxDepth
-    //    only increasing
-    std::atomic<PCase> m_PendingD0Cases, m_PendingD1Cases;
-
-    // locked for ResolveDanger
-    // always rlock m_Mutex first then m_MutexRDaRS
-    std::mutex m_MutexRDaRS;
-
-    // wait for a stage change
+    // wait for a stage change (m_MaxDepth or m_Completed)
     boost::condition_variable_any m_CVStage;
-    // wait for completion
+    // wait for m_Completed
     boost::condition_variable_any m_CVCompletion;
 
     // you must hold rlock of m_Mutex before calling this!
-    void updateMax(std::atomic<unsigned> &v, unsigned d)
-    {
-        auto old = v.load();
-        while (d > old)
-            if (v.compare_exchange_weak(old, d))
-                break;
-        return;
-    }
+    void updateMax(std::atomic<unsigned> &v, unsigned d);
 
-    // you must hold rlock of m_Mutex before calling this!
     template <typename T>
         requires std::derived_from<T, BaseCase>
-    void push(std::atomic<T *> &atm, T *v)
+    class ThreadLocalList
     {
-        constexpr auto MPtr = std::is_same_v<T, BaseCase> ? &BaseCase::QueueNext : &BaseCase::RegistryNext;
-        auto &rn = *reinterpret_cast<T **>(&v->*MPtr);
-        rn = atm.load(std::memory_order_acquire);
-        while (!atm.compare_exchange_weak(rn, v));
-    }
+        T *front, **next;
+
+    public:
+        ThreadLocalList() : front{}, next{} { }
+        explicit ThreadLocalList(T *v)
+            : front{ v },
+              next{ reinterpret_cast<T **>(&v->RegistryNext) } { }
+
+        friend auto &operator<<(ThreadLocalList<T> &v, T *x)
+        {
+            (v.next ? *v.next : v.front) = x;
+            v.next = reinterpret_cast<T **>(&x->RegistryNext);
+            return v;
+        }
+
+        // you must hold rlock of m_Mutex before calling this!
+        friend void operator>>(ThreadLocalList<T> &&v, std::atomic<T *> &atm)
+        {
+            if (!v.next) return;
+            *v.next = atm.load(std::memory_order_acquire);
+            while (!atm.compare_exchange_weak(*v.next, v.front));
+            v.front = nullptr, v.next = nullptr;
+        }
+    };
+
+    using TLLS = ThreadLocalList<SafeCase>;
+    using TLLU = ThreadLocalList<UnsafeCase>;
 
     // you must hold rlock of m_Mutex before calling this!
-    // m_Borrowed is increased by one iff succeeded
     template <typename T>
         requires std::derived_from<T, BaseCase>
     auto pop(std::atomic<T *> &atm)
     {
-        constexpr auto MPtr = std::is_same_v<T, BaseCase> ? &BaseCase::QueueNext : &BaseCase::RegistryNext;
         auto c = atm.load(std::memory_order_acquire);
         if (!c) return c;
-        ++m_Borrowed;
-        while (atm.compare_exchange_weak(c, reinterpret_cast<T *>(c->*MPtr), std::memory_order_acquire))
-            if (!c) { --m_Borrowed; return c; }
-        c->*MPtr = nullptr;
+        while (atm.compare_exchange_weak(c, reinterpret_cast<T *>(c->RegistryNext), std::memory_order_acquire))
+            if (!c) { return c; }
+        c->RegistryNext = nullptr;
         return c;
     }
 
@@ -360,53 +327,38 @@ class CaseRegistry
     }
 
     // you must hold rlock of m_Mutex before calling this!
-    void Fork(PCase p);
-    void Enqueue(PCase p);
+    void Process(ACase uc, TLLS &scs, TLLU &ucs);
+    void Process(SCase sc, TLLS &scs, TLLU &ucs);
+    void Process(UCase uc, TLLS &scs, TLLU &ucs);
+    void WriteReport();
+
+    HCase root;
 
 public:
-    // only indirectly called from CaseRegistry::Fork(PCase)
-    void Save(ACase ac);
-    void Save(SCase ac);
-    void Save(UCase uc);
+    CaseRegistry(HCase root, int id);
 
     // worker thread entry
     void Process();
 
     template <typename T>
-    bool Resolve(T &&t)
+    bool WriteReport(T &&t)
     {
-        std::shared_lock lock{ m_Mutex };
-        m_CVCompletion.wait_for(lock, t);
-        return !done();
+        boost::shared_lock lock{ m_Mutex };
+        m_CVStage.wait_for(lock, t);
+        WriteReport();
+        return m_Completed;
     }
 
     template <typename T>
     bool Wait(T &&t)
     {
-        std::shared_lock lock{ m_Mutex };
+        boost::shared_lock lock{ m_Mutex };
         m_CVCompletion.wait_for(lock, t);
-        return !done();
+        return m_Completed;
     }
 
-    // anyone can call this
-    void ResolveDanger(HCase root);
+    // anyone can call this at any time
+    void ResolveDanger();
 
-    auto GetDepth() const
-    {
-        std::shared_lock lock{ m_Mutex };
-        return m_MaxDepth;
-    }
-
-    auto GetStep() const { return m_MaxStep.load(std::memory_order_relaxed); }
-
-    auto GetCases() const
-    {
-        return std::make_tuple(
-                m_ACases.load(std::memory_order_relaxed),
-                m_SCases.load(std::memory_order_relaxed),
-                m_UCases.load(std::memory_order_relaxed)
-                );
-    }
-
-    auto GetPending() { return m_Pending.load(std::memory_order_relaxed); }
+    auto GetProcessed() { return m_Processed.load(std::memory_order_relaxed); }
 };

@@ -51,6 +51,8 @@ else()
     target_link_libraries(MineSweeperProver PRIVATE mws)
     target_link_libraries(MineSweeperProver PRIVATE fmt)
     target_link_libraries(MineSweeperProver PRIVATE mimalloc)
+    target_link_libraries(MineSweeperProver PRIVATE boost_chrono)
+    target_link_libraries(MineSweeperProver PRIVATE boost_thread)
 endif()
 
 target_link_libraries(MineSweeperSolver PRIVATE mws)
