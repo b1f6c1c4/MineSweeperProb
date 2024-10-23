@@ -835,3 +835,12 @@ int GameMgr::FrontierDist(Block blk) const
     }
     return d;
 }
+
+[[nodiscard]] size_t GameMgr::MemoryFootprint() const
+{
+    auto cnt = sizeof(*this);
+    cnt += m_Blocks.capacity() * sizeof(m_Blocks[0]);
+    if (m_Solver)
+        cnt += m_Solver->MemoryFootprint();
+    return cnt;
+}

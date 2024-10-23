@@ -243,6 +243,8 @@ class CaseRegistry
     std::atomic<size_t> m_D0, m_D1;
     // count number of outstanding cases
     std::atomic<size_t> m_ACases, m_SCases, m_UCases;
+    // count memory footprint
+    std::atomic<size_t> m_AMem, m_SMem, m_UMem;
 
     // rlocked by anything below
     // wlocked by m_MaxDepth, m_Completed change

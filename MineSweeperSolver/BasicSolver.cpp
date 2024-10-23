@@ -1008,3 +1008,39 @@ void BasicSolver::CheckForConsistency(bool complete)
             ASSERT(false);
 }
 #endif
+
+[[nodiscard]] size_t BasicSolver::MemoryFootprint() const
+{
+    auto cnt = sizeof(*this);
+#define SZ_CONT(cont) \
+    cnt += cont.capacity() * sizeof(*cont.begin())
+
+    SZ_CONT(m_Manager);
+    SZ_CONT(m_BlockSets);
+    SZ_CONT(m_SetIDs);
+    if (!m_Matrix.empty())
+        cnt += m_Matrix.size() * m_Matrix.front().size() * sizeof(Container);
+    SZ_CONT(m_MatrixAugment);
+    SZ_CONT(m_Minors);
+    SZ_CONT(m_Solutions);
+    SZ_CONT(m_Probability);
+
+    SZ_CONT(m_Reduce_Temp);
+    SZ_CONT(m_ReduceCount_Temp);
+    SZ_CONT(m_IntersectionCounts_Temp);
+    cnt += m_Pairs_Temp_Size * sizeof(bool);
+    SZ_CONT(m_OverlapIndexes_Temp);
+    SZ_CONT(m_OverlapA_Temp);
+    SZ_CONT(m_OverlapB_Temp);
+    SZ_CONT(m_OverlapC_Temp);
+    SZ_CONT(m_GaussVec_Temp);
+    SZ_CONT(m_NonZero_Temp);
+    SZ_CONT(m_Counts_Temp);
+    SZ_CONT(m_Majors_Temp);
+    SZ_CONT(m_Stack_Temp);
+    SZ_CONT(m_Dist_Temp);
+    SZ_CONT(m_Sums_Temp);
+    SZ_CONT(m_Exp_Temp);
+#undef SZ_CONT
+    return cnt;
+}

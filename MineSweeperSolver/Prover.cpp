@@ -399,12 +399,14 @@ void CaseRegistry::Enqueue(RCase rc, TLL &rcs)
     {
         rcs.ucs << static_cast<UCase>(pc);
         ++m_UCases;
+        m_UMem += pc->ThePGame()->MemoryFootprint();
         pc->Deflate();
     }
     else
     {
         rcs.scs << static_cast<SCase>(pc);
         ++m_SCases;
+        m_SMem += pc->ThePGame()->MemoryFootprint();
         if (g_MemoryAvailPercent.load(std::memory_order_relaxed) < 30)
             pc->Deflate();
     }
@@ -436,6 +438,7 @@ try
         Enqueue(rc, rcs);
     }
     // no need to sc->Deplete, it will be deleted
+    m_SMem -= sc->ThePGame()->MemoryFootprint();
     --m_SCases;
 }
 #ifdef TRACEBACK
@@ -506,6 +509,7 @@ try
 #endif
         Enqueue(rc, rcs);
     }
+    m_AMem += ac->ThePGame()->MemoryFootprint();
     ac->Deplete();
 }
 #ifdef TRACEBACK
@@ -659,15 +663,24 @@ void CaseRegistry::Dispose()
 void CaseRegistry::WriteReport()
 {
     ResolveDangerImpl();
-    fmt::print("{:.10f}% d{} s{} d0={:.2e} d1={:.2e} a{:.2f}GiB s{:.2f}GiB u{:.2f}GiB t{:.2f}GiB m{:.3f}%\n",
+    auto acnt = m_ACases.load(std::memory_order_relaxed);
+    auto scnt = m_SCases.load(std::memory_order_relaxed);
+    auto ucnt = m_UCases.load(std::memory_order_relaxed);
+    auto amem = m_AMem.load(std::memory_order_relaxed);
+    auto smem = m_SMem.load(std::memory_order_relaxed);
+    auto umem = m_UMem.load(std::memory_order_relaxed);
+    fmt::print("{:.10f}% d{} s{} d0={:.2e} d1={:.2e} a{:.2f}GiB s{:.2f}GiB u{:.2f}GiB a{:.1f}B s{:.1f}B u{:.1f}B t{:.2f}GiB m{:.3f}%\n",
             100.0 * root->Danger / root->TotalStates,
             m_MaxDepth,
             m_MaxStep.load(std::memory_order_relaxed),
             m_D0.load(std::memory_order_relaxed) + 0.0,
             m_D1.load(std::memory_order_relaxed) + 0.0,
-            m_ACases.load(std::memory_order_relaxed) * sizeof(ActionCase) * GiB,
-            m_SCases.load(std::memory_order_relaxed) * sizeof(SafeCase) * GiB,
-            m_UCases.load(std::memory_order_relaxed) * sizeof(UnsafeCase) * GiB,
+            amem * GiB,
+            smem * GiB,
+            umem * GiB,
+            static_cast<double>(amem) / acnt,
+            static_cast<double>(smem) / scnt,
+            static_cast<double>(umem) / ucnt,
             g_Trie.size() * GiB,
             g_MemoryAvailPercent.load(std::memory_order_relaxed));
 }

@@ -116,6 +116,8 @@ public:
      */
     virtual bool Solve(SolvingState maxDepth, bool shortcut);
 
+    [[nodiscard]] size_t MemoryFootprint() const;
+
     friend class Drainer;
 protected:
     /* SolvingState::Stale (=0) is used when anything NEW is found.

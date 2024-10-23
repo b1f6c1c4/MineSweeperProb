@@ -105,6 +105,8 @@ public:
 
     void Save(std::ostream &sw) const;
 
+    [[nodiscard]] size_t MemoryFootprint() const;
+
     friend class Drainer;
 private:
     bool m_IsExternal;
