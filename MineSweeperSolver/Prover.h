@@ -314,8 +314,12 @@ class CaseRegistry
         requires std::derived_from<T, BaseCase>
     void foreach(std::atomic<T *> &atm, auto &&fun)
     {
-        for (auto ptr = atm.load(std::memory_order_acquire); ptr; ptr = reinterpret_cast<T *>(ptr->RegistryNext))
+        for (auto ptr = atm.load(std::memory_order_acquire); ptr;)
+        {
+            auto nxt = reinterpret_cast<T *>(ptr->RegistryNext);
             fun(ptr);
+            ptr = nxt;
+        }
     }
 
     // you must hold rlock of m_Mutex before calling this!

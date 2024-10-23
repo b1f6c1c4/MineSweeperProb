@@ -457,6 +457,7 @@ try
     std::cin.get();
 #endif
     updateMax(m_MaxStep, uc->Step + 1);
+    ThreadLocalList<ActionCase> tll;
     for (ACase ac; (ac = uc->Fork());)
     {
 #ifndef NDEBUG
@@ -464,8 +465,10 @@ try
             throw std::logic_error{ "Depth not matching" };
 #endif
         ++m_ACases;
+        tll << ac;
         Process(ac, rcs);
     }
+    std::move(tll) >> m_ActionCases;
     uc->Deplete();
 }
 #ifdef TRACEBACK
@@ -634,6 +637,7 @@ CaseRegistry::CaseRegistry(HCase root, int id)
     auto ac = new ActionCase(root, root->ThePGame(), id);
     root->AddChildren(ac);
     root->Deplete();
+    ThreadLocalList<ActionCase>{ ac } >> m_ActionCases;
 
     TLL rcs;
     Process(ac, rcs);
@@ -745,4 +749,5 @@ int main(int argc, char *argv[])
 
     cr.Dispose();
     g_Trie.Dispose();
+    delete root;
 }
