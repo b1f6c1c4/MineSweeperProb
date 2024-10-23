@@ -3,6 +3,7 @@
 #include "Prover.h"
 #include "GameMgr.h"
 #include "Util.h"
+#include <atomic>
 #include <boost/chrono/duration.hpp>
 #include <mimalloc-new-delete.h>
 #include <fmt/ostream.h>
@@ -17,6 +18,8 @@
 #ifndef TRACEBACK
 #define Traceback ""
 #endif
+
+static constexpr auto GiB = 1.0 / 1024 / 1024 / 1024;
 
 Trie g_Trie{};
 Strategy g_Strategy;
@@ -34,6 +37,15 @@ void updateMemoryAvailPercent()
     fin >> s >> avail >> s;
     fin >> s >> avail >> s;
     g_MemoryAvailPercent.store(100.0 * avail / total);
+}
+
+void Trie::Dispose()
+{
+    [](this auto &&self, node_t *n) -> void {
+        for (auto &atm : n->next)
+            if (auto v = atm.load(std::memory_order_acquire); v)
+                self(v), delete v;
+    }(&root);
 }
 
 node_t *Trie::find(FCase c, int special)
@@ -116,15 +128,15 @@ void BaseCase::PrintTraceback() const
 }
 #endif
 
-BaseCase &BaseCase::Deflate()
+void BaseCase::Deflate()
 {
-    if (std::holds_alternative<std::string>(m_Game))
-        return *this;
+    if (!std::holds_alternative<PGame>(m_Game))
+        return;
 
     std::stringstream ss;
     std::get<PGame>(m_Game)->Save(ss);
     m_Game = ss.str();
-    return *this;
+    return;
 }
 
 void HolderCase::AddChildren(ACase v)
@@ -380,13 +392,27 @@ void CaseRegistry::updateMax(std::atomic<unsigned> &v, unsigned d)
     return;
 }
 
-void CaseRegistry::Process(SCase sc, TLLS &scs, TLLU &ucs)
+void CaseRegistry::Enqueue(RCase rc, TLL &rcs)
+{
+    auto pc = rc->operator PCase();
+    if (pc->IsHolder())
+    {
+        rcs.ucs << static_cast<UCase>(pc);
+        ++m_UCases;
+    }
+    else
+    {
+        rcs.scs << static_cast<SCase>(pc);
+        ++m_SCases;
+    }
+}
+
+void CaseRegistry::Process(SCase sc, TLL &rcs)
 #ifdef TRACEBACK
 try
 #endif
 {
-    ++m_Processed;
-    --m_QCases;
+    --m_D0;
 #ifndef NDEBUG
     fmt::print("{1}  (@{0})\n", fmt::ptr(sc), sc->ToString());
     std::cin.get();
@@ -399,15 +425,12 @@ try
                 rc->operator PCase()->ToString(),
                 sc->GetDegree() - 1);
 #endif
-        ++m_QCases;
+        ++m_D1;
 #ifndef NDEBUG
         if (rc->operator PCase()->Depth != m_MaxDepth)
             throw std::logic_error{ "Depth not matching" };
 #endif
-        if (rc->operator PCase()->IsHolder())
-            ucs << static_cast<UCase>(rc), ++m_UCases;
-        else
-            scs << static_cast<SCase>(rc), ++m_SCases;
+        Enqueue(rc, rcs);
     }
     // no need to sc->Deplete, it will be deleted
     --m_SCases;
@@ -422,18 +445,18 @@ catch (const std::exception &err)
 }
 #endif
 
-void CaseRegistry::Process(UCase uc, TLLS &scs, TLLU &ucs)
+void CaseRegistry::Process(UCase uc, TLL &rcs)
 #ifdef TRACEBACK
 try
 #endif
 {
-    ++m_Processed;
-    --m_QCases;
+    --m_D0;
     uc->ResolveParents();
 #ifndef NDEBUG
     fmt::print("{1}  (@{0})\n", fmt::ptr(uc), uc->ToString());
     std::cin.get();
 #endif
+    updateMax(m_MaxStep, uc->Step + 1);
     for (ACase ac; (ac = uc->Fork());)
     {
 #ifndef NDEBUG
@@ -441,7 +464,7 @@ try
             throw std::logic_error{ "Depth not matching" };
 #endif
         ++m_ACases;
-        Process(ac, scs, ucs);
+        Process(ac, rcs);
     }
     uc->Deplete();
 }
@@ -455,12 +478,11 @@ catch (const std::exception &err)
 }
 #endif
 
-void CaseRegistry::Process(ACase ac, TLLS &scs, TLLU &ucs)
+void CaseRegistry::Process(ACase ac, TLL &rcs)
 #ifdef TRACEBACK
 try
 #endif
 {
-    ++m_Processed;
 #ifndef NDEBUG
     fmt::print("  >>{1}  (@{0})\n", fmt::ptr(ac), ac->ToString());
 #endif
@@ -471,15 +493,12 @@ try
                 fmt::ptr(rc),
                 rc->operator PCase()->ToString());
 #endif
-        ++m_QCases;
+        ++m_D1;
 #ifndef NDEBUG
         if (rc->operator PCase()->Depth != m_MaxDepth)
             throw std::logic_error{ "Depth not matching" };
 #endif
-        if (rc->operator PCase()->IsHolder())
-            ucs << static_cast<UCase>(rc), ++m_UCases;
-        else
-            scs << static_cast<SCase>(rc), ++m_SCases;
+        Enqueue(rc, rcs);
     }
     ac->Deplete();
 }
@@ -539,17 +558,16 @@ struct StupidLock
 
 // you must hold wlock of m_Mutex before calling this!
 template <typename T>
-void operator>>(std::atomic<T *> &p, std::atomic<T *> &q)
+void operator>>(std::atomic<T> &p, std::atomic<T> &q)
 {
-    q.store(p.exchange(nullptr, std::memory_order_acquire), std::memory_order_release);
+    q.store(p.exchange({}, std::memory_order_acquire), std::memory_order_release);
 }
 
 void CaseRegistry::Process()
 {
     SCase sc;
     UCase uc;
-    TLLS scs;
-    TLLU ucs;
+    TLL rcs;
     TLLU ucx;
 
     StupidLock lock{ m_Mutex };
@@ -559,11 +577,11 @@ again:
         return;
 lagain:
     while ((sc = pop(m_D0SafeCases)))
-        Process(sc, scs, ucs), delete sc;
+        Process(sc, rcs), delete sc;
     while ((uc = pop(m_D0UnsafeCases)))
-        Process(uc, scs, ucs), ucx << uc;
-    std::move(scs) >> m_D1SafeCases;
-    std::move(ucs) >> m_D1UnsafeCases;
+        Process(uc, rcs), ucx << uc;
+    std::move(rcs.scs) >> m_D1SafeCases;
+    std::move(rcs.ucs) >> m_D1UnsafeCases;
     std::move(ucx) >> m_UnsafeCases.front();
     // D0 is now empty, we need to enter next stage
     if (auto wlock = lock.Upgrade(); !wlock)
@@ -581,6 +599,7 @@ lagain:
         // we can offically enter next stage
         m_MaxDepth++;
         m_UnsafeCases.emplace_front();
+        m_D1 >> m_D0;
         m_D1SafeCases >> m_D0SafeCases;
         m_D1UnsafeCases >> m_D0UnsafeCases;
         if (!m_D0SafeCases.load(std::memory_order_relaxed)
@@ -616,28 +635,33 @@ CaseRegistry::CaseRegistry(HCase root, int id)
     root->AddChildren(ac);
     root->Deplete();
 
-    TLLS scs;
-    TLLU ucs;
-    Process(ac, scs, ucs);
+    TLL rcs;
+    Process(ac, rcs);
     m_UnsafeCases.emplace_front();
-    std::move(scs) >> m_D1SafeCases;
-    std::move(ucs) >> m_D1UnsafeCases;
+    std::move(rcs.scs) >> m_D1SafeCases;
+    std::move(rcs.ucs) >> m_D1UnsafeCases;
+}
+
+void CaseRegistry::Dispose()
+{
+    boost::unique_lock lock{ m_Mutex };
+    foreach(m_ActionCases, [](ACase ac){ delete ac; });
+    foreachUnsafeCases([](UCase uc){ delete uc; });
 }
 
 void CaseRegistry::WriteReport()
 {
-    fmt::print("x");
     ResolveDangerImpl();
-    fmt::print("{:.10f}% p{} q{} d{} s{} a{}s{}u{} t{} m{:.3f}%\n",
+    fmt::print("{:.10f}% d{} s{} d0={:.2e} d1={:.2e} a{:.2f}GiB s{:.2f}GiB u{:.2f}GiB t{:.2f}GiB m{:.3f}%\n",
             100.0 * root->Danger / root->TotalStates,
-            m_Processed.load(std::memory_order_relaxed),
-            m_QCases.load(std::memory_order_relaxed),
             m_MaxDepth,
             m_MaxStep.load(std::memory_order_relaxed),
-            m_ACases.load(std::memory_order_relaxed),
-            m_SCases.load(std::memory_order_relaxed),
-            m_UCases.load(std::memory_order_relaxed),
-            g_Trie.size(),
+            m_D0.load(std::memory_order_relaxed) + 0.0,
+            m_D1.load(std::memory_order_relaxed) + 0.0,
+            m_ACases.load(std::memory_order_relaxed) * sizeof(ActionCase) * GiB,
+            m_SCases.load(std::memory_order_relaxed) * sizeof(SafeCase) * GiB,
+            m_UCases.load(std::memory_order_relaxed) * sizeof(UnsafeCase) * GiB,
+            g_Trie.size() * GiB,
             g_MemoryAvailPercent.load(std::memory_order_relaxed));
 }
 
@@ -656,13 +680,6 @@ int main(int argc, char *argv[])
             << std::endl;
         return 1;
     }
-
-#define CHK(T) \
-    fmt::print("sizeof(" #T ")={}\n", sizeof(T))
-
-    CHK(ActionCase);
-    CHK(SafeCase);
-    CHK(UnsafeCase);
 
 #ifdef NDEBUG
     const bool is_tty = isatty(STDERR_FILENO);
@@ -724,6 +741,8 @@ int main(int argc, char *argv[])
     j["result"]["ratio"] = 100.0 * root->Danger / root->TotalStates;
     j["exec"]["duration"] = timer_computation.seconds();
     j["exec"]["cpu"] = nprocs;
-    j["exec"]["speed"] = static_cast<double>(cr.GetProcessed()) / timer_computation.seconds() / nprocs;
     std::cout << j << std::endl;
+
+    cr.Dispose();
+    g_Trie.Dispose();
 }

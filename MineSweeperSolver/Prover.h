@@ -59,9 +59,14 @@ private:
     node_t *ensure(node_t *ptr, int d);
 
 public:
+    void Dispose();
+
     node_t *find(FCase c, int special = -1);
 
-    [[nodiscard]] auto size() const { return cnt.load(std::memory_order_relaxed); }
+    [[nodiscard]] auto size() const
+    {
+        return cnt.load(std::memory_order_relaxed) * sizeof(node_t) + sizeof(Trie);
+    }
 };
 
 using node_t = Trie::node_t;
@@ -79,12 +84,14 @@ struct BaseCase
 
     [[nodiscard]] const GameMgr &Game() { return *ThePGame(); }
     [[nodiscard]] PGame ThePGame();
-    BaseCase &Deflate();
+
+    // Convert game to string to reduce memory footprint
+    void Deflate();
+    // Discard game information
     void Deplete() { m_Game = std::monostate{}; }
 
     virtual bool IsHolder() const { return false; }
     virtual bool IsAction() const { return false; }
-    virtual bool ShallDeflate() const { return false; }
 
     virtual std::string ToString() const;
 
@@ -205,8 +212,6 @@ struct UnsafeCase : HolderCase, ReportingCase
 {
     UnsafeCase(PCase p, PGame g, int lmi);
 
-    bool ShallDeflate() const override { return true; }
-
     void ResolveParents();
 
     ACase Fork();
@@ -235,10 +240,9 @@ class CaseRegistry
 
     // some statistics, never locked
     std::atomic<unsigned> m_MaxStep;
-    std::atomic<size_t> m_Processed, m_Pending;
+    std::atomic<size_t> m_D0, m_D1;
     // count number of outstanding cases
     std::atomic<size_t> m_ACases, m_SCases, m_UCases;
-    std::atomic<size_t> m_QCases;
 
     // rlocked by anything below
     // wlocked by m_MaxDepth, m_Completed change
@@ -292,9 +296,6 @@ class CaseRegistry
         }
     };
 
-    using TLLS = ThreadLocalList<SafeCase>;
-    using TLLU = ThreadLocalList<UnsafeCase>;
-
     // you must hold rlock of m_Mutex before calling this!
     template <typename T>
         requires std::derived_from<T, BaseCase>
@@ -324,10 +325,22 @@ class CaseRegistry
             foreach(atm, fun);
     }
 
+    using TLLS = ThreadLocalList<SafeCase>;
+    using TLLU = ThreadLocalList<UnsafeCase>;
+
+    struct TLL
+    {
+        TLLS scs;
+        TLLU ucs;
+    };
+
     // you must hold rlock of m_Mutex before calling this!
-    void Process(ACase uc, TLLS &scs, TLLU &ucs);
-    void Process(SCase sc, TLLS &scs, TLLU &ucs);
-    void Process(UCase uc, TLLS &scs, TLLU &ucs);
+    void Enqueue(RCase c, TLL &rcs);
+
+    // you must hold rlock of m_Mutex before calling this!
+    void Process(ACase uc, TLL &rcs);
+    void Process(SCase sc, TLL &rcs);
+    void Process(UCase uc, TLL &rcs);
     void WriteReport();
 
     HCase root;
@@ -335,6 +348,7 @@ class CaseRegistry
 
 public:
     CaseRegistry(HCase root, int id);
+    void Dispose();
 
     // worker thread entry
     void Process();
@@ -358,6 +372,4 @@ public:
 
     // anyone can call this at any time
     void ResolveDanger();
-
-    auto GetProcessed() { return m_Processed.load(std::memory_order_relaxed); }
 };
