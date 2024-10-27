@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <forward_list>
 #include <limits>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -41,35 +42,6 @@ using PGame = std::shared_ptr<GameMgr>;
 #define TRACEBACK
 #endif
 #endif
-
-class Trie
-{
-public:
-    struct node_t
-    {
-        std::mutex mtx;
-        std::atomic<RCase> p;
-        // degree: 9 if unopened
-        std::array<std::atomic<node_t *>, 10zu> next;
-    };
-
-private:
-    node_t root;
-    std::atomic<size_t> cnt;
-    node_t *ensure(node_t *ptr, int d);
-
-public:
-    void Dispose();
-
-    node_t *find(FCase c, int special = -1);
-
-    [[nodiscard]] auto size() const
-    {
-        return cnt.load(std::memory_order_relaxed) * sizeof(node_t) + sizeof(Trie);
-    }
-};
-
-using node_t = Trie::node_t;
 
 struct BaseCase
 {
@@ -234,6 +206,70 @@ private:
     std::vector<ACase> m_CachedParents;
 };
 
+template <typename T>
+    requires std::derived_from<T, BaseCase>
+class ThreadLocalList
+{
+    T *front, **next;
+    friend class Tier;
+
+public:
+    ThreadLocalList() : front{}, next{} { }
+    explicit ThreadLocalList(T *v)
+        : front{ v },
+          next{ reinterpret_cast<T **>(&v->RegistryNext) } { }
+
+    friend auto &operator<<(ThreadLocalList<T> &v, T *x)
+    {
+        (v.next ? *v.next : v.front) = x;
+        v.next = reinterpret_cast<T **>(&x->RegistryNext);
+        return v;
+    }
+
+    friend void operator>>(ThreadLocalList<T> &&v, ThreadLocalList<T> &d)
+    {
+        if (!v.next) return;
+        *v.next = d.front;
+        d.front = v.front;
+        d.next = v.next;
+        v.front = nullptr, v.next = nullptr;
+    }
+
+    friend void operator>>(ThreadLocalList<T> &&v, std::atomic<T *> &atm)
+    {
+        if (!v.next) return;
+        *v.next = atm.load(std::memory_order_acquire);
+        while (!atm.compare_exchange_weak(*v.next, v.front));
+        v.front = nullptr, v.next = nullptr;
+    }
+};
+
+using TLLS = ThreadLocalList<SafeCase>;
+using TLLU = ThreadLocalList<UnsafeCase>;
+
+struct TLL
+{
+    TLLS scs;
+    TLLU ucs;
+};
+
+class Tier : protected TLL
+{
+    // protects TLL, m_Size
+    boost::upgrade_mutex m_Mutex;
+    size_t m_Size;
+
+    template <typename T>
+        requires std::derived_from<T, BaseCase>
+    bool Push(T *c, ThreadLocalList<T> &lst);
+
+public:
+    void operator<<(SCase sc) { Push(sc, scs); }
+    void operator<<(UCase uc) { Push(uc, ucs); }
+    void operator>>(TLLS &v) { std::move(scs) >> v; }
+    void operator>>(TLLU &v) { std::move(ucs) >> v; }
+};
+
 class CaseRegistry
 {
     std::atomic<ACase> m_ActionCases;
@@ -254,12 +290,19 @@ class CaseRegistry
 
     // it is guaranteed that (whenever rlocked by m_Mutex)
     //   m_D0SafeCases <=> Depth == m_MaxDepth - 1
-    //   m_D1SafeCases <=> Depth == m_MaxDepth
-    //   m_D1UnsafeCases <=> Depth == m_MaxDepth
-    std::atomic<SCase> m_D0SafeCases, m_D1SafeCases;
-    std::atomic<UCase> m_D0UnsafeCases, m_D1UnsafeCases;
+    //   m_D0UnsafeCases <=> Depth == m_MaxDepth - 1
+    std::atomic<SCase> m_D0SafeCases;
+    std::atomic<UCase> m_D0UnsafeCases;
     // m_UnsafeCases.front() <=> Depth == m_MaxDepth - 1
     std::forward_list<std::atomic<UCase>> m_UnsafeCases;
+
+    // always lock m_Mutex before m_D1Mutex
+    // rlocked by m_D1Map, m_D1Quota
+    // wlocked by m_D1Map, m_D1Quota
+    boost::upgrade_mutex m_D1Mutex;
+    size_t m_D1Quota;
+    std::map<double, Tier> m_D1Map;
+    std::atomic<double> m_D1Cutoff;
 
     // wait for a stage change (m_MaxDepth or m_Completed)
     boost::condition_variable_any m_CVStage;
@@ -268,35 +311,6 @@ class CaseRegistry
 
     // you must hold rlock of m_Mutex before calling this!
     void updateMax(std::atomic<unsigned> &v, unsigned d);
-
-    template <typename T>
-        requires std::derived_from<T, BaseCase>
-    class ThreadLocalList
-    {
-        T *front, **next;
-
-    public:
-        ThreadLocalList() : front{}, next{} { }
-        explicit ThreadLocalList(T *v)
-            : front{ v },
-              next{ reinterpret_cast<T **>(&v->RegistryNext) } { }
-
-        friend auto &operator<<(ThreadLocalList<T> &v, T *x)
-        {
-            (v.next ? *v.next : v.front) = x;
-            v.next = reinterpret_cast<T **>(&x->RegistryNext);
-            return v;
-        }
-
-        // you must hold rlock of m_Mutex before calling this!
-        friend void operator>>(ThreadLocalList<T> &&v, std::atomic<T *> &atm)
-        {
-            if (!v.next) return;
-            *v.next = atm.load(std::memory_order_acquire);
-            while (!atm.compare_exchange_weak(*v.next, v.front));
-            v.front = nullptr, v.next = nullptr;
-        }
-    };
 
     // you must hold rlock of m_Mutex before calling this!
     template <typename T>
@@ -331,22 +345,15 @@ class CaseRegistry
             foreach(atm, fun);
     }
 
-    using TLLS = ThreadLocalList<SafeCase>;
-    using TLLU = ThreadLocalList<UnsafeCase>;
-
-    struct TLL
-    {
-        TLLS scs;
-        TLLU ucs;
-    };
+    // you must hold rlock of m_Mutex before calling this!
+    // return true => the case is saved
+    // return false => the case is discarded
+    bool Enqueue(RCase c);
 
     // you must hold rlock of m_Mutex before calling this!
-    void Enqueue(RCase c, TLL &rcs);
-
-    // you must hold rlock of m_Mutex before calling this!
-    void Process(ACase uc, TLL &rcs);
-    void Process(SCase sc, TLL &rcs);
-    void Process(UCase uc, TLL &rcs);
+    void Process(ACase uc);
+    void Process(SCase sc);
+    void Process(UCase uc);
     void WriteReport();
 
     HCase root;

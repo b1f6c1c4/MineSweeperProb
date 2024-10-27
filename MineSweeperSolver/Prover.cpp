@@ -21,7 +21,6 @@
 
 static constexpr auto GiB = 1.0 / 1024 / 1024 / 1024;
 
-Trie g_Trie{};
 Strategy g_Strategy;
 RCase g_InvalidCase;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
@@ -37,46 +36,6 @@ void updateMemoryAvailPercent()
     fin >> s >> avail >> s;
     fin >> s >> avail >> s;
     g_MemoryAvailPercent.store(100.0 * avail / total);
-}
-
-void Trie::Dispose()
-{
-    [](this auto &&self, node_t *n) -> void {
-        for (auto &atm : n->next)
-            if (auto v = atm.load(std::memory_order_acquire); v)
-                self(v), delete v;
-    }(&root);
-}
-
-node_t *Trie::find(FCase c, int special)
-{
-    auto ptr = &root;
-    for (auto id = 0; id <= c->LargestModifiedIndex; id++)
-    {
-        auto blk = c->Game().GetBlockProperties()[id];
-        auto degree = id == c->Id ? special : blk.IsOpen ? blk.Degree : 9;
-        ptr = ensure(ptr, degree);
-    }
-    return ptr;
-}
-
-node_t *Trie::ensure(node_t *ptr, int d)
-{
-    if (d < 0 || d >= ptr->next.size())
-        throw std::logic_error{ "Index out of bound" };
-    auto &nxt = ptr->next[d];
-    auto next = nxt.load(std::memory_order_acquire);
-    if (next)
-        return next;
-
-    std::lock_guard lock{ ptr->mtx };
-    if ((next = nxt.load(std::memory_order_relaxed)))
-        return next;
-
-    next = new node_t{};
-    ++cnt;
-    nxt.store(next, std::memory_order_release);
-    return next;
 }
 
 BaseCase::BaseCase(PCase p)
@@ -383,6 +342,69 @@ std::string UnsafeCase::ToString() const
             m_CachedParents.size());
 }
 
+template <typename M>
+struct StupidLock
+{
+    M &mtx;
+    bool is_locked;
+
+    explicit StupidLock(M &m)
+        : mtx{ m }, is_locked{} { lock(); }
+
+    ~StupidLock() { if (is_locked) unlock(); }
+
+    void unlock()
+    {
+        if (!is_locked)
+            throw std::logic_error{ "Unlocking twice" };
+        mtx.unlock_shared();
+        is_locked = false;
+    }
+
+    void lock()
+    {
+        if (is_locked)
+            throw std::logic_error{ "Unlocking twice" };
+        mtx.lock_shared();
+        is_locked = true;
+    }
+
+    struct Upgrader
+    {
+        StupidLock &lck;
+        bool is_locked;
+        explicit Upgrader(StupidLock &l)
+            : lck{ l }, is_locked{ lck.mtx.try_unlock_shared_and_lock() } { }
+        ~Upgrader()
+        {
+            if (is_locked)
+                lck.mtx.unlock_and_lock_shared();
+        }
+        operator bool() { return is_locked; }
+    };
+
+    // if returning false, wlock is NOT granted
+    auto Upgrade() { return Upgrader{ *this }; }
+};
+
+template <typename T>
+    requires std::derived_from<T, BaseCase>
+bool Tier::Push(T *c, ThreadLocalList<T> &lst)
+{
+    StupidLock lock{ m_Mutex };
+    for (auto ptr = lst.front; ptr; ptr = ptr->RegistryNext)
+        if (*c == *ptr) // TODO
+            return false;
+    auto wlock = lock.Upgrade();
+    for (auto ptr = lst.front; ptr; ptr = ptr->RegistryNext)
+        if (*c == *ptr) // TODO
+            return false;
+    c->RegistryNext = lst.front;
+    lst.front = c;
+    m_Size++;
+    return true;
+}
+
 void CaseRegistry::updateMax(std::atomic<unsigned> &v, unsigned d)
 {
     auto old = v.load();
@@ -392,24 +414,43 @@ void CaseRegistry::updateMax(std::atomic<unsigned> &v, unsigned d)
     return;
 }
 
-void CaseRegistry::Enqueue(RCase rc, TLL &rcs)
+bool CaseRegistry::Enqueue(RCase rc)
 {
     auto pc = rc->operator PCase();
+    auto ts = pc->TotalStates;
+    auto cutoff = m_D1Cutoff.load(std::memory_order_relaxed);
+    if (ts < cutoff)
+    {
+        delete rc;
+        return;
+    }
+    auto &tier = [this,ts] -> auto & {
+        StupidLock lock{ m_D1Mutex };
+        if (!m_D1Quota)
+        {
+            auto wlock = lock.Upgrade();
+            if (!m_D1Quota)
+        }
+        if (auto it = m_D1Map.find(ts); it != m_D1Map.end())
+            return it->second;
+        auto wlock = lock.Upgrade();
+        return m_D1Map.try_emplace(ts).second;
+    }();
+    bool flag;
     if (pc->IsHolder())
     {
-        rcs.ucs << static_cast<UCase>(pc);
+        flag = tier << static_cast<UCase>(pc);
         ++m_UCases;
         m_UMem += pc->ThePGame()->MemoryFootprint();
         pc->Deflate();
     }
     else
     {
-        rcs.scs << static_cast<SCase>(pc);
+        flag = tier << static_cast<SCase>(pc);
         ++m_SCases;
         m_SMem += pc->ThePGame()->MemoryFootprint();
-        if (g_MemoryAvailPercent.load(std::memory_order_relaxed) < 30)
-            pc->Deflate();
     }
+        pc->Deflate();
 }
 
 void CaseRegistry::Process(SCase sc, TLL &rcs)
@@ -521,50 +562,6 @@ catch (const std::exception &err)
     throw;
 }
 #endif
-
-template <typename M>
-struct StupidLock
-{
-    M &mtx;
-    bool is_locked;
-
-    explicit StupidLock(M &m)
-        : mtx{ m }, is_locked{} { lock(); }
-
-    ~StupidLock() { if (is_locked) unlock(); }
-
-    void unlock()
-    {
-        if (!is_locked)
-            throw std::logic_error{ "Unlocking twice" };
-        mtx.unlock_shared();
-        is_locked = false;
-    }
-
-    void lock()
-    {
-        if (is_locked)
-            throw std::logic_error{ "Unlocking twice" };
-        mtx.lock_shared();
-        is_locked = true;
-    }
-
-    struct Upgrader
-    {
-        StupidLock &lck;
-        bool is_locked;
-        explicit Upgrader(StupidLock &l)
-            : lck{ l }, is_locked{ lck.mtx.try_unlock_shared_and_lock() } { }
-        ~Upgrader()
-        {
-            if (is_locked)
-                lck.mtx.unlock_and_lock_shared();
-        }
-        operator bool() { return is_locked; }
-    };
-
-    auto Upgrade() { return Upgrader{ *this }; }
-};
 
 // you must hold wlock of m_Mutex before calling this!
 template <typename T>

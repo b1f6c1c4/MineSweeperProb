@@ -3,60 +3,97 @@
 #include <functional>
 #include <optional>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
+#include <boost/thread/upgrade_mutex.hpp>
 
-template <typename K, typename V,
-     typename Comparer = std::less<K>,
-     K I = K{}>
-class Concurrent234
+// Important limitations:
+// 1. Insert-only
+// 2. Both K and V are immutable once inserted
+// 3. K must support <, ==, !=
+// 4. There must be a special value, I, of K s.t. == works
+template <typename K, typename V, K I = K{}>
+     requires {
+         std::is_trivial_v<K>;
+         std::is_copy_constructible_v<V>;
+         { K a, b; a < b } -> bool;
+         { K a, b; a == b } -> bool;
+         { K a, b; a != b } -> bool;
+     }
+class Lockfree234
 {
-    using kvp_t = std::pair<K, V>;
+    struct kvp_t
+    {
+        K first;
+        mutable V second;
+    };
+    static_assert(std::is_trivial_v<kvp_t>, "kvp_t is not trivial");
 
     struct node_t;
+    using ap_t = std::atomic<node_t *>;
 
     template <kvp_t node_t::*MPtr>
     struct H {};
 
+    enum state_t : unsigned char
+    {
+        NON_LEAF = 0,
+        PROMOTE_P = 1,
+        PROMOTE_Q = 2,
+        PROMOTE_R = 4,
+        AB = 8,
+        ABC = 16 | 8,
+        LEAF = 128,
+    };
+
+#define LX(atm)  unref((atm)).load(std::memory_order_relaxed)
+#define LR(atm)  unref((atm)).load(std::memory_order_release)
+#define LA(atm)  unref((atm)).load(std::memory_order_acquire)
+#define LAR(atm) unref((atm)).load(std::memory_order_acq_rel)
+#define SX(atm, v)  unref((atm)).store((v), std::memory_order_relaxed)
+#define SR(atm, v)  unref((atm)).store((v), std::memory_order_release)
+#define SA(atm, v)  unref((atm)).store((v), std::memory_order_acquire)
+#define SAR(atm, v) unref((atm)).store((v), std::memory_order_acq_rel)
+#define CASR(atm, x, v)  unref((atm)).compare_exchange_weak((x), (v), std::memory_order_release)
+#define CASAR(atm, x, v) unref((atm)).compare_exchange_weak((x), (v), std::memory_order_acq_rel)
+
     struct alignas(64) node_t
     {
-        kvp_t    a,  b,  c;
-        node_t *p, *q, *r, *s{};
-        mutable std::atomic_flag mtx; // true if being modified
+        kvp_t a, b, c;
+        std::atomic<state_t> st;
+        union {
+            boost::upgrade_mutex mtx; // when (st & LEAF)
+            struct { // when !(st & LEAF)
+                ap_t p, q, r, s;
+            };
+        };
 
-#define E std::make_pair<K, V>(I, V{})
-        node_t() : a(E), b(E), c(E), p{}, q{}, r{}, s{} { }
+#define E kvp_t{I}
+        explicit node_t(const kvp_t &kvp)
+            : a(kvp), b(E), c(E), st{ LEAF }, mtx{} { }
+        explicit node_t(const kvp_t &kvp, node_t *pp, node_t *qq)
+            : a(kvp), b(E), c(E), st{ NON_LEAF }, p{pp}, q{qq} { }
         template <kvp_t node_t::*MPtr>
-        explicit node_t(node_t *base, H<MPtr> h)
-            : a(std::move(base->*MPtr)), b(E), c(E),
-              p{[&]{
-                  auto tmp = base->*decltype(h)::left;
-                  base->*decltype(h)::left = nullptr;
-                  return tmp;
-              }()},
-              q{[&]{
-                  auto tmp = base->*decltype(h)::right;
-                  base->*decltype(h)::right = nullptr;
-                  return tmp;
-              }()},
-              r{}, s{} { base->*MPtr = E; }
+        explicit node_t(const node_t *base, H<MPtr>)
+            : a(base->*MPtr), b(E), c(E),
+              st{ NON_LEAF },
+              p{base->*H<MPtr>::left},
+              q{base->*H<MPtr>::right}, r{}, s{} { }
 #undef E
-
-        void lock() const { while (mtx.test_and_set(std::memory_order_acquire)); }
-        void unlock() const { mtx.clear(std::memory_order_release); }
 
         [[nodiscard]] auto Is2() const { return b.first == I; }
         [[nodiscard]] auto Is4() const { return c.first != I; }
-        // 2-3-4 tree is always full
-        [[nodiscard]] auto IsLeaf() const { return !p; }
 
         void Dispose()
         {
+            if (LX(st) & LEAF) return;
             if (p) p->Dispose(), delete p;
             if (q) q->Dispose(), delete q;
             if (r) r->Dispose(), delete r;
             if (s) s->Dispose(), delete s;
         }
-    } root;
+    };
+    ap_t root;
 
     std::atomic<size_t> height;
 
@@ -67,103 +104,96 @@ class Concurrent234
     template <> struct H<&node_t::c>
     { static constexpr node_t *node_t::* left = &node_t::r, *node_t::*right = &node_t::s; };
 
-    class result_t
-    {
-        const node_t *node;
-    public:
-        result_t(node_t *ptr, kvp_t node_t::*mptr)
-            : node{ ptr }, first{ (ptr->*mptr).first }, second{ (ptr->*mptr).second } { };
-        ~result_t() { if (node) node->unlock(); }
-        const K first;
-        V &second;
-    };
+    static constexpr auto &unref(ap_t &atm) { return atm; }
+    static constexpr auto &unref(ap_t *atm) { return *atm; }
 
 public:
-    std::optional<result_t> find(K k)
+
+    kvp_t find(K k) const
     {
         if (k == I) return {};
-        node_t *parent{}, *ptr{ &root };
-        kvp_t node_t::*res{};
+        auto ptr = LA(root);
+        if (!ptr) return {};
     next:
-        ptr->lock();
         if (k < ptr->a.first)
         {
-            if (ptr->IsLeaf())
-                goto finally;
-            if (parent) parent->unlock();
-            parent = ptr;
-            ptr = ptr->p;
+            if (ptr->IsLeaf()) return {};
+            ptr = LA(ptr->p);
             goto next;
         }
-        if (k == ptr->a.first) { res = &node_t::a; goto finally; }
+        if (k == ptr->a.first) return &ptr->a;
         if (ptr->b.first == I || k < ptr->b.first)
         {
-            if (ptr->IsLeaf())
-                goto finally;
-            if (parent) parent->unlock();
-            parent = ptr;
-            ptr = ptr->q;
+            if (ptr->IsLeaf()) return {};
+            ptr = LA(ptr->q);
             goto next;
         }
-        if (k == ptr->b.first) { res = &node_t::b; goto finally; }
+        if (k == ptr->b.first) return &ptr->b;
         if (ptr->c.first == I || k < ptr->c.first)
         {
-            if (ptr->IsLeaf())
-                goto finally;
-            if (parent) parent->unlock();
-            parent = ptr;
-            ptr = ptr->r;
+            if (ptr->IsLeaf()) return {};
+            ptr = LA(ptr->r);
             goto next;
         }
-        if (k == ptr->c.first) { res = &node_t::c; goto finally; }
+        if (k == ptr->c.first) return &ptr->c;
         // k > ptr->c.first
         {
-            if (ptr->IsLeaf())
-                goto finally;
-            if (parent) parent->unlock();
-            parent = ptr;
-            ptr = ptr->r;
+            if (ptr->IsLeaf()) return {};
+            ptr = LA(ptr->r);
             goto next;
         }
-
-    finally:
-        if (parent) parent->unlock();
-        if (!res)
-        {
-            ptr->unlock();
-            return {};
-        }
-        return result_t{ ptr, res };
     }
 
-    template <typename ... Args>
-    result_t try_emplace(K k, Args &&... args)
+    kvp_t try_emplace(K k, V v)
     {
         if (k == I)
             throw std::logic_error{ "You cannot insert an invalid key" };
-        node_t *parent{}, *ptr{ &root };
-        kvp_t node_t::*res{};
+
+        node_t *parent{}, *ptr{ LA(root) };
+        if (!ptr) // empty root insert
+        {
+            auto tmp = new node_t({ k, v });
+            while (!CASAR(grand, ptr, tmp))
+                if (ptr)
+                {
+                    // root changed, proceed to normal loop
+                    // root must not be empty, as we are insert-only
+                    delete tmp;
+                    goto next;
+                }
+            // root change complete
+            return tmp->a;
+        }
     next:
-        ptr->lock();
-        if (k == ptr->a.first) { res = &node_t::a; goto finally; }
-        if (k == ptr->b.first) { res = &node_t::b; goto finally; }
-        if (k == ptr->c.first) { res = &node_t::c; goto finally; }
+        if (k == ptr->a.first) return &ptr->a;
+        if (k == ptr->b.first) return &ptr->b;
+        if (k == ptr->c.first) return &ptr->c;
         if (ptr->Is4())
         {
-            if (!parent) // ptr == &root
+            if (!parent) // grand == &root, ptr == root
             {
+                auto tmp = new node_t(ptr->b,
+                        new node_t(ptr, &node_t::a),
+                        new node_t(ptr, &node_t::c));
+                if (!CASAR(grand, ptr, tmp))
+                {
+                    // root changed, start over
+                    // root must not be empty, as we are insert-only
+                    delete tmp->p;
+                    delete tmp->q;
+                    delete tmp;
+                    goto next;
+                }
+                delete ptr;
                 height.fetch_add(1, std::memory_order_relaxed);
-                ptr->p = new node_t(ptr, H<&node_t::a>{});
-                ptr->q = new node_t(ptr, H<&node_t::c>{});
-                ptr->a = std::move(ptr->b);
-                ptr->b.first = I;
-                parent = ptr;
-                if (k < ptr->a.first)
-                    ptr = ptr->p;
+                parent = tmp;
+                if (k < tmp->a.first)
+                    ptr = tmp->p;
                 else
-                    ptr = ptr->q;
+                    ptr = tmp->q;
+                goto down;
             }
-            else if (parent->Is4())
+            if (parent->Is4())
                 throw std::logic_error{ "4-node's parent must not be 4-node" };
 #define RETURN_PARENT(x) \
     { \
@@ -173,15 +203,17 @@ public:
         parent = nullptr; \
         goto finally; \
     }
-            else if (parent->Is2())
+            node_t *alt_parent{}, *alt_ptr{};
+            if (parent->Is2())
             {
                 if (parent->a.first < ptr->b.first) // parent->q == ptr
                 {
+                    if (k == parent->b.first) { return &parent->b };
+                    alt_ptr = new node_t(
                     parent->r = new node_t(ptr, H<&node_t::c>{});
                     ptr->c.first = I;
                     parent->b = std::move(ptr->b);
                     ptr->b.first = I;
-                    if (k == parent->b.first) RETURN_PARENT(b);
                     if (k > parent->b.first)
                     {
                         ptr->unlock();
@@ -253,6 +285,7 @@ public:
                 }
             }
         }
+    down:
         // here we've ensured that ptr->c.first == I
 #define RETURN_MAKE(x) do { \
         ptr->x = std::make_pair(k, std::forward<Args>(args)...); \
