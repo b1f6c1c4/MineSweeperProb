@@ -275,7 +275,7 @@ class HSPQ
 
     mutable std::mutex m_Mtx;
     // count of all objects stored in m_Array, regardless of dismissed or not
-    size_t m_Occupied;
+    std::atomic<size_t> m_Occupied;
     double m_Threshold;
     // holds a list of non-dismissed objects
     std::vector<RCase> m_Queue;
@@ -306,6 +306,7 @@ public:
         m_Threshold = -1.0;
         m_Queue.clear();
         m_Queue.reserve(m_BeamSize);
+        std::atomic_thread_fence(std::memory_order_release);
     }
 
     [[nodiscard]] auto begin() const { return m_Queue.begin(); }
@@ -313,8 +314,7 @@ public:
 
     [[nodiscard]] double Utilization() const
     {
-        std::lock_guard lock{ m_Mtx };
-        return static_cast<double>(m_Occupied) / m_ArraySize;
+        return static_cast<double>(m_Occupied.load(std::memory_order_relaxed)) / m_ArraySize;
     }
 };
 

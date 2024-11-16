@@ -387,13 +387,14 @@ RCase HSPQ::Find(__uint128_t hash)
 
 RCase HSPQ::Emplace(RCase obj)
 {
+    auto valid = *obj && obj->TotalStates() >= m_Threshold;
     auto mo_overflow = false;
     {
         std::lock_guard lock{ m_Mtx };
-        mo_overflow = m_Occupied >= m_MaxOccupied;
-        if (!*obj || obj->TotalStates() < m_Threshold)
+        mo_overflow = m_Occupied.load(std::memory_order_acquire) >= m_MaxOccupied;
+        if (!valid)
         {
-            obj->Dismiss();
+            if (*obj) obj->Dismiss();
             if (mo_overflow) {
                 // when mo_overflow, an invalid object are dismissed rightaway
                 // without storing in m_Array
@@ -403,48 +404,24 @@ RCase HSPQ::Emplace(RCase obj)
                 delete obj;
                 return nullptr;
             }
-            // without mo_overflow, an invalid object are dismissed and stored in m_Array
-            m_Occupied++;
-        }
-        else
-        {
-            // a valid object will always hit m_Array
-            m_Occupied++;
-            if (m_Queue.size() >= m_BeamSize)
-            {
-                // dismiss an old valid obj when:
-                // 1) the new obj is valid; and
-                // 2) at least m_BeamSize objs are stored
-                //
-                // note that the dismissed object is not *directly* removed from m_Array,
-                // but lazily overwritten when a better obj arrives with mo_overflow == true
-                auto p = m_Queue.front();
-#ifndef NDEBUG
-                fmt::print("------- HSPQ popping @{} for @{}\n",
-                        fmt::ptr(p), fmt::ptr(obj));
-#endif
-                std::pop_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
-                m_Threshold = p->TotalStates();
-                p->Dismiss();
-                m_Queue.back() = obj;
-                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
-            }
-            else
-            {
-                m_Queue.push_back(obj);
-                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
-            }
         }
     }
 
+    auto overwritten = false;
     auto hash = obj->Hash();
     auto h0 = hash % m_ArraySize;
     for (auto h = h0; ; h++) {
         if (h == m_ArraySize) h = 0u;
         auto v = m_Array[h].load(std::memory_order_acquire);
     again:
-        if (v && v->Hash() == hash)
+        if (v && v->Hash() == hash) {
+#ifndef NDEBUG
+            fmt::print("------- HSPQ duplication @{} with @{}\n",
+                    fmt::ptr(v), fmt::ptr(obj));
+#endif
+            // skip the m_Queue update
             return v;
+        }
         if (!v || mo_overflow && !*v)
         {
             if (m_Array[h].compare_exchange_weak(v, obj,
@@ -453,18 +430,51 @@ RCase HSPQ::Emplace(RCase obj)
             {
                 if (v) // when mo_overflow, we may overwrite a dismissed object
                 {
-                    // m_Occupied are purposefully not updated here
+                    overwritten = true;
 #ifndef NDEBUG
                     fmt::print("------- HSPQ lazily deleting @{} for @{}\n",
                             fmt::ptr(v), fmt::ptr(obj));
 #endif
                     delete v;
                 }
-                return nullptr;
+                break;
             }
             goto again;
         }
     }
+
+    if (!overwritten)
+        m_Occupied.fetch_add(1, std::memory_order_relaxed);
+    if (valid)
+    {
+        std::lock_guard lock{ m_Mtx };
+        if (m_Queue.size() >= m_BeamSize)
+        {
+            // dismiss an old valid obj when:
+            // 1) the new obj is valid; and
+            // 2) no duplication found; and
+            // 3) at least m_BeamSize objs are stored
+            //
+            // note that the dismissed object is not *directly* removed from m_Array,
+            // but lazily overwritten when a better obj arrives with mo_overflow == true
+            auto p = m_Queue.front();
+#ifndef NDEBUG
+            fmt::print("------- HSPQ popping @{} for @{}\n",
+                    fmt::ptr(p), fmt::ptr(obj));
+#endif
+            std::pop_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+            m_Threshold = p->TotalStates();
+            p->Dismiss();
+            m_Queue.back() = obj;
+            std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+        }
+        else
+        {
+            m_Queue.push_back(obj);
+            std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+        }
+    }
+    return nullptr;
 }
 
 template <typename M>
@@ -728,7 +738,7 @@ void CaseRegistry::WriteReport()
     auto amem = m_AMem.load(std::memory_order_relaxed);
     auto smem = m_SMem.load(std::memory_order_relaxed);
     auto umem = m_UMem.load(std::memory_order_relaxed);
-    fmt::print("{:.10f}% d{} s{} d0={:.2e} d1={:.2e} a{:.2f}GiB s{:.2f}GiB u{:.2f}GiB a{:.1f}B s{:.1f}B u{:.1f}B t{:.2f}GiB m{:.3f}%\n",
+    fmt::print("{:.10f}% d{} s{} d0={:.2e} d1={:.2e} a{:.2f}GiB s{:.2f}GiB u{:.2f}GiB a{:.1f}B s{:.1f}B u{:.1f}B t{:.3f}% m{:.3f}%\n",
             100.0 * root->Danger / root->TotalStates,
             m_MaxDepth,
             m_MaxStep.load(std::memory_order_relaxed),
@@ -740,7 +750,7 @@ void CaseRegistry::WriteReport()
             static_cast<double>(amem) / acnt,
             static_cast<double>(smem) / scnt,
             static_cast<double>(umem) / ucnt,
-            m_D1Registry.Utilization(),
+            100.0 * m_D1Registry.Utilization(),
             g_MemoryAvailPercent.load(std::memory_order_relaxed));
 }
 
@@ -764,7 +774,7 @@ int main(int argc, char *argv[])
     const bool is_tty = isatty(STDERR_FILENO);
     using namespace std::chrono_literals;
     const auto report_interval = chronoAdapter(is_tty ? 5s : 60s);
-    auto nprocs = argc < 4 ? get_nprocs() : std::atoi(argv[4]);
+    auto nprocs = argc < 5 ? get_nprocs() : std::atoi(argv[4]);
 #else
     auto nprocs = 1;
 #endif
