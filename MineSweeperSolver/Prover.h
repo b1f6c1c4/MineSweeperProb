@@ -117,12 +117,7 @@ struct ReportingCase
     virtual __uint128_t Hash() { return operator PCase()->Hash; };
     virtual double TotalStates() { return operator PCase()->TotalStates; };
 
-    void Dismiss()
-    {
-        if (!Dismissed.test_and_set(std::memory_order_acquire)) {
-            operator PCase()->Deplete();
-        }
-    }
+    void Dismiss();
 
     [[nodiscard]] operator bool()
     {
@@ -262,7 +257,11 @@ private:
 
 class HSPQ
 {
-    const size_t m_MaxOccupied, m_ArraySize;
+    // m_BeamSize < m_MaxOccupied < m_ArraySize
+    const size_t m_BeamSize;
+    const size_t m_MaxOccupied;
+    const size_t m_ArraySize;
+
     // Assuming no hash collision!
     std::atomic<RCase> *m_Array;
 
@@ -270,86 +269,43 @@ class HSPQ
     {
         bool operator()(RCase lhs, RCase rhs) const
         {
-            return lhs->operator PCase()->TotalStates
-                > rhs->operator PCase()->TotalStates;
+            return lhs->TotalStates() > rhs->TotalStates();
         }
     };
 
     mutable std::mutex m_Mtx;
+    // count of all objects stored in m_Array, regardless of dismissed or not
     size_t m_Occupied;
     double m_Threshold;
+    // holds a list of non-dismissed objects
     std::vector<RCase> m_Queue;
 
 public:
     // it must holds that mo < as
-    HSPQ(size_t mo, size_t as)
-        : m_MaxOccupied{ mo }, m_ArraySize{ as },
+    HSPQ(size_t bs, size_t mo, size_t as)
+        : m_BeamSize{ bs }, m_MaxOccupied{ mo }, m_ArraySize{ as },
           m_Array{ new std::atomic<RCase>[as] },
-          m_Occupied{}, m_Threshold{ -1.0 } { }
+          m_Occupied{}, m_Threshold{ -1.0 }
+    {
+        m_Queue.reserve(m_BeamSize);
+    }
     ~HSPQ() { if (m_Array) delete [] m_Array; }
 
-    [[nodiscard]] RCase Find(__uint128_t hash)
-    {
-        auto h0 = hash % m_ArraySize;
-        for (auto h = h0; ; h++)
-        {
-            if (h == m_ArraySize) h = 0u;
-            auto v = m_Array[h].load(std::memory_order_acquire);
-            if (!v)
-                return nullptr;
-            if (hash == v->Hash())
-                return v;
-        }
-    }
+    [[nodiscard]] RCase Find(__uint128_t hash);
 
     // obj could be: SafeCase, UnsafeCase, or IgnorableCase
+    // only good RCases are put into m_Queue
+    // all cases, whether good or bad, are put into m_Array
     // returns the old value
-    RCase Emplace(RCase obj)
-    {
-        if (obj->TotalStates() <= m_Threshold)
-            return nullptr;
-        {
-            std::lock_guard lock{ m_Mtx };
-            if (m_Occupied >= m_MaxOccupied)
-            {
-                auto p = m_Queue.front();
-                std::pop_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
-                m_Threshold = p->TotalStates();
-                p->Dismiss();
-                m_Queue.back() = obj;
-                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
-            }
-            else
-            {
-                m_Occupied++;
-                m_Queue.push_back(obj);
-                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
-            }
-        }
-        auto hash = obj->Hash();
-        auto h0 = hash % m_ArraySize;
-        for (auto h = h0; ; h++) {
-            if (h == m_ArraySize) h = 0u;
-            auto v = m_Array[h].load(std::memory_order_acquire);
-        again:
-            if (v && v->Hash() == hash)
-                return v;
-            if (!v)
-            {
-                if (m_Array[h].compare_exchange_weak(v, obj,
-                            std::memory_order_acq_rel,
-                            std::memory_order_acquire))
-                    return nullptr;
-                goto again;
-            }
-        }
-    }
+    RCase Emplace(RCase obj);
 
     // the below are not thread-safe
     void Clear() {
         std::memset(m_Array, 0, m_ArraySize * sizeof(m_Array[0]));
+        m_Occupied = 0;
         m_Threshold = -1.0;
-        m_Queue = {};
+        m_Queue.clear();
+        m_Queue.reserve(m_BeamSize);
     }
 
     [[nodiscard]] auto begin() const { return m_Queue.begin(); }

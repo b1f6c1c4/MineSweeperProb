@@ -133,6 +133,17 @@ const BaseCase *ReportingCase::GetAnyParent() const
     return *AllParents.begin();
 }
 
+void ReportingCase::Dismiss()
+{
+    if (!Dismissed.test_and_set(std::memory_order_acquire)) {
+        auto pc = operator PCase();
+#ifndef NDEBUG
+        fmt::print("DISMISSING {} (@{})\n", pc->ToString(), fmt::ptr(pc));
+#endif
+        pc->Deplete();
+    }
+}
+
 size_t ForkedCase::Fork(HSPQ &registry)
 {
     auto forked_count = 0zu;
@@ -143,7 +154,7 @@ size_t ForkedCase::Fork(HSPQ &registry)
             continue;
 
         auto next_hash = Hash;
-        HashCache::set(next_hash, Id, m_Degree);
+        HashCache::set(next_hash, Id, m_Degree + 1u);
 
         auto c = registry.Find(next_hash);
         if (c)
@@ -170,19 +181,22 @@ size_t ForkedCase::Fork(HSPQ &registry)
 #ifdef TRACEBACK
         c->operator PCase()->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
+#ifndef NDEBUG
+        fmt::print("  >>{1}  (@{3}->@{0}) *{2}\n",
+                fmt::ptr(c),
+                c->operator PCase()->ToString(),
+                m_Degree,
+                fmt::ptr(this));
+#endif
         if (auto old = registry.Emplace(c); old)
         {
+#ifndef NDEBUG
+            fmt::print("------- deleting @{0}\n", fmt::ptr(c));
+#endif
             delete c;
             c = old;
             goto child;
         }
-#ifndef NDEBUG
-        fmt::print("  >>{1}  (@{0}) *{2}\n",
-                fmt::ptr(c),
-                c->operator PCase()->ToString(),
-                m_Degree);
-#endif
-        m_Degree++;
         continue;
 
     child:
@@ -354,6 +368,105 @@ std::string UnsafeCase::ToString() const
             m_CachedParents.size());
 }
 
+RCase HSPQ::Find(__uint128_t hash)
+{
+    auto h0 = hash % m_ArraySize;
+    auto max = m_ArraySize * 2u;
+    for (auto h = h0; ; h++)
+    {
+        if (h == m_ArraySize) h = 0u;
+        auto v = m_Array[h].load(std::memory_order_acquire);
+        if (!v)
+            return nullptr;
+        if (hash == v->Hash())
+            return v;
+        if (--max == 0zu)
+            return nullptr;
+    }
+}
+
+RCase HSPQ::Emplace(RCase obj)
+{
+    auto mo_overflow = false;
+    {
+        std::lock_guard lock{ m_Mtx };
+        mo_overflow = m_Occupied >= m_MaxOccupied;
+        if (!*obj || obj->TotalStates() < m_Threshold)
+        {
+            obj->Dismiss();
+            if (mo_overflow) {
+                // when mo_overflow, an invalid object are dismissed rightaway
+                // without storing in m_Array
+#ifndef NDEBUG
+                fmt::print("------- HSPQ early deleting @{0}\n", fmt::ptr(obj));
+#endif
+                delete obj;
+                return nullptr;
+            }
+            // without mo_overflow, an invalid object are dismissed and stored in m_Array
+            m_Occupied++;
+        }
+        else
+        {
+            // a valid object will always hit m_Array
+            m_Occupied++;
+            if (m_Queue.size() >= m_BeamSize)
+            {
+                // dismiss an old valid obj when:
+                // 1) the new obj is valid; and
+                // 2) at least m_BeamSize objs are stored
+                //
+                // note that the dismissed object is not *directly* removed from m_Array,
+                // but lazily overwritten when a better obj arrives with mo_overflow == true
+                auto p = m_Queue.front();
+#ifndef NDEBUG
+                fmt::print("------- HSPQ popping @{} for @{}\n",
+                        fmt::ptr(p), fmt::ptr(obj));
+#endif
+                std::pop_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+                m_Threshold = p->TotalStates();
+                p->Dismiss();
+                m_Queue.back() = obj;
+                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+            }
+            else
+            {
+                m_Queue.push_back(obj);
+                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+            }
+        }
+    }
+
+    auto hash = obj->Hash();
+    auto h0 = hash % m_ArraySize;
+    for (auto h = h0; ; h++) {
+        if (h == m_ArraySize) h = 0u;
+        auto v = m_Array[h].load(std::memory_order_acquire);
+    again:
+        if (v && v->Hash() == hash)
+            return v;
+        if (!v || mo_overflow && !*v)
+        {
+            if (m_Array[h].compare_exchange_weak(v, obj,
+                        std::memory_order_acq_rel,
+                        std::memory_order_acquire))
+            {
+                if (v) // when mo_overflow, we may overwrite a dismissed object
+                {
+                    // m_Occupied are purposefully not updated here
+#ifndef NDEBUG
+                    fmt::print("------- HSPQ lazily deleting @{} for @{}\n",
+                            fmt::ptr(v), fmt::ptr(obj));
+#endif
+                    delete v;
+                }
+                return nullptr;
+            }
+            goto again;
+        }
+    }
+}
+
 template <typename M>
 struct StupidLock
 {
@@ -475,9 +588,12 @@ try
 #endif
 {
 #ifndef NDEBUG
-    fmt::print("  >>{1}  (@{0})\n", fmt::ptr(ac), ac->ToString());
+    fmt::print(" >>{1}  (@{0})\n", fmt::ptr(ac), ac->ToString());
 #endif
     if (ac->PrepareFork()) {
+#ifndef NDEBUG
+        fmt::print("    Guarenteed Win!\n");
+#endif
         ac->Deplete();
         return;
     }
@@ -548,8 +664,10 @@ void CaseRegistry::ShiftD1R()
     ThreadLocalList<UnsafeCase> ucs;
     ThreadLocalList<SafeCase> scs;
     for (auto rc : m_D1Registry) {
-        if (*rc)
-            continue; // dismissed!
+        if (!*rc) { // dismissed!
+            delete rc;
+            continue;
+        }
         if (rc->operator PCase()->IsHolder())
             ucs << static_cast<UnsafeCase *>(rc->operator PCase());
         else
@@ -634,10 +752,10 @@ auto chronoAdapter(std::chrono::duration<Rep, Period> dur)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 3 || argc > 4)
+    if (argc < 4 || argc > 5)
     {
         std::cout << "Usage: " << argv[0]
-            << R"(FL@\[<I>,<J>\]-(NH|2|P|2P)-<W>-<H>-T<M>-(SFAR|SNR) <beam> [<nprocs>])"
+            << R"(FL@\[<I>,<J>\]-(NH|2|P|2P)-<W>-<H>-T<M>-(SFAR|SNR) <beam> <mo> [<nprocs>])"
             << std::endl;
         return 1;
     }
@@ -646,11 +764,17 @@ int main(int argc, char *argv[])
     const bool is_tty = isatty(STDERR_FILENO);
     using namespace std::chrono_literals;
     const auto report_interval = chronoAdapter(is_tty ? 5s : 60s);
-    const auto beam = static_cast<size_t>(std::atoll(argv[2]));
-    auto nprocs = argc < 4 ? get_nprocs() : std::atoi(argv[3]);
+    auto nprocs = argc < 4 ? get_nprocs() : std::atoi(argv[4]);
 #else
     auto nprocs = 1;
 #endif
+    const auto beam = static_cast<size_t>(std::atoll(argv[2]));
+    const auto mo = static_cast<size_t>(std::atoll(argv[3]));
+    if (beam > mo)
+    {
+        std::cerr << "<beam> must be less than or equals to <mo>\n";
+        return 1;
+    }
 
     auto cfg = parse(argv[1]);
     if (!cfg.InitialPositionSpecified)
@@ -665,7 +789,7 @@ int main(int argc, char *argv[])
     auto root = new HolderCase(nullptr, game, 0);
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
 
-    HSPQ registry{ beam, beam * 10u / 8u };
+    HSPQ registry{ beam, mo, mo * 10u / 8u };
     CaseRegistry cr{ root, cfg.Index, registry };
 
     updateMemoryAvailPercent();
