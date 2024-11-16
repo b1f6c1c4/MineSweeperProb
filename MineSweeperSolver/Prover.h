@@ -5,19 +5,14 @@
 #include <concepts>
 #include <condition_variable>
 #include <forward_list>
-#include <limits>
-#include <map>
 #include <memory>
 #include <mutex>
-#include <queue>
 #include <set>
-#include <shared_mutex>
 #include <stdexcept>
 #include <variant>
 #include "BasicSolver.h"
 #include "stdafx.h"
 #include "GameMgr.h"
-#include "BinomialHelper.h"
 
 struct BaseCase;
 struct ReportingCase;
@@ -26,6 +21,7 @@ struct HolderCase;
 struct SafeCase;
 struct ActionCase;
 struct UnsafeCase;
+class HSPQ;
 class CaseRegistry;
 
 using PCase = BaseCase *;
@@ -130,7 +126,7 @@ struct ReportingCase
 
     [[nodiscard]] operator bool()
     {
-        return Dismissed.test(std::memory_order_relaxed);
+        return !Dismissed.test(std::memory_order_relaxed);
     }
 
 protected:
@@ -162,7 +158,7 @@ struct ForkedCase : BaseCase
 
     int Id;
 
-    virtual RCase Fork();
+    size_t Fork(HSPQ &registry);
 
     std::string ToString() const override;
 
@@ -202,7 +198,8 @@ struct ActionCase : ForkedCase
 {
     ActionCase(HCase p, PGame g, int id);
 
-    RCase Fork() override;
+    // call this once before forking; if true no forking necessary
+    [[nodiscard]] bool PrepareFork();
 
     bool IsAction() const override { return true; }
 
@@ -278,7 +275,7 @@ class HSPQ
         }
     };
 
-    std::mutex m_Mtx;
+    mutable std::mutex m_Mtx;
     size_t m_Occupied;
     double m_Threshold;
     std::vector<RCase> m_Queue;
@@ -306,9 +303,11 @@ public:
     }
 
     // obj could be: SafeCase, UnsafeCase, or IgnorableCase
-    bool Emplace(RCase obj)
+    // returns the old value
+    RCase Emplace(RCase obj)
     {
-        if (obj->TotalStates() <= m_Threshold) return false;
+        if (obj->TotalStates() <= m_Threshold)
+            return nullptr;
         {
             std::lock_guard lock{ m_Mtx };
             if (m_Occupied >= m_MaxOccupied)
@@ -334,13 +333,13 @@ public:
             auto v = m_Array[h].load(std::memory_order_acquire);
         again:
             if (v && v->Hash() == hash)
-                return false;
+                return v;
             if (!v)
             {
                 if (m_Array[h].compare_exchange_weak(v, obj,
                             std::memory_order_acq_rel,
                             std::memory_order_acquire))
-                    return true;
+                    return nullptr;
                 goto again;
             }
         }
@@ -355,16 +354,19 @@ public:
 
     [[nodiscard]] auto begin() const { return m_Queue.begin(); }
     [[nodiscard]] auto end() const { return m_Queue.end(); }
-};
 
-extern HSPQ g_Trie;
+    [[nodiscard]] double Utilization() const
+    {
+        std::lock_guard lock{ m_Mtx };
+        return static_cast<double>(m_Occupied) / m_ArraySize;
+    }
+};
 
 template <typename T>
     requires std::derived_from<T, BaseCase>
 class ThreadLocalList
 {
     T *front, **next;
-    friend class Tier;
 
 public:
     ThreadLocalList() : front{}, next{} { }
@@ -374,14 +376,14 @@ public:
 
     friend auto &operator<<(ThreadLocalList<T> &v, T *x)
     {
-        (v.next ? *v.next : v.front) = x;
+        (v ? *v.next : v.front) = x;
         v.next = reinterpret_cast<T **>(&x->RegistryNext);
         return v;
     }
 
     friend void operator>>(ThreadLocalList<T> &&v, ThreadLocalList<T> &d)
     {
-        if (!v.next) return;
+        if (!v) return;
         *v.next = d.front;
         d.front = v.front;
         d.next = v.next;
@@ -395,32 +397,8 @@ public:
         while (!atm.compare_exchange_weak(*v.next, v.front));
         v.front = nullptr, v.next = nullptr;
     }
-};
 
-using TLLS = ThreadLocalList<SafeCase>;
-using TLLU = ThreadLocalList<UnsafeCase>;
-
-struct TLL
-{
-    TLLS scs;
-    TLLU ucs;
-};
-
-class Tier : protected TLL
-{
-    // protects TLL, m_Size
-    boost::upgrade_mutex m_Mutex;
-    size_t m_Size;
-
-    template <typename T>
-        requires std::derived_from<T, BaseCase>
-    bool Push(T *c, ThreadLocalList<T> &lst);
-
-public:
-    void operator<<(SCase sc) { Push(sc, scs); }
-    void operator<<(UCase uc) { Push(uc, ucs); }
-    void operator>>(TLLS &v) { std::move(scs) >> v; }
-    void operator>>(TLLU &v) { std::move(ucs) >> v; }
+    [[nodiscard]] operator bool() const { return next; }
 };
 
 class CaseRegistry
@@ -449,13 +427,9 @@ class CaseRegistry
     // m_UnsafeCases.front() <=> Depth == m_MaxDepth - 1
     std::forward_list<std::atomic<UCase>> m_UnsafeCases;
 
-    // always lock m_Mutex before m_D1Mutex
-    // rlocked by m_D1Map, m_D1Quota
-    // wlocked by m_D1Map, m_D1Quota
-    boost::upgrade_mutex m_D1Mutex;
-    size_t m_D1Quota;
-    std::map<double, Tier> m_D1Map;
-    std::atomic<double> m_D1Cutoff;
+    // a thread-safe registry for all D1 cases
+    // requires wlock to use its non-thread-safe functions
+    HSPQ &m_D1Registry;
 
     // wait for a stage change (m_MaxDepth or m_Completed)
     boost::condition_variable_any m_CVStage;
@@ -499,21 +473,19 @@ class CaseRegistry
     }
 
     // you must hold rlock of m_Mutex before calling this!
-    // return true => the case is saved
-    // return false => the case is discarded
-    bool Enqueue(RCase c);
-
-    // you must hold rlock of m_Mutex before calling this!
     void Process(ACase uc);
     void Process(SCase sc);
     void Process(UCase uc);
     void WriteReport();
 
+    // you must hold wlock of m_Mutex before calling this!
+    void ShiftD1R();
+
     HCase root;
     void ResolveDangerImpl();
 
 public:
-    CaseRegistry(HCase root, int id);
+    CaseRegistry(HCase root, int id, HSPQ &reg);
     void Dispose();
 
     // worker thread entry

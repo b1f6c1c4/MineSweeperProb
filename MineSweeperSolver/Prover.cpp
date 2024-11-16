@@ -133,8 +133,9 @@ const BaseCase *ReportingCase::GetAnyParent() const
     return *AllParents.begin();
 }
 
-RCase ForkedCase::Fork()
+size_t ForkedCase::Fork(HSPQ &registry)
 {
+    auto forked_count = 0zu;
     auto [lb, ub] = Game().GetDegreeBounds(Id);
     for (; m_Degree <= ub; m_Degree++)
     {
@@ -144,8 +145,10 @@ RCase ForkedCase::Fork()
         auto next_hash = Hash;
         HashCache::set(next_hash, Id, m_Degree);
 
-        auto c = g_Trie.Find(next_hash);
-        if (!c)
+        auto c = registry.Find(next_hash);
+        if (c)
+            goto child;
+
         {
             auto g = std::make_shared<GameMgr>(Game());
             g->SetBlockDegree(Id, m_Degree);
@@ -153,7 +156,7 @@ RCase ForkedCase::Fork()
             if (!g->GetStarted() // infeasible
                     || g->GetSolver().GetTotalStates() == 1) // guaranteed win
             {
-                g_Trie.Emplace(new IgnorableCase(next_hash));
+                registry.Emplace(new IgnorableCase(next_hash));
                 continue;
             }
 
@@ -161,15 +164,28 @@ RCase ForkedCase::Fork()
                 c = new SafeCase(this, g);
             else
                 c = new UnsafeCase(this, g);
-            c->operator PCase()->Hash = next_hash;
-            c->AssignParent(this);
-#ifdef TRACEBACK
-            c->operator PCase()->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
-#endif
-            g_Trie.Emplace(c);
-            m_Degree++;
-            return c;
         }
+        c->operator PCase()->Hash = next_hash;
+        c->AssignParent(this);
+#ifdef TRACEBACK
+        c->operator PCase()->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
+#endif
+        if (auto old = registry.Emplace(c); old)
+        {
+            delete c;
+            c = old;
+            goto child;
+        }
+#ifndef NDEBUG
+        fmt::print("  >>{1}  (@{0}) *{2}\n",
+                fmt::ptr(c),
+                c->operator PCase()->ToString(),
+                m_Degree);
+#endif
+        m_Degree++;
+        continue;
+
+    child:
         if (c->TotalStates() == 0)
             continue;
         c->AssignParent(this);
@@ -180,7 +196,7 @@ RCase ForkedCase::Fork()
             fmt::ptr(c->operator PCase()));
 #endif
     }
-    return nullptr;
+    return forked_count;
 }
 
 ActionCase::ActionCase(HCase p, PGame g, int id)
@@ -195,21 +211,17 @@ ActionCase::ActionCase(HCase p, PGame g, int id)
     ++Step;
 }
 
-RCase ActionCase::Fork()
+bool ActionCase::PrepareFork()
 {
-    if (!m_Degree)
-    {
-        auto g = std::make_shared<GameMgr>(Game());
-        g->SetBlockMine(Id, false);
-        g->Solve(HEUR, false);
-        if (!g->GetStarted()) // infeasible at all
-            throw std::logic_error{ "All ActionCase should be feasible" };
-        if (g->GetSolver().GetTotalStates() == 1)
-            return nullptr; // guaranteed win
-        m_Game = g;
-    }
-
-    return ForkedCase::Fork();
+    auto g = std::make_shared<GameMgr>(Game());
+    g->SetBlockMine(Id, false);
+    g->Solve(HEUR, false);
+    if (!g->GetStarted()) // infeasible at all
+        throw std::logic_error{ "All ActionCase should be feasible" };
+    if (g->GetSolver().GetTotalStates() == 1)
+        return true; // guaranteed win
+    m_Game = g;
+    return false;
 }
 
 SafeCase::SafeCase(PCase p, PGame g)
@@ -387,24 +399,6 @@ struct StupidLock
     auto Upgrade() { return Upgrader{ *this }; }
 };
 
-template <typename T>
-    requires std::derived_from<T, BaseCase>
-bool Tier::Push(T *c, ThreadLocalList<T> &lst)
-{
-    StupidLock lock{ m_Mutex };
-    for (auto ptr = lst.front; ptr; ptr = ptr->RegistryNext)
-        if (*c == *ptr) // TODO
-            return false;
-    auto wlock = lock.Upgrade();
-    for (auto ptr = lst.front; ptr; ptr = ptr->RegistryNext)
-        if (*c == *ptr) // TODO
-            return false;
-    c->RegistryNext = lst.front;
-    lst.front = c;
-    m_Size++;
-    return true;
-}
-
 void CaseRegistry::updateMax(std::atomic<unsigned> &v, unsigned d)
 {
     auto old = v.load();
@@ -414,46 +408,7 @@ void CaseRegistry::updateMax(std::atomic<unsigned> &v, unsigned d)
     return;
 }
 
-bool CaseRegistry::Enqueue(RCase rc)
-{
-    auto pc = rc->operator PCase();
-    auto ts = pc->TotalStates;
-    auto cutoff = m_D1Cutoff.load(std::memory_order_relaxed);
-    if (ts < cutoff)
-    {
-        delete rc;
-        return;
-    }
-    auto &tier = [this,ts] -> auto & {
-        StupidLock lock{ m_D1Mutex };
-        if (!m_D1Quota)
-        {
-            auto wlock = lock.Upgrade();
-            if (!m_D1Quota)
-        }
-        if (auto it = m_D1Map.find(ts); it != m_D1Map.end())
-            return it->second;
-        auto wlock = lock.Upgrade();
-        return m_D1Map.try_emplace(ts).second;
-    }();
-    bool flag;
-    if (pc->IsHolder())
-    {
-        flag = tier << static_cast<UCase>(pc);
-        ++m_UCases;
-        m_UMem += pc->ThePGame()->MemoryFootprint();
-        pc->Deflate();
-    }
-    else
-    {
-        flag = tier << static_cast<SCase>(pc);
-        ++m_SCases;
-        m_SMem += pc->ThePGame()->MemoryFootprint();
-    }
-        pc->Deflate();
-}
-
-void CaseRegistry::Process(SCase sc, TLL &rcs)
+void CaseRegistry::Process(SCase sc)
 #ifdef TRACEBACK
 try
 #endif
@@ -463,21 +418,7 @@ try
     fmt::print("{1}  (@{0})\n", fmt::ptr(sc), sc->ToString());
     std::cin.get();
 #endif
-    for (RCase rc; (rc = sc->Fork());)
-    {
-#ifndef NDEBUG
-        fmt::print("  >>{1}  (@{0}) *{2}\n",
-                fmt::ptr(rc),
-                rc->operator PCase()->ToString(),
-                sc->GetDegree() - 1);
-#endif
-        ++m_D1;
-#ifndef NDEBUG
-        if (rc->operator PCase()->Depth != m_MaxDepth)
-            throw std::logic_error{ "Depth not matching" };
-#endif
-        Enqueue(rc, rcs);
-    }
+    m_D1 += sc->Fork(m_D1Registry);
     // no need to sc->Deplete, it will be deleted
     m_SMem -= sc->ThePGame()->MemoryFootprint();
     --m_SCases;
@@ -492,7 +433,7 @@ catch (const std::exception &err)
 }
 #endif
 
-void CaseRegistry::Process(UCase uc, TLL &rcs)
+void CaseRegistry::Process(UCase uc)
 #ifdef TRACEBACK
 try
 #endif
@@ -513,7 +454,7 @@ try
 #endif
         ++m_ACases;
         tll << ac;
-        Process(ac, rcs);
+        Process(ac);
     }
     std::move(tll) >> m_ActionCases;
     uc->Deplete();
@@ -528,7 +469,7 @@ catch (const std::exception &err)
 }
 #endif
 
-void CaseRegistry::Process(ACase ac, TLL &rcs)
+void CaseRegistry::Process(ACase ac)
 #ifdef TRACEBACK
 try
 #endif
@@ -536,20 +477,11 @@ try
 #ifndef NDEBUG
     fmt::print("  >>{1}  (@{0})\n", fmt::ptr(ac), ac->ToString());
 #endif
-    for (RCase rc; (rc = ac->Fork());)
-    {
-#ifndef NDEBUG
-        fmt::print("    >>{1}  (@{0})\n",
-                fmt::ptr(rc),
-                rc->operator PCase()->ToString());
-#endif
-        ++m_D1;
-#ifndef NDEBUG
-        if (rc->operator PCase()->Depth != m_MaxDepth)
-            throw std::logic_error{ "Depth not matching" };
-#endif
-        Enqueue(rc, rcs);
+    if (ac->PrepareFork()) {
+        ac->Deplete();
+        return;
     }
+    m_D1 += ac->Fork(m_D1Registry);
     m_AMem += ac->ThePGame()->MemoryFootprint();
     ac->Deplete();
 }
@@ -574,8 +506,7 @@ void CaseRegistry::Process()
 {
     SCase sc;
     UCase uc;
-    TLL rcs;
-    TLLU ucx;
+    ThreadLocalList<UnsafeCase> ucx;
 
     StupidLock lock{ m_Mutex };
 again:
@@ -584,11 +515,9 @@ again:
         return;
 lagain:
     while ((sc = pop(m_D0SafeCases)))
-        Process(sc, rcs), delete sc;
+        Process(sc), delete sc;
     while ((uc = pop(m_D0UnsafeCases)))
-        Process(uc, rcs), ucx << uc;
-    std::move(rcs.scs) >> m_D1SafeCases;
-    std::move(rcs.ucs) >> m_D1UnsafeCases;
+        Process(uc), ucx << uc;
     std::move(ucx) >> m_UnsafeCases.front();
     // D0 is now empty, we need to enter next stage
     if (auto wlock = lock.Upgrade(); !wlock)
@@ -604,22 +533,40 @@ lagain:
     else // necessary `else' here to keep wlock alive
     {
         // we can offically enter next stage
-        m_MaxDepth++;
-        m_UnsafeCases.emplace_front();
-        m_D1 >> m_D0;
-        m_D1SafeCases >> m_D0SafeCases;
-        m_D1UnsafeCases >> m_D0UnsafeCases;
-        if (!m_D0SafeCases.load(std::memory_order_relaxed)
-            && !m_D0UnsafeCases.load(std::memory_order_relaxed))
-        {
-            m_Completed = true;
-            m_CVStage.notify_all();
-            m_CVCompletion.notify_all();
-            return;
-        }
-        m_CVStage.notify_all();
-        goto lagain;
+        ShiftD1R();
+        if (!m_Completed)
+            goto lagain;
     }
+}
+
+void CaseRegistry::ShiftD1R()
+{
+    m_MaxDepth++;
+    m_UnsafeCases.emplace_front();
+    m_D1 = 0zu;
+    m_D0 = 0zu;
+    ThreadLocalList<UnsafeCase> ucs;
+    ThreadLocalList<SafeCase> scs;
+    for (auto rc : m_D1Registry) {
+        if (*rc)
+            continue; // dismissed!
+        if (rc->operator PCase()->IsHolder())
+            ucs << static_cast<UnsafeCase *>(rc->operator PCase());
+        else
+            scs << static_cast<SafeCase *>(rc->operator PCase());
+        m_D0++;
+    }
+    m_D1Registry.Clear();
+    if (!scs && !ucs)
+    {
+        m_Completed = true;
+        m_CVStage.notify_all();
+        m_CVCompletion.notify_all();
+        return;
+    }
+    std::move(scs) >> m_D0SafeCases;
+    std::move(ucs) >> m_D0UnsafeCases;
+    m_CVStage.notify_all();
 }
 
 void CaseRegistry::ResolveDanger()
@@ -635,19 +582,16 @@ void CaseRegistry::ResolveDangerImpl()
     root->ResolveDanger();
 }
 
-CaseRegistry::CaseRegistry(HCase root, int id)
-    : m_MaxDepth{ 1 }, m_Completed{}, root{ root }
+CaseRegistry::CaseRegistry(HCase root, int id, HSPQ &reg)
+    : m_MaxDepth{ 1 }, m_Completed{}, m_D1Registry(reg), root{ root }
 {
     auto ac = new ActionCase(root, root->ThePGame(), id);
     root->AddChildren(ac);
     root->Deplete();
     ThreadLocalList<ActionCase>{ ac } >> m_ActionCases;
 
-    TLL rcs;
-    Process(ac, rcs);
+    Process(ac);
     m_UnsafeCases.emplace_front();
-    std::move(rcs.scs) >> m_D1SafeCases;
-    std::move(rcs.ucs) >> m_D1UnsafeCases;
 }
 
 void CaseRegistry::Dispose()
@@ -678,7 +622,7 @@ void CaseRegistry::WriteReport()
             static_cast<double>(amem) / acnt,
             static_cast<double>(smem) / scnt,
             static_cast<double>(umem) / ucnt,
-            g_Trie.size() * GiB,
+            m_D1Registry.Utilization(),
             g_MemoryAvailPercent.load(std::memory_order_relaxed));
 }
 
@@ -690,10 +634,10 @@ auto chronoAdapter(std::chrono::duration<Rep, Period> dur)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2 || argc > 3)
+    if (argc < 3 || argc > 4)
     {
         std::cout << "Usage: " << argv[0]
-            << R"(FL@\[<I>,<J>\]-(NH|2|P|2P)-<W>-<H>-T<M>-(SFAR|SNR) [<nprocs>])"
+            << R"(FL@\[<I>,<J>\]-(NH|2|P|2P)-<W>-<H>-T<M>-(SFAR|SNR) <beam> [<nprocs>])"
             << std::endl;
         return 1;
     }
@@ -702,7 +646,8 @@ int main(int argc, char *argv[])
     const bool is_tty = isatty(STDERR_FILENO);
     using namespace std::chrono_literals;
     const auto report_interval = chronoAdapter(is_tty ? 5s : 60s);
-    auto nprocs = argc < 3 ? get_nprocs() : std::atoi(argv[2]);
+    const auto beam = static_cast<size_t>(std::atoll(argv[2]));
+    auto nprocs = argc < 4 ? get_nprocs() : std::atoi(argv[3]);
 #else
     auto nprocs = 1;
 #endif
@@ -718,10 +663,10 @@ int main(int argc, char *argv[])
 
     auto game = std::make_shared<GameMgr>(cfg.Width, cfg.Height, cfg.TotalMines, &g_Strategy);
     auto root = new HolderCase(nullptr, game, 0);
-    g_InvalidCase = reinterpret_cast<RCase>(root); // random value
     root->TotalStates = Binomial(cfg.Width * cfg.Height - 1, cfg.TotalMines); // fix the first move
 
-    CaseRegistry cr{ root, cfg.Index };
+    HSPQ registry{ beam, beam * 10u / 8u };
+    CaseRegistry cr{ root, cfg.Index, registry };
 
     updateMemoryAvailPercent();
 #ifdef NDEBUG
@@ -761,6 +706,5 @@ int main(int argc, char *argv[])
     std::cout << j << std::endl;
 
     cr.Dispose();
-    g_Trie.Dispose();
     delete root;
 }

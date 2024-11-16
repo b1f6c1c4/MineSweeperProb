@@ -18,6 +18,8 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 include(FetchContent)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS YES)
+
 set(JSON_MultipleHeaders OFF)
 FetchContent_Declare(json
         GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent
