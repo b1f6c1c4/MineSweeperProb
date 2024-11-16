@@ -43,6 +43,32 @@ using PGame = std::shared_ptr<GameMgr>;
 #endif
 #endif
 
+constexpr __uint128_t operator""_ulll(const char *x)
+{
+    __uint128_t y{};
+    for (auto i = 0zu; x[i] != '\0'; i++)
+    {
+        y *= 10u;
+        y += x[i] - '0';
+    }
+    return y;
+}
+
+class HashCache
+{
+    static constexpr __uint128_t Modulo{
+        // a prime p s.t. 10*(p-1)+9 < 2^128 so no overflow happens
+        34028236692093846346337460743176821023_ulll };
+    static_assert(Modulo * 10u + 1226u == 0u, "Modulo wrong");
+    // a primitive root for Z/pZ above
+    static constexpr __uint128_t Base{ 10u };
+    static std::vector<__uint128_t> cache;
+public:
+    static void ensure(size_t sz);
+    // n=0 for blank, n=1..9 for opened
+    static void set(__uint128_t &v, int id, unsigned n);
+};
+
 struct BaseCase
 {
     BaseCase(PCase p, PGame game);
@@ -75,7 +101,7 @@ struct BaseCase
 #define Traceback ""
 #endif
 
-    int LargestModifiedIndex;
+    __uint128_t Hash;
 
     void *RegistryNext;
 
@@ -85,23 +111,54 @@ protected:
 
 struct ReportingCase
 {
+    virtual ~ReportingCase() = default;
+
     void AssignParent(FCase p);
 
     virtual operator PCase() = 0;
     const BaseCase *GetAnyParent() const;
 
+    virtual __uint128_t Hash() { return operator PCase()->Hash; };
+    virtual double TotalStates() { return operator PCase()->TotalStates; };
+
+    void Dismiss()
+    {
+        if (!Dismissed.test_and_set(std::memory_order_acquire)) {
+            operator PCase()->Deplete();
+        }
+    }
+
+    [[nodiscard]] operator bool()
+    {
+        return Dismissed.test(std::memory_order_relaxed);
+    }
+
 protected:
     mutable std::mutex ParentsMtx;
     std::set<ACase> AllParents;
+
+    std::atomic_flag Dismissed;
+};
+
+struct IgnorableCase : ReportingCase
+{
+    operator PCase() override { return nullptr; }
+    __uint128_t Hash() override { return m_Hash; };
+    double TotalStates() override { return 0; };
+
+    explicit IgnorableCase(__uint128_t h)
+        : m_Hash{ h }
+    {
+        Dismissed.test_and_set(std::memory_order_relaxed);
+    }
+private:
+    __uint128_t m_Hash;
 };
 
 struct ForkedCase : BaseCase
 {
     ForkedCase(PCase p, PGame g, int id)
-        : BaseCase{ p, g }, Id{ id }, m_Degree{}
-    {
-        LargestModifiedIndex = std::max(LargestModifiedIndex, Id);
-    }
+        : BaseCase{ p, g }, Id{ id }, m_Degree{} { }
 
     int Id;
 
@@ -169,7 +226,7 @@ struct ActionCase : ForkedCase
 
 struct SafeCase : ForkedCase, ReportingCase
 {
-    SafeCase(PCase p, PGame g, int lmi);
+    SafeCase(PCase p, PGame g);
 
     std::string ToString() const override;
 
@@ -182,7 +239,7 @@ struct SafeCase : ForkedCase, ReportingCase
 
 struct UnsafeCase : HolderCase, ReportingCase
 {
-    UnsafeCase(PCase p, PGame g, int lmi);
+    UnsafeCase(PCase p, PGame g);
 
     void ResolveParents();
 
@@ -205,6 +262,102 @@ private:
     BlockSet::iterator m_It;
     std::vector<ACase> m_CachedParents;
 };
+
+class HSPQ
+{
+    const size_t m_MaxOccupied, m_ArraySize;
+    // Assuming no hash collision!
+    std::atomic<RCase> *m_Array;
+
+    struct Comparer
+    {
+        bool operator()(RCase lhs, RCase rhs) const
+        {
+            return lhs->operator PCase()->TotalStates
+                > rhs->operator PCase()->TotalStates;
+        }
+    };
+
+    std::mutex m_Mtx;
+    size_t m_Occupied;
+    double m_Threshold;
+    std::vector<RCase> m_Queue;
+
+public:
+    // it must holds that mo < as
+    HSPQ(size_t mo, size_t as)
+        : m_MaxOccupied{ mo }, m_ArraySize{ as },
+          m_Array{ new std::atomic<RCase>[as] },
+          m_Occupied{}, m_Threshold{ -1.0 } { }
+    ~HSPQ() { if (m_Array) delete [] m_Array; }
+
+    [[nodiscard]] RCase Find(__uint128_t hash)
+    {
+        auto h0 = hash % m_ArraySize;
+        for (auto h = h0; ; h++)
+        {
+            if (h == m_ArraySize) h = 0u;
+            auto v = m_Array[h].load(std::memory_order_acquire);
+            if (!v)
+                return nullptr;
+            if (hash == v->Hash())
+                return v;
+        }
+    }
+
+    // obj could be: SafeCase, UnsafeCase, or IgnorableCase
+    bool Emplace(RCase obj)
+    {
+        if (obj->TotalStates() <= m_Threshold) return false;
+        {
+            std::lock_guard lock{ m_Mtx };
+            if (m_Occupied >= m_MaxOccupied)
+            {
+                auto p = m_Queue.front();
+                std::pop_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+                m_Threshold = p->TotalStates();
+                p->Dismiss();
+                m_Queue.back() = obj;
+                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+            }
+            else
+            {
+                m_Occupied++;
+                m_Queue.push_back(obj);
+                std::push_heap(m_Queue.begin(), m_Queue.end(), Comparer{});
+            }
+        }
+        auto hash = obj->Hash();
+        auto h0 = hash % m_ArraySize;
+        for (auto h = h0; ; h++) {
+            if (h == m_ArraySize) h = 0u;
+            auto v = m_Array[h].load(std::memory_order_acquire);
+        again:
+            if (v && v->Hash() == hash)
+                return false;
+            if (!v)
+            {
+                if (m_Array[h].compare_exchange_weak(v, obj,
+                            std::memory_order_acq_rel,
+                            std::memory_order_acquire))
+                    return true;
+                goto again;
+            }
+        }
+    }
+
+    // the below are not thread-safe
+    void Clear() {
+        std::memset(m_Array, 0, m_ArraySize * sizeof(m_Array[0]));
+        m_Threshold = -1.0;
+        m_Queue = {};
+    }
+
+    [[nodiscard]] auto begin() const { return m_Queue.begin(); }
+    [[nodiscard]] auto end() const { return m_Queue.end(); }
+};
+
+extern HSPQ g_Trie;
 
 template <typename T>
     requires std::derived_from<T, BaseCase>

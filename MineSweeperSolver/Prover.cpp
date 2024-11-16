@@ -22,7 +22,6 @@
 static constexpr auto GiB = 1.0 / 1024 / 1024 / 1024;
 
 Strategy g_Strategy;
-RCase g_InvalidCase;
 static constexpr auto HEUR = SolvingState::Reduce | SolvingState::Overlap | SolvingState::Probability | SolvingState::Heuristic;
 
 std::atomic<double> g_MemoryAvailPercent;
@@ -38,11 +37,20 @@ void updateMemoryAvailPercent()
     g_MemoryAvailPercent.store(100.0 * avail / total);
 }
 
+std::vector<__uint128_t> HashCache::cache{ 1u };
+void HashCache::ensure(size_t sz) {
+    while (cache.size() < sz)
+        cache.push_back(cache.back() * Base % Modulo);
+}
+void HashCache::set(__uint128_t &v, int id, unsigned n) {
+    v = (cache[id] * n + v) % Modulo;
+}
+
 BaseCase::BaseCase(PCase p)
     : TotalStates{ p->TotalStates },
       Depth{ p->Depth },
       Step{ p->Step },
-      LargestModifiedIndex{ p->LargestModifiedIndex },
+      Hash{ p->Hash },
       RegistryNext{},
       m_Game{ p->m_Game } { }
 
@@ -50,7 +58,7 @@ BaseCase::BaseCase(PCase p, PGame game)
     : TotalStates{ game->GetSolver().GetTotalStates() },
       Depth{ p ? p->Depth : 0u },
       Step{ p ? p->Step : 0u },
-      LargestModifiedIndex{ p ? p->LargestModifiedIndex : 0 },
+      Hash{ p ? p->Hash : 0ull },
       RegistryNext{},
       m_Game{ std::move(game) } { }
 
@@ -133,40 +141,36 @@ RCase ForkedCase::Fork()
         if (m_Degree < lb)
             continue;
 
-        auto node = g_Trie.find(this, m_Degree);
-        RCase c;
-        if ((c = node->p.load(std::memory_order_acquire)))
-            goto child;
+        auto next_hash = Hash;
+        HashCache::set(next_hash, Id, m_Degree);
 
+        auto c = g_Trie.Find(next_hash);
+        if (!c)
         {
-            std::lock_guard lock{ node->mtx };
-            if ((c = node->p.load(std::memory_order_relaxed)))
-                goto child;
-
             auto g = std::make_shared<GameMgr>(Game());
             g->SetBlockDegree(Id, m_Degree);
             g->Solve(HEUR, false);
             if (!g->GetStarted() // infeasible
                     || g->GetSolver().GetTotalStates() == 1) // guaranteed win
             {
-                node->p.store(g_InvalidCase, std::memory_order_relaxed);
+                g_Trie.Emplace(new IgnorableCase(next_hash));
                 continue;
             }
 
             if (g->GetBestBlockCount())
-                c = new SafeCase(this, g, LargestModifiedIndex);
+                c = new SafeCase(this, g);
             else
-                c = new UnsafeCase(this, g, LargestModifiedIndex);
+                c = new UnsafeCase(this, g);
+            c->operator PCase()->Hash = next_hash;
             c->AssignParent(this);
 #ifdef TRACEBACK
             c->operator PCase()->Traceback = Traceback + fmt::format("[{}]={}", Id, m_Degree);
 #endif
-            node->p.store(c, std::memory_order_release);
+            g_Trie.Emplace(c);
             m_Degree++;
             return c;
         }
-child:
-        if (c == g_InvalidCase)
+        if (c->TotalStates() == 0)
             continue;
         c->AssignParent(this);
         // note that we shouldn't report c to main queue
@@ -208,20 +212,18 @@ RCase ActionCase::Fork()
     return ForkedCase::Fork();
 }
 
-SafeCase::SafeCase(PCase p, PGame g, int lmi)
+SafeCase::SafeCase(PCase p, PGame g)
     : ForkedCase{ p, g, g->GetBestBlockList().front() }
 {
     ++Depth;
-    LargestModifiedIndex = std::max(LargestModifiedIndex, lmi);
 }
 
-UnsafeCase::UnsafeCase(PCase p, PGame g, int lmi)
-    : HolderCase{ p, g, g->GetMinProbability() * TotalStates },
+UnsafeCase::UnsafeCase(PCase p, PGame g)
+    : HolderCase{ p, g, g->GetMinProbability() * BaseCase::TotalStates },
       m_List{ std::move(const_cast<BlockSet &>(Game().GetPreferredBlockList())) },
       m_It{ m_List.begin() }
 {
     ++Depth;
-    LargestModifiedIndex = lmi;
 }
 
 void UnsafeCase::ResolveParents()
@@ -283,15 +285,13 @@ void HolderCase::ResolveDanger()
 std::string BaseCase::ToString() const
 {
     if (!std::holds_alternative<PGame>(m_Game))
-        return fmt::format("[d{}s{}i{} TS{}]",
+        return fmt::format("[d{}s{} TS{}]",
                 Depth,
                 Step,
-                LargestModifiedIndex,
                 TotalStates);
-    return fmt::format("[d{}s{}i{} G={} TS{}]",
+    return fmt::format("[d{}s{} G={} TS{}]",
             Depth,
             Step,
-            LargestModifiedIndex,
             fmt::ptr(std::get<PGame>(m_Game).get()),
             TotalStates);
 }
